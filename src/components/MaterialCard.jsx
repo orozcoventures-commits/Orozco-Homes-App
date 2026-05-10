@@ -99,8 +99,8 @@ export default function MaterialCard({ material, category }) {
           background: fallbackBg,
         }}
       >
-        {/* Skeleton shimmer shown until image loads */}
-        {!imgLoaded && !imgError && (
+        {/* Skeleton shimmer shown while a real image is loading */}
+        {material.imageURL && !imgLoaded && !imgError && (
           <div
             className="absolute inset-0 animate-pulse"
             style={{ background: fallbackBg }}
@@ -108,9 +108,9 @@ export default function MaterialCard({ material, category }) {
         )}
 
         {/* Actual product image */}
-        {!imgError && material.imageUrl && (
+        {!imgError && material.imageURL && (
           <img
-            src={material.imageUrl}
+            src={material.imageURL}
             alt={material.name}
             loading="lazy"
             onLoad={() => setImgLoaded(true)}
@@ -124,10 +124,27 @@ export default function MaterialCard({ material, category }) {
           />
         )}
 
-        {/* Fallback icon shown if image fails */}
-        {imgError && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-5xl opacity-20 select-none">🏠</span>
+        {/* Professional "No Image Available" box shown when imageURL is empty or fails */}
+        {(imgError || !material.imageURL) && (
+          <div
+            className="absolute inset-0 flex flex-col items-center justify-center gap-2"
+            style={{ background: fallbackBg }}
+          >
+            <svg
+              width="36" height="36" viewBox="0 0 24 24" fill="none"
+              stroke="#002147" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"
+              style={{ opacity: 0.25 }}
+            >
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <circle cx="8.5" cy="8.5" r="1.5" />
+              <polyline points="21 15 16 10 5 21" />
+            </svg>
+            <span
+              className="text-xs font-semibold tracking-wide uppercase"
+              style={{ color: '#002147', opacity: 0.3, letterSpacing: '0.08em' }}
+            >
+              No Image Available
+            </span>
           </div>
         )}
 
