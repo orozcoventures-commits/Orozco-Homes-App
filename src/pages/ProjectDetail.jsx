@@ -16,62 +16,107 @@ export default function ProjectDetail() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Breadcrumb & header */}
-      <div className="mb-6">
-        <button
-          onClick={() => dispatch({ type: 'SET_PROJECT', project: null })}
-          className="text-sm text-gray-400 hover:text-amber-700 flex items-center gap-1 mb-4"
-        >
-          ← All Projects
-        </button>
-        <div className="flex flex-wrap items-start justify-between gap-4">
+
+      {/* Breadcrumb */}
+      <button
+        onClick={() => dispatch({ type: 'SET_PROJECT', project: null })}
+        className="flex items-center gap-1.5 text-xs font-semibold tracking-wide uppercase mb-6 transition-colors duration-150"
+        style={{ color: '#9CA3AF' }}
+        onMouseEnter={(e) => { e.currentTarget.style.color = '#D4AF37'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.color = '#9CA3AF'; }}
+      >
+        ← All Projects
+      </button>
+
+      {/* Page header */}
+      <div className="flex flex-wrap items-start justify-between gap-4 mb-8">
+        <div className="flex items-center gap-4">
+          <div
+            className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl shadow-md flex-shrink-0"
+            style={{ backgroundColor: 'rgba(0,33,71,0.07)' }}
+          >
+            {activeProject.icon}
+          </div>
           <div>
-            <div className="flex items-center gap-3">
-              <span className="text-4xl">{activeProject.icon}</span>
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">{activeProject.label}</h2>
-                <p className="text-gray-500 text-sm">{activeProject.description}</p>
-              </div>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setView('materials')}
-              className={`px-5 py-2 rounded-lg text-sm font-medium border transition-all
-                ${view === 'materials' ? 'bg-amber-700 text-white border-amber-700' : 'bg-white text-gray-600 border-gray-200 hover:border-amber-400'}`}
+            <h2
+              className="font-bold mb-0.5 tracking-wide"
+              style={{ color: '#002147', fontSize: '1.4rem', letterSpacing: '0.02em' }}
             >
-              Materials
-            </button>
-            <button
-              onClick={() => setView('summary')}
-              className={`px-5 py-2 rounded-lg text-sm font-medium border transition-all relative
-                ${view === 'summary' ? 'bg-amber-700 text-white border-amber-700' : 'bg-white text-gray-600 border-gray-200 hover:border-amber-400'}`}
-            >
-              My List
-              {selectionCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
-                  {selectionCount}
-                </span>
-              )}
-            </button>
+              {activeProject.label}
+            </h2>
+            <p className="text-sm" style={{ color: '#4A4A4A' }}>{activeProject.description}</p>
           </div>
+        </div>
+
+        {/* Materials / My List toggle */}
+        <div
+          className="flex rounded-xl overflow-hidden"
+          style={{ border: '1.5px solid #E8E6E1', backgroundColor: '#F9F8F6' }}
+        >
+          {['materials', 'summary'].map((v) => {
+            const active = view === v;
+            const label = v === 'materials' ? 'Materials' : 'My List';
+            return (
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                className="relative px-5 py-2 text-sm font-semibold transition-all duration-150"
+                style={
+                  active
+                    ? { backgroundColor: '#002147', color: '#fff' }
+                    : { backgroundColor: 'transparent', color: '#4A4A4A' }
+                }
+              >
+                {label}
+                {v === 'summary' && selectionCount > 0 && (
+                  <span
+                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold"
+                    style={{ backgroundColor: '#D4AF37', color: '#002147' }}
+                  >
+                    {selectionCount}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 
       {/* Info strip */}
-      <div className="flex flex-wrap gap-3 mb-8">
-        <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
-          <span className="text-amber-700 font-semibold text-sm">Typical size:</span>
-          <span className="text-sm text-gray-700">{activeProject.sqftRange[0]}–{activeProject.sqftRange[1]} sq ft</span>
+      <div className="flex flex-wrap gap-2 mb-8">
+        <div
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium"
+          style={{
+            backgroundColor: 'rgba(0,33,71,0.05)',
+            border: '1.5px solid rgba(0,33,71,0.12)',
+            color: '#002147',
+          }}
+        >
+          <span style={{ color: '#D4AF37' }}>◈</span>
+          <span className="font-semibold">Typical size:</span>
+          <span style={{ color: '#4A4A4A' }}>
+            {activeProject.sqftRange[0]}–{activeProject.sqftRange[1]} sq ft
+          </span>
         </div>
         <div className="flex flex-wrap gap-2">
           {activeProject.materialCategories.map((cat) => (
-            <span key={cat} className="bg-gray-100 text-gray-600 text-xs px-3 py-1.5 rounded-full border border-gray-200">
+            <span
+              key={cat}
+              className="text-xs px-3 py-1.5 rounded-full font-medium"
+              style={{
+                backgroundColor: '#F0EEE9',
+                color: '#4A4A4A',
+                border: '1px solid #E8E6E1',
+              }}
+            >
               {MATERIAL_CATEGORY_LABELS[cat] ?? cat}
             </span>
           ))}
         </div>
       </div>
+
+      {/* Gold divider */}
+      <div className="h-px mb-8" style={{ backgroundColor: 'rgba(212,175,55,0.3)' }} />
 
       {view === 'materials' ? (
         <MaterialSection categories={activeProject.materialCategories} />

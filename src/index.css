@@ -1,15 +1,25 @@
 @import "tailwindcss";
 
+:root {
+  --navy: #002147;
+  --navy-light: #002f63;
+  --gold: #D4AF37;
+  --gold-light: #e8cc6a;
+  --charcoal: #4A4A4A;
+  --bg: #f5f4f0;
+}
+
 * {
   box-sizing: border-box;
 }
 
 body {
   margin: 0;
-  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
-  background: #f8f7f5;
-  color: #1a1a1a;
+  font-family: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--charcoal);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 #root {

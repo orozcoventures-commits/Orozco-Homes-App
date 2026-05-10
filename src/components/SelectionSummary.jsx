@@ -1,12 +1,16 @@
 import { useProject } from '../context/ProjectContext';
 import { MATERIAL_CATEGORY_LABELS } from '../data/projectTypes';
-import { SUPPLIERS } from '../data/materials';
-import SupplierBadge from './SupplierBadge';
 
 const STATUS_CONFIG = {
-  Considering: { bg: 'bg-yellow-50', text: 'text-yellow-800', border: 'border-yellow-200', dot: 'bg-yellow-400' },
-  Selected: { bg: 'bg-green-50', text: 'text-green-800', border: 'border-green-200', dot: 'bg-green-500' },
-  Ordered: { bg: 'bg-blue-50', text: 'text-blue-800', border: 'border-blue-200', dot: 'bg-blue-500' },
+  Considering: {
+    bg: '#FFFBEB', text: '#92400E', border: '#FCD34D', dot: '#F59E0B',
+  },
+  Selected: {
+    bg: '#ECFDF5', text: '#065F46', border: '#6EE7B7', dot: '#10B981',
+  },
+  Ordered: {
+    bg: '#EFF6FF', text: '#1E40AF', border: '#93C5FD', dot: '#3B82F6',
+  },
 };
 
 export default function SelectionSummary() {
@@ -15,10 +19,17 @@ export default function SelectionSummary() {
 
   if (entries.length === 0) {
     return (
-      <div className="text-center py-20">
-        <p className="text-5xl mb-4">📋</p>
-        <h3 className="text-xl font-semibold text-gray-700 mb-2">No materials selected yet</h3>
-        <p className="text-gray-400 text-sm">
+      <div className="text-center py-24">
+        <div
+          className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-5 shadow-sm"
+          style={{ backgroundColor: 'rgba(0,33,71,0.06)' }}
+        >
+          📋
+        </div>
+        <h3 className="font-semibold text-lg mb-2" style={{ color: '#002147' }}>
+          No materials selected yet
+        </h3>
+        <p className="text-sm" style={{ color: '#4A4A4A' }}>
           Go to <strong>Materials</strong> and mark items as Considering, Selected, or Ordered.
         </p>
       </div>
@@ -43,38 +54,59 @@ export default function SelectionSummary() {
         if (!items) return null;
         const cfg = STATUS_CONFIG[status];
         const subtotal = items.reduce((s, i) => s + i.price, 0);
+
         return (
           <div key={status} className="mb-8">
+            {/* Status group header */}
             <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <span className={`w-2.5 h-2.5 rounded-full ${cfg.dot}`} />
-                <h3 className="font-semibold text-gray-800">{status}</h3>
-                <span className="text-sm text-gray-400">({items.length} item{items.length !== 1 ? 's' : ''})</span>
+              <div className="flex items-center gap-2.5">
+                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: cfg.dot }} />
+                <h3 className="font-bold tracking-wide text-sm" style={{ color: '#002147' }}>
+                  {status}
+                </h3>
+                <span className="text-xs" style={{ color: '#9CA3AF' }}>
+                  ({items.length} item{items.length !== 1 ? 's' : ''})
+                </span>
               </div>
-              <span className={`text-sm font-bold px-3 py-1 rounded-full border ${cfg.bg} ${cfg.text} ${cfg.border}`}>
-                Subtotal: ${subtotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              <span
+                className="text-xs font-bold px-3 py-1 rounded-full"
+                style={{ backgroundColor: cfg.bg, color: cfg.text, border: `1px solid ${cfg.border}` }}
+              >
+                ${subtotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
               </span>
             </div>
 
+            {/* Item rows */}
             <div className="space-y-2">
               {items.map((item) => (
                 <div
                   key={item.id}
-                  className={`flex items-center justify-between px-4 py-3 rounded-xl border ${cfg.border} ${cfg.bg}`}
+                  className="flex items-center justify-between px-5 py-3.5 rounded-xl"
+                  style={{
+                    backgroundColor: cfg.bg,
+                    border: `1px solid ${cfg.border}`,
+                  }}
                 >
                   <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-medium ${cfg.text} truncate`}>{item.name}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">
+                    <p className="text-sm font-semibold truncate" style={{ color: cfg.text }}>
+                      {item.name}
+                    </p>
+                    <p className="text-xs mt-0.5" style={{ color: '#9CA3AF' }}>
                       {MATERIAL_CATEGORY_LABELS[item.category] ?? item.category}
                     </p>
                   </div>
-                  <div className="flex items-center gap-4 ml-4 shrink-0">
-                    <span className={`text-sm font-bold ${cfg.text}`}>
+                  <div className="flex items-center gap-5 ml-4 shrink-0">
+                    <span className="text-sm font-bold" style={{ color: cfg.text }}>
                       ${item.price.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </span>
                     <button
-                      onClick={() => dispatch({ type: 'SET_MATERIAL_STATUS', materialId: item.id, status: item.status })}
-                      className="text-gray-300 hover:text-red-400 transition-colors text-lg leading-none"
+                      onClick={() =>
+                        dispatch({ type: 'SET_MATERIAL_STATUS', materialId: item.id, status: item.status })
+                      }
+                      className="text-lg leading-none transition-colors duration-150"
+                      style={{ color: 'rgba(0,0,0,0.2)' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.color = '#EF4444'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(0,0,0,0.2)'; }}
                       title="Remove"
                     >
                       ×
@@ -87,23 +119,29 @@ export default function SelectionSummary() {
         );
       })}
 
-      {/* Totals */}
-      <div className="mt-8 border-t border-gray-200 pt-6 space-y-3">
-        <div className="flex justify-between text-sm text-gray-500">
+      {/* Totals block */}
+      <div
+        className="mt-8 pt-6 space-y-4 rounded-2xl p-6"
+        style={{ border: '1.5px solid #E8E6E1', backgroundColor: '#fff' }}
+      >
+        <div className="flex justify-between text-sm" style={{ color: '#4A4A4A' }}>
           <span>Total tracked ({entries.length} items)</span>
-          <span className="font-semibold text-gray-900">
+          <span className="font-bold" style={{ color: '#002147' }}>
             ${total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
           </span>
         </div>
-        <div className="flex justify-between text-base font-bold">
-          <span className="text-gray-700">Committed budget (Selected + Ordered)</span>
-          <span className="text-green-700">
+        <div
+          className="flex justify-between text-base font-bold pt-3"
+          style={{ borderTop: '1px solid #E8E6E1' }}
+        >
+          <span style={{ color: '#002147' }}>Committed budget</span>
+          <span style={{ color: '#D4AF37', fontSize: '1.2rem' }}>
             ${committedTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
           </span>
         </div>
-        <p className="text-xs text-gray-400">
-          * Prices are per-unit estimates (per sq ft, each, per linear ft). Final totals depend on quantity.
-          A full estimate will be provided by Orozco Homes during consultation.
+        <p className="text-xs" style={{ color: '#9CA3AF' }}>
+          * Per-unit estimates only. Final project cost depends on quantities and labor.
+          A detailed estimate will be provided during your Orozco Homes consultation.
         </p>
       </div>
     </div>
