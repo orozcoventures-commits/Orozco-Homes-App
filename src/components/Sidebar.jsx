@@ -135,10 +135,9 @@ const CONTRACTOR_TOOLS = [
 
 export default function Sidebar({ isOpen, onClose }) {
   const { state, dispatch } = useProject();
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, profile, isAdmin, isAuthenticated, logout } = useAuth();
   const active = state.activeProject;
   const activePage = state.activePage;
-  const isAdmin = user?.role === 'admin';
 
   // Tools visible to clients: only Weekly Updates + Messages
   // Tools visible to unauthenticated: everything except Weekly Updates
