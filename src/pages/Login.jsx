@@ -149,11 +149,17 @@ function SignInForm() {
 // ── Create account form (also handles first-admin bootstrap) ──────────────────
 function CreateAccountForm({ onSuccess }) {
   const { signup, login, claimFirstAdmin } = useAuth();
-  const [name, setName]         = useState('');
-  const [email, setEmail]       = useState('orozcoventures@gmail.com');
+
+  const params      = new URLSearchParams(window.location.search);
+  const inviteEmail = params.get('invite') || '';
+  const inviteName  = params.get('name')   || '';
+  const isInvite    = !!inviteEmail;
+
+  const [name, setName]         = useState(inviteName);
+  const [email, setEmail]       = useState(isInvite ? inviteEmail : 'orozcoventures@gmail.com');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm]   = useState('');
-  const [adminSetup, setAdminSetup] = useState(true);
+  const [adminSetup, setAdminSetup] = useState(!isInvite);
   const [error, setError]       = useState('');
   const [loading, setLoading]   = useState(false);
   const [done, setDone]         = useState(false);
@@ -216,6 +222,21 @@ function CreateAccountForm({ onSuccess }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+      {/* Invite banner */}
+      {isInvite && (
+        <div
+          className="flex items-start gap-2.5 px-4 py-3 rounded-xl text-sm"
+          style={{ backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', color: '#92400E' }}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-0.5">
+            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.99 12 19.79 19.79 0 0 1 1.93 3.35 2 2 0 0 1 3.91 1h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 8a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 14.92z" />
+          </svg>
+          <span>
+            You've been invited by <strong>Orozco Homes</strong>. Create your account below to access your project portal.
+          </span>
+        </div>
+      )}
+
       {/* Full name */}
       <div>
         <label className="block text-xs font-bold mb-2" style={{ color: '#374151' }}>Full name</label>
@@ -266,8 +287,8 @@ function CreateAccountForm({ onSuccess }) {
         autoComplete="new-password"
       />
 
-      {/* First-admin toggle */}
-      <label className="flex items-start gap-3 cursor-pointer select-none">
+      {/* First-admin toggle — hidden for client invites */}
+      {!isInvite && <label className="flex items-start gap-3 cursor-pointer select-none">
         <div className="relative mt-0.5 shrink-0">
           <input
             type="checkbox"
@@ -295,14 +316,14 @@ function CreateAccountForm({ onSuccess }) {
             Only works if no admin exists yet. Grants full access to all client projects and tools.
           </p>
         </div>
-      </label>
+      </label>}
 
       <ErrorBanner message={error} />
 
       <SubmitButton
         loading={loading}
         disabled={!name.trim() || !email.trim() || !password || !confirm}
-        label={adminSetup ? 'Create Admin Account' : 'Create Account'}
+        label={!isInvite && adminSetup ? 'Create Admin Account' : 'Create Account'}
         loadingLabel="Creating account…"
       />
     </form>
@@ -311,7 +332,8 @@ function CreateAccountForm({ onSuccess }) {
 
 // ── Main Login page ───────────────────────────────────────────────────────────
 export default function Login() {
-  const [tab, setTab] = useState('signin');
+  const hasInvite = !!new URLSearchParams(window.location.search).get('invite');
+  const [tab, setTab] = useState(hasInvite ? 'signup' : 'signin');
 
   const tabStyle = (active) => ({
     flex: 1,

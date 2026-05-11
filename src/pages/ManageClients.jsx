@@ -1,0 +1,322 @@
+import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../context/AuthContext';
+
+function getInitials(name) {
+  if (!name) return '?';
+  return name.trim().split(/\s+/).map((w) => w[0]).join('').toUpperCase().slice(0, 2);
+}
+
+const AVATAR_COLORS = ['#1B4F6B', '#2D7DA0', '#374151', '#3B2F1E', '#1E3A5F', '#1A3A2A'];
+function avatarColor(id) {
+  let h = 0;
+  for (let i = 0; i < (id || '').length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return AVATAR_COLORS[h % AVATAR_COLORS.length];
+}
+
+const inputStyle = {
+  border: '1.5px solid #E8E6E1',
+  color: '#002147',
+  backgroundColor: '#fff',
+};
+
+function Field({ label, required, children }) {
+  return (
+    <div>
+      <label className="block text-xs font-bold mb-2" style={{ color: '#374151' }}>
+        {label}{required && <span style={{ color: '#EF4444' }}> *</span>}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+function StyledInput({ value, onChange, placeholder, type = 'text', autoComplete }) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <input
+      type={type}
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      autoComplete={autoComplete}
+      className="w-full text-sm rounded-xl px-4 py-3 focus:outline-none transition-colors duration-150"
+      style={{ ...inputStyle, borderColor: focused ? '#D4AF37' : '#E8E6E1' }}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+    />
+  );
+}
+
+function AddClientForm({ onAdded }) {
+  const { user } = useAuth();
+  const [name, setName]   = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError]   = useState('');
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!name.trim() || !email.trim()) return;
+    setError('');
+    setSaving(true);
+    const { data, error: insertError } = await supabase
+      .from('clients')
+      .insert({ full_name: name.trim(), email: email.trim().toLowerCase(), phone: phone.trim() || null, created_by: user?.id })
+      .select()
+      .single();
+    setSaving(false);
+    if (insertError) { setError(insertError.message); return; }
+    setName(''); setEmail(''); setPhone('');
+    onAdded(data);
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4 p-6" noValidate>
+      <div className="grid sm:grid-cols-2 gap-4">
+        <Field label="Full Name" required>
+          <StyledInput value={name} onChange={(e) => setName(e.target.value)} placeholder="Maria Johnson" autoComplete="name" />
+        </Field>
+        <Field label="Email Address" required>
+          <StyledInput type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="maria@example.com" autoComplete="email" />
+        </Field>
+      </div>
+      <Field label="Phone Number">
+        <StyledInput type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 000-0000" autoComplete="tel" />
+      </Field>
+
+      {error && (
+        <div className="flex items-start gap-2.5 px-4 py-3 rounded-xl text-sm" style={{ backgroundColor: '#FEF2F2', border: '1px solid #FECACA', color: '#991B1B' }}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-0.5">
+            <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          {error}
+        </div>
+      )}
+
+      <div className="flex justify-end pt-1">
+        <button
+          type="submit"
+          disabled={saving || !name.trim() || !email.trim()}
+          className="px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-150 focus:outline-none flex items-center gap-2"
+          style={{
+            backgroundColor: saving || !name.trim() || !email.trim() ? '#E5E3DF' : '#002147',
+            color: saving || !name.trim() || !email.trim() ? '#9CA3AF' : '#D4AF37',
+            cursor: saving || !name.trim() || !email.trim() ? 'not-allowed' : 'pointer',
+          }}
+          onMouseEnter={(e) => { if (!saving && name.trim() && email.trim()) e.currentTarget.style.backgroundColor = '#003166'; }}
+          onMouseLeave={(e) => { if (!saving && name.trim() && email.trim()) e.currentTarget.style.backgroundColor = '#002147'; }}
+        >
+          {saving ? (
+            <>
+              <svg className="animate-spin" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <circle cx="12" cy="12" r="10" strokeOpacity="0.25" /><path d="M12 2a10 10 0 0 1 10 10" />
+              </svg>
+              Saving…
+            </>
+          ) : 'Add Client'}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function CopyButton({ text }) {
+  const [copied, setCopied] = useState(false);
+  function handleCopy() {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+  return (
+    <button
+      onClick={handleCopy}
+      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 focus:outline-none shrink-0"
+      style={{
+        backgroundColor: copied ? '#ECFDF5' : '#F5F4F0',
+        color: copied ? '#059669' : '#374151',
+        border: `1px solid ${copied ? '#A7F3D0' : '#E8E6E1'}`,
+      }}
+      title="Copy invite link"
+    >
+      {copied ? (
+        <>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          Copied!
+        </>
+      ) : (
+        <>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+          </svg>
+          Copy Invite Link
+        </>
+      )}
+    </button>
+  );
+}
+
+function ClientRow({ client }) {
+  const inviteUrl = `${window.location.origin}?invite=${encodeURIComponent(client.email)}&name=${encodeURIComponent(client.full_name)}`;
+  return (
+    <div
+      className="flex items-center gap-4 px-5 py-4"
+      style={{ borderBottom: '1px solid #F3F2EE' }}
+    >
+      <div
+        className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white shrink-0"
+        style={{ backgroundColor: avatarColor(client.id), fontSize: '0.75rem' }}
+      >
+        {getInitials(client.full_name)}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold truncate" style={{ color: '#002147' }}>{client.full_name}</p>
+        <p className="text-xs truncate" style={{ color: '#6B7280' }}>{client.email}{client.phone ? ` · ${client.phone}` : ''}</p>
+      </div>
+      <CopyButton text={inviteUrl} />
+    </div>
+  );
+}
+
+export default function ManageClients() {
+  const { isAdmin } = useAuth();
+  const [clients, setClients]   = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [showForm, setShowForm] = useState(false);
+
+  const fetchClients = useCallback(async () => {
+    const { data } = await supabase
+      .from('clients')
+      .select('id, full_name, email, phone, created_at')
+      .order('created_at', { ascending: false });
+    setClients(data ?? []);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchClients(); }, [fetchClients]);
+
+  if (!isAdmin) {
+    return (
+      <div className="max-w-lg mx-auto px-6 py-20 text-center">
+        <p className="text-sm font-semibold" style={{ color: '#DC2626' }}>Access denied. Admin only.</p>
+      </div>
+    );
+  }
+
+  function handleAdded(newClient) {
+    setClients((prev) => [newClient, ...prev]);
+    setShowForm(false);
+  }
+
+  return (
+    <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+
+      {/* Header */}
+      <div className="flex items-start justify-between mb-8 gap-4">
+        <div>
+          <p className="text-xs font-bold tracking-[0.18em] uppercase mb-1" style={{ color: '#D4AF37' }}>Admin Tool</p>
+          <h2 className="text-2xl font-bold" style={{ color: '#002147' }}>Manage Clients</h2>
+          <p className="text-sm mt-1" style={{ color: '#6B7280' }}>
+            Add clients and share their invite link so they can create their account.
+          </p>
+        </div>
+        <button
+          onClick={() => setShowForm((v) => !v)}
+          className="shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all duration-150 focus:outline-none"
+          style={{ backgroundColor: showForm ? '#F5F4F0' : '#002147', color: showForm ? '#002147' : '#D4AF37' }}
+          onMouseEnter={(e) => { if (!showForm) e.currentTarget.style.backgroundColor = '#003166'; }}
+          onMouseLeave={(e) => { if (!showForm) e.currentTarget.style.backgroundColor = '#002147'; }}
+        >
+          {showForm ? (
+            <>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+              Cancel
+            </>
+          ) : (
+            <>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+              Add Client
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* Add client form */}
+      {showForm && (
+        <div
+          className="rounded-2xl mb-6"
+          style={{ backgroundColor: '#fff', border: '1.5px solid #D4AF37', boxShadow: '0 2px 12px rgba(0,33,71,0.06)' }}
+        >
+          <div className="px-6 pt-5 pb-1">
+            <p className="text-sm font-bold" style={{ color: '#002147' }}>New Client</p>
+            <p className="text-xs mt-0.5" style={{ color: '#9CA3AF' }}>
+              After saving, use the invite link to send them a signup URL.
+            </p>
+          </div>
+          <AddClientForm onAdded={handleAdded} />
+        </div>
+      )}
+
+      {/* Clients list */}
+      <div
+        className="rounded-2xl overflow-hidden"
+        style={{ backgroundColor: '#fff', border: '1.5px solid #E8E6E1', boxShadow: '0 2px 12px rgba(0,33,71,0.06)' }}
+      >
+        <div className="px-5 py-4" style={{ borderBottom: '1px solid #F3F2EE' }}>
+          <p className="text-sm font-bold" style={{ color: '#002147' }}>
+            All Clients
+            {!loading && (
+              <span className="ml-2 text-xs font-medium px-2 py-0.5 rounded-full" style={{ backgroundColor: '#F5F4F0', color: '#6B7280' }}>
+                {clients.length}
+              </span>
+            )}
+          </p>
+        </div>
+
+        {loading ? (
+          <div className="px-5 py-8 flex items-center justify-center gap-3">
+            <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" strokeWidth="2.5" strokeLinecap="round">
+              <circle cx="12" cy="12" r="10" strokeOpacity="0.2" /><path d="M12 2a10 10 0 0 1 10 10" />
+            </svg>
+            <span className="text-sm" style={{ color: '#9CA3AF' }}>Loading clients…</span>
+          </div>
+        ) : clients.length === 0 ? (
+          <div className="px-5 py-10 text-center">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: '#F5F4F0' }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
+                <line x1="23" y1="11" x2="17" y2="11" /><line x1="20" y1="8" x2="20" y2="14" />
+              </svg>
+            </div>
+            <p className="text-sm font-semibold mb-1" style={{ color: '#374151' }}>No clients yet</p>
+            <p className="text-xs" style={{ color: '#9CA3AF' }}>Click "Add Client" above to add your first client.</p>
+          </div>
+        ) : (
+          <div>
+            {clients.map((client) => (
+              <ClientRow key={client.id} client={client} />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Invite info box */}
+      {clients.length > 0 && (
+        <div
+          className="mt-4 flex items-start gap-3 px-4 py-3 rounded-xl text-xs"
+          style={{ backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', color: '#92400E' }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-0.5">
+            <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          Copy the invite link and send it to your client. When they open it and sign up, their account is automatically pre-filled with their name and email.
+        </div>
+      )}
+    </div>
+  );
+}

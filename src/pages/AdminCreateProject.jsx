@@ -95,9 +95,8 @@ export default function AdminCreateProject() {
   useEffect(() => {
     async function fetchClients() {
       const { data, error } = await supabase
-        .from('profiles')
+        .from('clients')
         .select('id, full_name')
-        .eq('role', 'client')
         .order('full_name');
       if (!error) setClients(data ?? []);
       setClientsLoading(false);
@@ -118,9 +117,9 @@ export default function AdminCreateProject() {
     const { data, error: insertError } = await supabase
       .from('projects')
       .insert({
-        client_id:    clientId,
-        label:        categoryLabel,
-        project_name: projectTitle.trim(),
+        managed_client_id: clientId,
+        label:             categoryLabel,
+        project_name:      projectTitle.trim(),
         category,
       })
       .select()
@@ -220,7 +219,7 @@ export default function AdminCreateProject() {
                 className="w-full text-sm rounded-xl px-4 py-3"
                 style={{ backgroundColor: '#FEF9E7', border: '1.5px solid #FDE68A', color: '#92400E' }}
               >
-                No client accounts found. Ask clients to sign up first, then return here.
+                No clients found. Go to <strong>Manage Clients</strong> to add your first client.
               </div>
             ) : (
               <StyledSelect value={clientId} onChange={(e) => setClientId(e.target.value)}>

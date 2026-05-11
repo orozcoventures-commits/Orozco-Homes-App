@@ -14,6 +14,7 @@ import Approvals from './pages/Approvals';
 import MessageCenter from './pages/MessageCenter';
 import WeeklyUpdates from './pages/WeeklyUpdates';
 import AdminCreateProject from './pages/AdminCreateProject';
+import ManageClients from './pages/ManageClients';
 import './index.css';
 
 // Shown when VITE_SUPABASE_* env vars are missing in Netlify
@@ -139,6 +140,7 @@ function AppContent() {
           {page === 'messages'       && <MessageCenter />}
           {page === 'weekly-updates'   && <WeeklyUpdates />}
           {page === 'create-project'   && <AdminCreateProject />}
+          {page === 'manage-clients'   && <ManageClients />}
         </main>
       </div>
     </div>
