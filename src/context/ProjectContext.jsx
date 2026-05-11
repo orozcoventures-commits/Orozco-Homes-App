@@ -3,8 +3,9 @@ import { createContext, useContext, useReducer } from 'react';
 const ProjectContext = createContext(null);
 
 const initialState = {
-  activeProject: null,
-  activePage: 'home', // 'home' | 'project' | 'client-portal' | 'photo-log' | 'approvals' | 'messages'
+  activeProject: null,    // PROJECT_TYPE (material catalog browsing)
+  activeDbProject: null,  // real Supabase projects row
+  activePage: 'home',
   selections: {},
 };
 
@@ -15,6 +16,12 @@ function reducer(state, action) {
         ...state,
         activeProject: action.project,
         activePage: action.project ? 'project' : 'home',
+      };
+    case 'SET_DB_PROJECT':
+      return {
+        ...state,
+        activeDbProject: action.project,
+        activePage: action.project ? 'client-portal' : 'home',
       };
     case 'SET_PAGE':
       return { ...state, activePage: action.page };

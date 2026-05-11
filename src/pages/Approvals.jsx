@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { useProject } from '../context/ProjectContext';
 
 const STATUS_CFG = {
   pending:  { bg: '#FFFBEB', text: '#92400E', border: '#FCD34D', dot: '#F59E0B', label: 'Pending Approval' },
@@ -156,6 +157,9 @@ function AddOrderForm({ projects, onAdded, onCancel }) {
 // ── Main Approvals page ───────────────────────────────────────────────────────
 export default function Approvals() {
   const { isAdmin, user, profile } = useAuth();
+  const { state } = useProject();
+  const activeDbProject = state.activeDbProject;
+
   const [orders,    setOrders]    = useState([]);
   const [projects,  setProjects]  = useState([]);
   const [loading,   setLoading]   = useState(true);
@@ -163,13 +167,19 @@ export default function Approvals() {
   const [showForm,  setShowForm]  = useState(false);
 
   const fetchOrders = useCallback(async () => {
-    const { data } = await supabase
+    let query = supabase
       .from('change_works')
       .select('*, project:projects(project_name)')
       .order('submitted_at', { ascending: false });
+
+    if (activeDbProject?.id) {
+      query = query.eq('project_id', activeDbProject.id);
+    }
+
+    const { data } = await query;
     setOrders(data ?? []);
     setLoading(false);
-  }, []);
+  }, [activeDbProject?.id]);
 
   useEffect(() => {
     fetchOrders();
@@ -223,7 +233,9 @@ export default function Approvals() {
         <div>
           <p className="text-xs font-bold tracking-[0.18em] uppercase mb-1" style={{ color: '#D4AF37' }}>Contractor Tool</p>
           <h2 className="text-2xl font-bold" style={{ color: '#002147' }}>Change Orders & Approvals</h2>
-          <p className="text-sm mt-1" style={{ color: '#6B7280' }}>Track material changes and get digital client approvals.</p>
+          <p className="text-sm mt-1" style={{ color: '#6B7280' }}>
+            {activeDbProject ? `Showing: ${activeDbProject.project_name}` : 'All projects — track material changes and get digital client approvals.'}
+          </p>
         </div>
         {isAdmin && (
           <button

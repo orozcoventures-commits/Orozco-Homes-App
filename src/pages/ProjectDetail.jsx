@@ -4,10 +4,12 @@ import MaterialSection from '../components/MaterialSection';
 import BudgetTracker from '../components/BudgetTracker';
 import SelectionSummary from '../components/SelectionSummary';
 import { MATERIAL_CATEGORY_LABELS } from '../data/projectTypes';
+import { useAuth } from '../context/AuthContext';
 
 export default function ProjectDetail() {
   const { state, dispatch } = useProject();
-  const { activeProject, selections } = state;
+  const { isAdmin } = useAuth();
+  const { activeProject, activeDbProject, selections } = state;
   const [view, setView] = useState('materials');
 
   if (!activeProject) return null;
@@ -114,6 +116,19 @@ export default function ProjectDetail() {
           ))}
         </div>
       </div>
+
+      {/* Active project context banner */}
+      {isAdmin && activeDbProject && (
+        <div
+          className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl mb-6 text-xs font-semibold"
+          style={{ backgroundColor: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.35)', color: '#92400E' }}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+          </svg>
+          Selecting materials for: <span className="font-bold ml-1" style={{ color: '#002147' }}>{activeDbProject.project_name}</span>
+        </div>
+      )}
 
       {/* Gold divider */}
       <div className="h-px mb-8" style={{ backgroundColor: 'rgba(212,175,55,0.3)' }} />
