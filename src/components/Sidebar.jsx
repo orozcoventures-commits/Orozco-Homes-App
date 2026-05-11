@@ -367,7 +367,7 @@ export default function Sidebar({ isOpen, onClose }) {
       </nav>
 
       {/* ── User info + logout ─────────────────────────── */}
-      {isAuthenticated && user && (
+      {isAuthenticated && user && profile && (
         <div
           className="px-4 py-3 shrink-0"
           style={{ borderTop: '1px solid rgba(255,255,255,0.12)' }}
@@ -377,10 +377,10 @@ export default function Sidebar({ isOpen, onClose }) {
               className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-white shrink-0"
               style={{ backgroundColor: getAvatarColour(user.id), fontSize: '0.72rem' }}
             >
-              {getInitials(profile?.full_name || user.email)}
+              {getInitials(profile.full_name || user.email)}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold text-white truncate">{profile?.full_name || user.email}</p>
+              <p className="text-xs font-bold text-white truncate">{profile.full_name || user.email}</p>
               <span
                 className="text-xs px-1.5 py-0.5 rounded font-semibold"
                 style={

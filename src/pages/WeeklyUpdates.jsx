@@ -544,13 +544,14 @@ function EditModal({ update, onSave, onClose }) {
 
 // ── Main page ──────────────────────────────────────────────────────────────
 export default function WeeklyUpdates() {
-  const { user, profile, isAdmin } = useAuth();
+  const { user, profile, isAdmin, loading } = useAuth();
   const [updates, setUpdates] = useState(INITIAL_UPDATES);
   const [editing, setEditing] = useState(null);
 
+  // Wait for auth/profile to finish loading before rendering
+  if (loading || !user) return null;
+
   // Admin sees all updates; clients see only rows matching their Supabase user id.
-  // With mock data clientIds won't match real UUIDs, so clients see the empty state
-  // until real Supabase rows (linked via projects.client_id) are fetched.
   const visibleUpdates = isAdmin
     ? updates
     : updates.filter((u) => u.clientId === user?.id);
