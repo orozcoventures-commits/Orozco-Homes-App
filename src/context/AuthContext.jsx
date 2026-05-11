@@ -50,6 +50,27 @@ export function AuthProvider({ children }) {
     if (error) throw error;
   }
 
+  async function signup(email, password, fullName) {
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { full_name: fullName } },
+    });
+    if (error) throw error;
+  }
+
+  // Promotes the current user to admin only if no admins exist yet (one-time bootstrap).
+  // Returns true if promotion succeeded, false if an admin already exists.
+  async function claimFirstAdmin() {
+    const { data, error } = await supabase.rpc('promote_to_first_admin');
+    if (error) throw error;
+    if (data) {
+      // Reload profile so isAdmin updates immediately
+      if (user) await loadProfile(user.id);
+    }
+    return data;
+  }
+
   async function logout() {
     await supabase.auth.signOut();
   }
@@ -58,7 +79,7 @@ export function AuthProvider({ children }) {
   const isAdmin         = profile?.role === 'admin';
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, isAuthenticated, isAdmin, login, logout }}>
+    <AuthContext.Provider value={{ user, profile, loading, isAuthenticated, isAdmin, login, signup, claimFirstAdmin, logout }}>
       {children}
     </AuthContext.Provider>
   );
