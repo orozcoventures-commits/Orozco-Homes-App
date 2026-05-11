@@ -1,86 +1,64 @@
-import { createContext, useContext, useReducer } from 'react';
-
-export const MOCK_USERS = [
-  {
-    id: 'admin-001',
-    name: 'Carlos Orozco',
-    email: 'carlos@orozcohomes.com',
-    role: 'admin',
-    initials: 'CO',
-    color: '#002147',
-    project: null,
-  },
-  {
-    id: 'client-sjohnson',
-    name: 'Sarah Johnson',
-    email: 'sarah.johnson@email.com',
-    role: 'client',
-    initials: 'SJ',
-    color: '#3B82F6',
-    project: 'Master Bath Remodel',
-  },
-  {
-    id: 'client-mrodriguez',
-    name: 'Maria Rodriguez',
-    email: 'maria.rodriguez@email.com',
-    role: 'client',
-    initials: 'MR',
-    color: '#7C3AED',
-    project: 'Full Kitchen Remodel',
-  },
-  {
-    id: 'client-dlee',
-    name: 'David Lee',
-    email: 'david.lee@email.com',
-    role: 'client',
-    initials: 'DL',
-    color: '#059669',
-    project: 'Master Suite Addition',
-  },
-  {
-    id: 'client-lnguyen',
-    name: 'Linh Nguyen',
-    email: 'linh.nguyen@email.com',
-    role: 'client',
-    initials: 'LN',
-    color: '#DC2626',
-    project: 'Front Entry Portico',
-  },
-  {
-    id: 'client-rpatel',
-    name: 'Raj Patel',
-    email: 'raj.patel@email.com',
-    role: 'client',
-    initials: 'RP',
-    color: '#D97706',
-    project: 'Garage ADU Conversion',
-  },
-];
+import { createContext, useContext, useEffect, useState } from 'react';
+import { supabase } from '../lib/supabase';
 
 const AuthContext = createContext(null);
 
-function reducer(state, action) {
-  switch (action.type) {
-    case 'LOGIN':  return { user: action.user, isAuthenticated: true };
-    case 'LOGOUT': return { user: null,        isAuthenticated: false };
-    default: return state;
-  }
-}
-
 export function AuthProvider({ children }) {
-  const [state, dispatch] = useReducer(reducer, { user: null, isAuthenticated: false });
+  const [user, setUser]       = useState(null);   // supabase auth user
+  const [profile, setProfile] = useState(null);   // { role, full_name } from profiles table
+  const [loading, setLoading] = useState(true);
 
-  function login(userId) {
-    const user = MOCK_USERS.find((u) => u.id === userId);
-    if (user) dispatch({ type: 'LOGIN', user });
+  useEffect(() => {
+    // Rehydrate session on mount (handles page refresh)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        loadProfile(session.user.id);
+      } else {
+        setLoading(false);
+      }
+    });
+
+    // Keep state in sync across tabs / token refreshes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          loadProfile(session.user.id);
+        } else {
+          setProfile(null);
+          setLoading(false);
+        }
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  async function loadProfile(userId) {
+    const { data } = await supabase
+      .from('profiles')
+      .select('role, full_name')
+      .eq('id', userId)
+      .single();
+    setProfile(data ?? null);
+    setLoading(false);
   }
 
-  function logout() {
-    dispatch({ type: 'LOGOUT' });
+  async function login(email, password) {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
   }
+
+  async function logout() {
+    await supabase.auth.signOut();
+  }
+
+  const isAuthenticated = !!user && !loading;
+  const isAdmin         = profile?.role === 'admin';
 
   return (
-    <AuthContext.Provider value={{ ...state, login, logout }}>
+    <AuthContext.Provider value={{ user, profile, loading, isAuthenticated, isAdmin, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

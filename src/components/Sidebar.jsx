@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { PROJECT_TYPES } from '../data/projectTypes';
 import { useProject } from '../context/ProjectContext';
 import { useAuth } from '../context/AuthContext';
+import { getInitials, getAvatarColour } from '../lib/utils';
 
 const SIDEBAR_COLOR = '#1B4F6B';
 
@@ -375,12 +376,12 @@ export default function Sidebar({ isOpen, onClose }) {
           <div className="flex items-center gap-3">
             <div
               className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-white shrink-0"
-              style={{ backgroundColor: user.color, fontSize: '0.72rem' }}
+              style={{ backgroundColor: getAvatarColour(user.id), fontSize: '0.72rem' }}
             >
-              {user.initials}
+              {getInitials(profile?.full_name || user.email)}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold text-white truncate">{user.name}</p>
+              <p className="text-xs font-bold text-white truncate">{profile?.full_name || user.email}</p>
               <span
                 className="text-xs px-1.5 py-0.5 rounded font-semibold"
                 style={

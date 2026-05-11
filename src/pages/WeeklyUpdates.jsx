@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { getAvatarColour } from '../lib/utils';
 
 const TODAY = new Date().toLocaleDateString('en-US', {
   weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
@@ -543,13 +544,13 @@ function EditModal({ update, onSave, onClose }) {
 
 // ── Main page ──────────────────────────────────────────────────────────────
 export default function WeeklyUpdates() {
-  const { user } = useAuth();
+  const { user, profile, isAdmin } = useAuth();
   const [updates, setUpdates] = useState(INITIAL_UPDATES);
   const [editing, setEditing] = useState(null);
 
-  const isAdmin = user?.role === 'admin';
-
-  // Clients only see their own update; admin sees all
+  // Admin sees all updates; clients see only rows matching their Supabase user id.
+  // With mock data clientIds won't match real UUIDs, so clients see the empty state
+  // until real Supabase rows (linked via projects.client_id) are fetched.
   const visibleUpdates = isAdmin
     ? updates
     : updates.filter((u) => u.clientId === user?.id);
@@ -583,10 +584,10 @@ export default function WeeklyUpdates() {
             style={
               isAdmin
                 ? { backgroundColor: '#002147', color: '#D4AF37' }
-                : { backgroundColor: user?.color + '18', color: user?.color, border: `1px solid ${user?.color}40` }
+                : { backgroundColor: getAvatarColour(user?.id) + '22', color: getAvatarColour(user?.id), border: `1px solid ${getAvatarColour(user?.id)}40` }
             }
           >
-            {isAdmin ? '🔑 Admin View — All Projects' : `👤 ${user?.name}`}
+            {isAdmin ? '🔑 Admin View — All Projects' : `👤 ${profile?.full_name || user?.email}`}
           </span>
         </div>
         <p className="text-sm mt-1" style={{ color: '#6B7280' }}>{TODAY}</p>
