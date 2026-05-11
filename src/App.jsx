@@ -13,6 +13,7 @@ import PhotoLog from './pages/PhotoLog';
 import Approvals from './pages/Approvals';
 import MessageCenter from './pages/MessageCenter';
 import WeeklyUpdates from './pages/WeeklyUpdates';
+import AdminCreateProject from './pages/AdminCreateProject';
 import './index.css';
 
 // Shown when VITE_SUPABASE_* env vars are missing in Netlify
@@ -136,7 +137,8 @@ function AppContent() {
           {page === 'photo-log'      && <PhotoLog />}
           {page === 'approvals'      && <Approvals />}
           {page === 'messages'       && <MessageCenter />}
-          {page === 'weekly-updates' && <WeeklyUpdates />}
+          {page === 'weekly-updates'   && <WeeklyUpdates />}
+          {page === 'create-project'   && <AdminCreateProject />}
         </main>
       </div>
     </div>

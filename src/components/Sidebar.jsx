@@ -76,6 +76,19 @@ const SECTIONS = [
 
 const CONTRACTOR_TOOLS = [
   {
+    label: 'Create New Project',
+    page: 'create-project',
+    adminOnly: true,
+    badge: null,
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10" />
+        <line x1="12" y1="8" x2="12" y2="16" />
+        <line x1="8" y1="12" x2="16" y2="12" />
+      </svg>
+    ),
+  },
+  {
     label: 'Weekly Updates',
     page: 'weekly-updates',
     badge: null,
@@ -139,15 +152,12 @@ export default function Sidebar({ isOpen, onClose }) {
   const active = state.activeProject;
   const activePage = state.activePage;
 
-  // Tools visible to clients: only Weekly Updates + Messages
-  // Tools visible to unauthenticated: everything except Weekly Updates
-  function toolVisible(page) {
-    // Weekly Updates is always in the menu; the route itself gates access
-    if (page === 'weekly-updates') return true;
+  function toolVisible(tool) {
+    if (tool.adminOnly) return isAdmin;
+    if (tool.page === 'weekly-updates') return true;
     if (!isAuthenticated) return true;
     if (isAdmin) return true;
-    // Clients only see Messages
-    return page === 'messages';
+    return tool.page === 'messages';
   }
 
   // Track which expandable items are open
@@ -228,7 +238,7 @@ export default function Sidebar({ isOpen, onClose }) {
             Contractor Tools
           </p>
           <div className="space-y-0.5">
-            {CONTRACTOR_TOOLS.filter((t) => toolVisible(t.page)).map((tool) => {
+            {CONTRACTOR_TOOLS.filter((t) => toolVisible(t)).map((tool) => {
               const isActive = activePage === tool.page;
               return (
                 <button
