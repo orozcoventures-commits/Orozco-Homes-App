@@ -112,7 +112,6 @@ function AppContent() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const page = state.activePage;
-  console.log('[App] rendering — loading:', loading, '| authenticated:', isAuthenticated, '| page:', page);
 
   if (loading) return <LoadingScreen />;
   if (!isAuthenticated) return <Login />;
@@ -132,15 +131,40 @@ function AppContent() {
         )}
 
         <main className={`flex-1 ${isMessages ? 'flex flex-col' : ''}`}>
-          {page === 'home'           && <ProjectSelector />}
-          {page === 'project'        && <ProjectDetail />}
-          {page === 'client-portal'  && <ClientPortal />}
-          {page === 'photo-log'      && <PhotoLog />}
-          {page === 'approvals'      && <Approvals />}
-          {page === 'messages'       && <MessageCenter />}
+          {page === 'home'             && <ProjectSelector />}
+          {page === 'project'          && <ProjectDetail />}
+          {page === 'client-portal'    && <ClientPortal />}
+          {page === 'photo-log'        && <PhotoLog />}
+          {page === 'approvals'        && <Approvals />}
+          {page === 'messages'         && <MessageCenter />}
           {page === 'weekly-updates'   && <WeeklyUpdates />}
           {page === 'create-project'   && <AdminCreateProject />}
           {page === 'manage-clients'   && <ManageClients />}
+          {!['home','project','client-portal','photo-log','approvals','messages',
+              'weekly-updates','create-project','manage-clients'].includes(page) && (
+            <div className="flex flex-col items-center justify-center py-32 px-6 text-center">
+              <div
+                className="w-14 h-14 rounded-2xl flex items-center justify-center mb-5"
+                style={{ backgroundColor: '#FEF2F2' }}
+              >
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+              </div>
+              <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: '#DC2626' }}>Access Denied</p>
+              <p className="text-xl font-bold mb-2" style={{ color: '#002147' }}>Page not found</p>
+              <p className="text-sm mb-6" style={{ color: '#6B7280' }}>
+                This page does not exist or you do not have permission to view it.
+              </p>
+              <button
+                onClick={() => window.location.replace('/')}
+                className="px-6 py-2.5 rounded-xl text-sm font-bold"
+                style={{ backgroundColor: '#002147', color: '#D4AF37' }}
+              >
+                Go to Dashboard
+              </button>
+            </div>
+          )}
         </main>
       </div>
     </div>

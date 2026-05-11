@@ -6,11 +6,6 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const urlMissing  = !supabaseUrl  || supabaseUrl  === 'https://placeholder.supabase.co';
 const keyMissing  = !supabaseAnonKey || supabaseAnonKey === 'placeholder-anon-key';
 
-console.log('[Supabase] init', {
-  url:  urlMissing  ? '(missing or placeholder)' : supabaseUrl,
-  key:  keyMissing  ? '(missing or placeholder)' : '(set)',
-});
-
 // Exported so App can render a visible diagnostic instead of a blank screen.
 export const supabaseConfigError =
   urlMissing || keyMissing
