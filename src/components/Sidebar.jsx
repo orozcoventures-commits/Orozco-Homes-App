@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { PROJECT_TYPES } from '../data/projectTypes';
 import { useProject } from '../context/ProjectContext';
+import { useAuth } from '../context/AuthContext';
 
 const SIDEBAR_COLOR = '#1B4F6B';
 
@@ -133,8 +134,20 @@ const CONTRACTOR_TOOLS = [
 
 export default function Sidebar({ isOpen, onClose }) {
   const { state, dispatch } = useProject();
+  const { user, isAuthenticated, logout } = useAuth();
   const active = state.activeProject;
   const activePage = state.activePage;
+  const isAdmin = user?.role === 'admin';
+
+  // Tools visible to clients: only Weekly Updates + Messages
+  // Tools visible to unauthenticated: everything except Weekly Updates
+  function toolVisible(page) {
+    if (page === 'weekly-updates') return isAuthenticated;
+    if (!isAuthenticated) return true;
+    if (isAdmin) return true;
+    // Clients only see Messages (not Photo Log, Approvals, Client Portal admin tools)
+    return page === 'messages';
+  }
 
   // Track which expandable items are open
   const [expanded, setExpanded] = useState({ bathrooms: true, kitchens: false });
@@ -214,7 +227,7 @@ export default function Sidebar({ isOpen, onClose }) {
             Contractor Tools
           </p>
           <div className="space-y-0.5">
-            {CONTRACTOR_TOOLS.map((tool) => {
+            {CONTRACTOR_TOOLS.filter((t) => toolVisible(t.page)).map((tool) => {
               const isActive = activePage === tool.page;
               return (
                 <button
@@ -352,12 +365,54 @@ export default function Sidebar({ isOpen, onClose }) {
         ))}
       </nav>
 
+      {/* ── User info + logout ─────────────────────────── */}
+      {isAuthenticated && user && (
+        <div
+          className="px-4 py-3 shrink-0"
+          style={{ borderTop: '1px solid rgba(255,255,255,0.12)' }}
+        >
+          <div className="flex items-center gap-3">
+            <div
+              className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-white shrink-0"
+              style={{ backgroundColor: user.color, fontSize: '0.72rem' }}
+            >
+              {user.initials}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold text-white truncate">{user.name}</p>
+              <span
+                className="text-xs px-1.5 py-0.5 rounded font-semibold"
+                style={
+                  isAdmin
+                    ? { backgroundColor: '#D4AF37', color: '#002147' }
+                    : { backgroundColor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.7)' }
+                }
+              >
+                {isAdmin ? 'Admin' : 'Client'}
+              </span>
+            </div>
+            <button
+              onClick={() => { logout(); dispatch({ type: 'SET_PAGE', page: 'home' }); onClose(); }}
+              title="Sign out"
+              className="shrink-0 w-7 h-7 rounded-lg flex items-center justify-center focus:outline-none transition-colors duration-150"
+              style={{ backgroundColor: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.5)' }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.2)'; e.currentTarget.style.color = '#FCA5A5'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = 'rgba(255,255,255,0.5)'; }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── Footer ─────────────────────────────────────── */}
       <div
-        className="px-5 py-4 shrink-0"
-        style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}
+        className="px-5 py-3 shrink-0"
+        style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}
       >
-        <p className="text-xs text-center" style={{ color: 'rgba(255,255,255,0.3)' }}>
+        <p className="text-xs text-center" style={{ color: 'rgba(255,255,255,0.25)' }}>
           © 2025 Orozco Homes
         </p>
       </div>

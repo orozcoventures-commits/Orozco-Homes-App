@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
 
 const TODAY = new Date().toLocaleDateString('en-US', {
   weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
@@ -16,6 +17,8 @@ const STATUS_CFG = {
 const INITIAL_UPDATES = [
   {
     id: 'bathrooms',
+    clientId: 'client-sjohnson',
+    clientColor: '#3B82F6',
     label: 'Bathrooms',
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -42,6 +45,8 @@ const INITIAL_UPDATES = [
   },
   {
     id: 'kitchens',
+    clientId: 'client-mrodriguez',
+    clientColor: '#7C3AED',
     label: 'Kitchens',
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -67,6 +72,8 @@ const INITIAL_UPDATES = [
   },
   {
     id: 'additions',
+    clientId: 'client-dlee',
+    clientColor: '#059669',
     label: 'Additions',
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -91,6 +98,8 @@ const INITIAL_UPDATES = [
   },
   {
     id: 'portico',
+    clientId: 'client-lnguyen',
+    clientColor: '#DC2626',
     label: 'Portico',
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -117,6 +126,8 @@ const INITIAL_UPDATES = [
   },
   {
     id: 'garage',
+    clientId: 'client-rpatel',
+    clientColor: '#D97706',
     label: 'Garage Conversion',
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -357,15 +368,17 @@ function UpdateCard({ update, onEdit }) {
             <p className="text-xs" style={{ color: '#9CA3AF' }}>
               Last updated: <span className="font-semibold" style={{ color: '#6B7280' }}>{TODAY_SHORT}</span>
             </p>
-            <button
-              onClick={() => onEdit(update.id)}
-              className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-all duration-150 focus:outline-none"
-              style={{ backgroundColor: '#F0EEE9', color: '#002147' }}
-              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#D4AF37'; e.currentTarget.style.color = '#002147'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#F0EEE9'; e.currentTarget.style.color = '#002147'; }}
-            >
-              Edit Update
-            </button>
+            {onEdit && (
+              <button
+                onClick={() => onEdit(update.id)}
+                className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-all duration-150 focus:outline-none"
+                style={{ backgroundColor: '#F0EEE9', color: '#002147' }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#D4AF37'; e.currentTarget.style.color = '#002147'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#F0EEE9'; e.currentTarget.style.color = '#002147'; }}
+              >
+                Edit Update
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -530,12 +543,20 @@ function EditModal({ update, onSave, onClose }) {
 
 // ── Main page ──────────────────────────────────────────────────────────────
 export default function WeeklyUpdates() {
+  const { user } = useAuth();
   const [updates, setUpdates] = useState(INITIAL_UPDATES);
-  const [editing, setEditing] = useState(null); // id of update being edited
+  const [editing, setEditing] = useState(null);
 
-  const onTrack  = updates.filter((u) => u.status === 'on-track').length;
-  const attention = updates.filter((u) => u.status === 'attention').length;
-  const delayed   = updates.filter((u) => u.status === 'delayed').length;
+  const isAdmin = user?.role === 'admin';
+
+  // Clients only see their own update; admin sees all
+  const visibleUpdates = isAdmin
+    ? updates
+    : updates.filter((u) => u.clientId === user?.id);
+
+  const onTrack   = visibleUpdates.filter((u) => u.status === 'on-track').length;
+  const attention = visibleUpdates.filter((u) => u.status === 'attention').length;
+  const delayed   = visibleUpdates.filter((u) => u.status === 'delayed').length;
 
   function handleSave(updated) {
     setUpdates((prev) => prev.map((u) => u.id === updated.id ? updated : u));
@@ -550,39 +571,90 @@ export default function WeeklyUpdates() {
       {/* Header */}
       <div className="mb-8">
         <p className="text-xs font-bold tracking-[0.18em] uppercase mb-1" style={{ color: '#D4AF37' }}>
-          Contractor Tool
+          {isAdmin ? 'Contractor Tool' : 'Client Portal'}
         </p>
-        <h2 className="text-2xl font-bold" style={{ color: '#002147' }}>Weekly Project Updates</h2>
+        <div className="flex items-center gap-3 flex-wrap">
+          <h2 className="text-2xl font-bold" style={{ color: '#002147' }}>
+            {isAdmin ? 'Weekly Project Updates' : 'Your Project Update'}
+          </h2>
+          {/* Role badge */}
+          <span
+            className="text-xs px-2.5 py-1 rounded-full font-bold"
+            style={
+              isAdmin
+                ? { backgroundColor: '#002147', color: '#D4AF37' }
+                : { backgroundColor: user?.color + '18', color: user?.color, border: `1px solid ${user?.color}40` }
+            }
+          >
+            {isAdmin ? '🔑 Admin View — All Projects' : `👤 ${user?.name}`}
+          </span>
+        </div>
         <p className="text-sm mt-1" style={{ color: '#6B7280' }}>{TODAY}</p>
+
+        {/* Client security notice */}
+        {!isAdmin && (
+          <div
+            className="flex items-center gap-2 mt-3 px-4 py-2.5 rounded-xl text-xs font-medium"
+            style={{ backgroundColor: '#ECFDF5', border: '1px solid #6EE7B7', color: '#065F46' }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+            You are viewing your private project update. Other clients' projects are not accessible from this account.
+          </div>
+        )}
       </div>
 
-      {/* Summary stats */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
-        {[
-          { label: 'On Track',  value: onTrack,   color: '#059669', bg: '#ECFDF5', border: '#6EE7B7' },
-          { label: 'Attention', value: attention,  color: '#D97706', bg: '#FFFBEB', border: '#FCD34D' },
-          { label: 'Delayed',   value: delayed,    color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
-        ].map((s) => (
-          <div
-            key={s.label}
-            className="rounded-2xl p-4 text-center"
-            style={{ backgroundColor: s.bg, border: `1.5px solid ${s.border}` }}
-          >
-            <p className="text-2xl font-bold" style={{ color: s.color }}>{s.value}</p>
-            <p className="text-xs font-semibold mt-1" style={{ color: '#6B7280' }}>{s.label}</p>
-          </div>
-        ))}
-      </div>
+      {/* Summary stats — admin only (clients have 1 project, no need for stats) */}
+      {isAdmin && (
+        <div className="grid grid-cols-3 gap-4 mb-8">
+          {[
+            { label: 'On Track',  value: onTrack,   color: '#059669', bg: '#ECFDF5', border: '#6EE7B7' },
+            { label: 'Attention', value: attention,  color: '#D97706', bg: '#FFFBEB', border: '#FCD34D' },
+            { label: 'Delayed',   value: delayed,    color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
+          ].map((s) => (
+            <div
+              key={s.label}
+              className="rounded-2xl p-4 text-center"
+              style={{ backgroundColor: s.bg, border: `1.5px solid ${s.border}` }}
+            >
+              <p className="text-2xl font-bold" style={{ color: s.color }}>{s.value}</p>
+              <p className="text-xs font-semibold mt-1" style={{ color: '#6B7280' }}>{s.label}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Project update cards */}
       <div className="space-y-5">
-        {updates.map((update) => (
-          <UpdateCard key={update.id} update={update} onEdit={setEditing} />
-        ))}
+        {visibleUpdates.length === 0 ? (
+          <div className="text-center py-16">
+            <p className="text-sm font-semibold" style={{ color: '#9CA3AF' }}>No project updates found for your account.</p>
+          </div>
+        ) : (
+          visibleUpdates.map((update) => (
+            <div key={update.id}>
+              {/* Admin-only client name label above each card */}
+              {isAdmin && (
+                <div className="flex items-center gap-2 mb-2 px-1">
+                  <span
+                    className="w-2.5 h-2.5 rounded-full"
+                    style={{ backgroundColor: update.clientColor }}
+                  />
+                  <p className="text-xs font-bold" style={{ color: update.clientColor }}>
+                    {update.client}
+                  </p>
+                  <span className="text-xs" style={{ color: '#9CA3AF' }}>· {update.project}</span>
+                </div>
+              )}
+              <UpdateCard update={update} onEdit={isAdmin ? setEditing : null} />
+            </div>
+          ))
+        )}
       </div>
 
-      {/* Edit modal */}
-      {editingUpdate && (
+      {/* Edit modal — admin only */}
+      {editingUpdate && isAdmin && (
         <EditModal
           update={editingUpdate}
           onSave={handleSave}
