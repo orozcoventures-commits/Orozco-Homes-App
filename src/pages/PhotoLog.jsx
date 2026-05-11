@@ -252,7 +252,7 @@ export default function PhotoLog() {
               <p className="text-sm font-semibold mb-1" style={{ color: '#374151' }}>No updates yet</p>
               <p className="text-xs" style={{ color: '#9CA3AF' }}>
                 {activeCategory === 'All'
-                  ? isAdmin ? 'Post the first progress update above.' : 'Your contractor hasn't posted any updates yet.'
+                  ? isAdmin ? 'Post the first progress update above.' : "Your contractor hasn't posted any updates yet."
                   : `No updates in the "${activeCategory}" category.`}
               </p>
             </div>
