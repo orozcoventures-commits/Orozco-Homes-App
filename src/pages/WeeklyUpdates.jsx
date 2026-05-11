@@ -625,6 +625,99 @@ export default function WeeklyUpdates() {
         </div>
       )}
 
+      {/* ── Admin Master Dashboard client roster ──────────────────────── */}
+      {isAdmin && (
+        <div className="mb-10">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-bold text-base" style={{ color: '#002147' }}>
+              Master Dashboard
+              <span className="ml-2 text-xs font-normal" style={{ color: '#9CA3AF' }}>
+                — all active clients
+              </span>
+            </h3>
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ backgroundColor: '#002147', color: '#D4AF37' }}>
+              {visibleUpdates.length} Projects
+            </span>
+          </div>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {visibleUpdates.map((u) => {
+              const cfg = STATUS_CFG[u.status];
+              return (
+                <div
+                  key={u.id}
+                  className="rounded-2xl p-4 flex flex-col gap-3"
+                  style={{
+                    backgroundColor: '#fff',
+                    border: `1.5px solid ${u.clientColor}30`,
+                    boxShadow: '0 2px 10px rgba(0,33,71,0.06)',
+                  }}
+                >
+                  {/* Client avatar + name */}
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white shrink-0"
+                      style={{ backgroundColor: u.clientColor, fontSize: '0.75rem' }}
+                    >
+                      {u.client.split(' ').map((w) => w[0]).join('')}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-bold text-sm truncate" style={{ color: '#002147' }}>{u.client}</p>
+                      <p className="text-xs truncate" style={{ color: '#9CA3AF' }}>{u.label} · {u.currentPhase}</p>
+                    </div>
+                  </div>
+
+                  {/* Mini progress bar */}
+                  <div>
+                    <div className="flex justify-between text-xs mb-1" style={{ color: '#9CA3AF' }}>
+                      <span>{u.currentPhase}</span>
+                      <span className="font-semibold" style={{ color: u.clientColor }}>{u.progressPercent}%</span>
+                    </div>
+                    <div className="w-full rounded-full" style={{ height: '5px', backgroundColor: '#F0EEE9' }}>
+                      <div
+                        className="h-full rounded-full"
+                        style={{ width: `${u.progressPercent}%`, backgroundColor: u.clientColor }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Status + Create Update button */}
+                  <div className="flex items-center justify-between">
+                    <span
+                      className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                      style={{ backgroundColor: cfg.bg, color: cfg.text, border: `1px solid ${cfg.border}` }}
+                    >
+                      {cfg.label}
+                    </span>
+                    <button
+                      onClick={() => setEditing(u.id)}
+                      className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition-all duration-150 focus:outline-none"
+                      style={{ backgroundColor: '#002147', color: '#D4AF37' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = u.clientColor; e.currentTarget.style.color = '#fff'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#002147'; e.currentTarget.style.color = '#D4AF37'; }}
+                    >
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                      </svg>
+                      Post Update
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Divider before detailed cards */}
+          <div className="flex items-center gap-4 mt-10 mb-6">
+            <div className="flex-1 h-px" style={{ backgroundColor: '#E8E6E1' }} />
+            <p className="text-xs font-bold tracking-[0.14em] uppercase" style={{ color: '#9CA3AF' }}>
+              Detailed Project Updates
+            </p>
+            <div className="flex-1 h-px" style={{ backgroundColor: '#E8E6E1' }} />
+          </div>
+        </div>
+      )}
+
       {/* Project update cards */}
       <div className="space-y-5">
         {visibleUpdates.length === 0 ? (
@@ -634,16 +727,11 @@ export default function WeeklyUpdates() {
         ) : (
           visibleUpdates.map((update) => (
             <div key={update.id}>
-              {/* Admin-only client name label above each card */}
+              {/* Admin-only client name label */}
               {isAdmin && (
                 <div className="flex items-center gap-2 mb-2 px-1">
-                  <span
-                    className="w-2.5 h-2.5 rounded-full"
-                    style={{ backgroundColor: update.clientColor }}
-                  />
-                  <p className="text-xs font-bold" style={{ color: update.clientColor }}>
-                    {update.client}
-                  </p>
+                  <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: update.clientColor }} />
+                  <p className="text-xs font-bold" style={{ color: update.clientColor }}>{update.client}</p>
                   <span className="text-xs" style={{ color: '#9CA3AF' }}>· {update.project}</span>
                 </div>
               )}

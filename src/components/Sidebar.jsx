@@ -142,10 +142,11 @@ export default function Sidebar({ isOpen, onClose }) {
   // Tools visible to clients: only Weekly Updates + Messages
   // Tools visible to unauthenticated: everything except Weekly Updates
   function toolVisible(page) {
-    if (page === 'weekly-updates') return isAuthenticated;
+    // Weekly Updates is always in the menu; the route itself gates access
+    if (page === 'weekly-updates') return true;
     if (!isAuthenticated) return true;
     if (isAdmin) return true;
-    // Clients only see Messages (not Photo Log, Approvals, Client Portal admin tools)
+    // Clients only see Messages
     return page === 'messages';
   }
 
