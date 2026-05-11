@@ -12,11 +12,8 @@ export function AuthProvider({ children }) {
   // Calling supabase.from() inside onAuthStateChange can deadlock the auth client's
   // internal lock in supabase-js v2, causing loadProfile to never resolve.
   useEffect(() => {
-    console.log('[Auth] subscribing to auth state changes');
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        console.log('[Auth] state change:', event, session?.user?.id ?? 'no user');
         setUser(session?.user ?? null);
         if (!session?.user) {
           setProfile(null);
@@ -36,7 +33,6 @@ export function AuthProvider({ children }) {
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function loadProfile(userId) {
-    console.log('[Auth] loadProfile start:', userId);
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -46,8 +42,6 @@ export function AuthProvider({ children }) {
 
       if (error) {
         console.error('[Auth] loadProfile error:', error.message, error.code);
-      } else {
-        console.log('[Auth] loadProfile result: role =', data?.role, '| name =', data?.full_name);
       }
 
       setProfile(data ?? null);
@@ -61,13 +55,11 @@ export function AuthProvider({ children }) {
   }
 
   async function login(email, password) {
-    console.log('[Auth] login attempt:', email);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
   }
 
   async function signup(email, password, fullName) {
-    console.log('[Auth] signup attempt:', email);
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -81,13 +73,11 @@ export function AuthProvider({ children }) {
   // because this is called right after login() before React has re-rendered
   // and the `user` closure value is still null.
   async function claimFirstAdmin() {
-    console.log('[Auth] claimFirstAdmin: calling RPC');
     const { data, error } = await supabase.rpc('promote_to_first_admin');
     if (error) {
       console.error('[Auth] claimFirstAdmin RPC error:', error.message);
       throw error;
     }
-    console.log('[Auth] claimFirstAdmin RPC result:', data);
     if (data) {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) await loadProfile(session.user.id);
@@ -96,14 +86,11 @@ export function AuthProvider({ children }) {
   }
 
   async function logout() {
-    console.log('[Auth] logout');
     await supabase.auth.signOut();
   }
 
   const isAuthenticated = !!user && !loading;
   const isAdmin         = profile?.role === 'admin';
-
-  console.log('[Auth] render state — loading:', loading, '| user:', user?.id ?? 'none', '| role:', profile?.role ?? 'none');
 
   return (
     <AuthContext.Provider value={{ user, profile, loading, isAuthenticated, isAdmin, login, signup, claimFirstAdmin, logout }}>
