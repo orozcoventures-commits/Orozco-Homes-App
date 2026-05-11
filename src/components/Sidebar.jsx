@@ -213,10 +213,12 @@ export default function Sidebar({ isOpen, onClose }) {
 
   function navigatePage(page) {
     if (page === 'messages') {
-      // Mark all current messages as seen
       localStorage.setItem('messages_last_viewed', new Date().toISOString());
       setUnreadMessages(0);
     }
+    // Tool pages are not project-scoped — clear any active project filter so
+    // the page shows data across all projects (matching the sidebar badge count).
+    dispatch({ type: 'CLEAR_DB_PROJECT' });
     dispatch({ type: 'SET_PAGE', page });
     onClose();
   }

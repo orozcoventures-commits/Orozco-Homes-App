@@ -41,6 +41,8 @@ function reducer(state, action) {
         },
       };
     }
+    case 'CLEAR_DB_PROJECT':
+      return { ...state, activeDbProject: null };
     case 'CLEAR_SELECTIONS':
       return { ...state, selections: {} };
     default:
