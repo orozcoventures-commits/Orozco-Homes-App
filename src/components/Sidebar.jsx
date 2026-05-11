@@ -1,0 +1,290 @@
+import { useState, useEffect } from 'react';
+import { PROJECT_TYPES } from '../data/projectTypes';
+import { useProject } from '../context/ProjectContext';
+
+const SIDEBAR_COLOR = '#1B4F6B';
+
+const SECTIONS = [
+  {
+    heading: 'PROJECT TYPES',
+    items: [
+      {
+        label: 'Bathrooms',
+        icon: (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 6 Q9 3 12 3 Q15 3 15 6" /><rect x="3" y="6" width="18" height="4" rx="1" />
+            <path d="M5 10 L5 19 Q5 21 7 21 L17 21 Q19 21 19 19 L19 10" />
+            <line x1="8" y1="15" x2="8" y2="18" /><line x1="12" y1="14" x2="12" y2="18" /><line x1="16" y1="15" x2="16" y2="18" />
+          </svg>
+        ),
+        key: 'bathrooms',
+        children: PROJECT_TYPES.filter((p) => p.category === 'bathroom'),
+      },
+      {
+        label: 'Kitchens',
+        icon: (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 3 L3 11 Q3 13 5 13 L5 21" /><path d="M5 7 L3 7" /><path d="M21 3 L21 21" />
+            <path d="M14 3 Q14 8 17.5 8 Q21 8 21 3" />
+          </svg>
+        ),
+        key: 'kitchens',
+        children: PROJECT_TYPES.filter((p) => p.category === 'kitchen'),
+      },
+    ],
+  },
+  {
+    heading: 'HOME SERVICES',
+    items: [
+      {
+        label: 'Additions',
+        icon: (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 9.5 L12 3 L21 9.5 V20 Q21 21 20 21 H15 V15 H9 V21 H4 Q3 21 3 20 Z" />
+            <line x1="12" y1="12" x2="12" y2="16" /><line x1="10" y1="14" x2="14" y2="14" />
+          </svg>
+        ),
+        project: PROJECT_TYPES.find((p) => p.id === 'addition'),
+      },
+      {
+        label: 'Portico',
+        icon: (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="3" y1="21" x2="21" y2="21" /><line x1="3" y1="10" x2="21" y2="10" />
+            <polyline points="5 10 5 3 19 3 19 10" />
+            <line x1="7" y1="21" x2="7" y2="10" /><line x1="11" y1="21" x2="11" y2="10" />
+            <line x1="15" y1="21" x2="15" y2="10" /><line x1="19" y1="21" x2="19" y2="10" />
+          </svg>
+        ),
+        project: PROJECT_TYPES.find((p) => p.id === 'portico'),
+      },
+      {
+        label: 'Garage Conversion',
+        icon: (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="7" width="20" height="14" rx="1" /><path d="M2 7 L12 2 L22 7" />
+            <line x1="7" y1="13" x2="17" y2="13" /><line x1="7" y1="17" x2="17" y2="17" />
+          </svg>
+        ),
+        project: PROJECT_TYPES.find((p) => p.id === 'garage-conversion'),
+      },
+    ],
+  },
+];
+
+export default function Sidebar({ isOpen, onClose }) {
+  const { state, dispatch } = useProject();
+  const active = state.activeProject;
+
+  // Track which expandable items are open
+  const [expanded, setExpanded] = useState({ bathrooms: true, kitchens: false });
+
+  // Auto-expand parent when a project becomes active
+  useEffect(() => {
+    if (active?.category === 'bathroom') setExpanded((e) => ({ ...e, bathrooms: true }));
+    if (active?.category === 'kitchen')  setExpanded((e) => ({ ...e, kitchens: true }));
+  }, [active]);
+
+  function navigate(project) {
+    dispatch({ type: 'SET_PROJECT', project });
+    onClose();
+  }
+
+  function goHome() {
+    dispatch({ type: 'SET_PROJECT', project: null });
+    onClose();
+  }
+
+  const sidebar = (
+    <aside
+      className="flex flex-col h-full overflow-y-auto"
+      style={{ backgroundColor: SIDEBAR_COLOR, width: '260px' }}
+    >
+      {/* ── Brand ──────────────────────────────────────── */}
+      <div
+        className="flex items-center gap-3 px-5 py-5 shrink-0"
+        style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}
+      >
+        <button
+          onClick={goHome}
+          className="flex items-center gap-3 group focus:outline-none w-full"
+        >
+          <div
+            className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 shadow-md transition-transform duration-150 group-hover:scale-105"
+            style={{ backgroundColor: '#D4AF37' }}
+          >
+            <span style={{ color: '#002147' }} className="font-extrabold text-xs tracking-wide">OH</span>
+          </div>
+          <div className="leading-none text-left">
+            <span className="block font-bold text-white" style={{ fontSize: '0.88rem', letterSpacing: '0.03em' }}>
+              Orozco Homes
+            </span>
+            <span className="block text-white/40 font-light tracking-widest uppercase mt-0.5" style={{ fontSize: '0.6rem' }}>
+              Remodel Planner
+            </span>
+          </div>
+        </button>
+
+        {/* Mobile close button */}
+        <button
+          onClick={onClose}
+          className="md:hidden ml-auto shrink-0 w-7 h-7 rounded-md flex items-center justify-center focus:outline-none"
+          style={{ backgroundColor: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)' }}
+          aria-label="Close menu"
+        >
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <line x1="1" y1="1" x2="11" y2="11" /><line x1="11" y1="1" x2="1" y2="11" />
+          </svg>
+        </button>
+      </div>
+
+      {/* ── Nav sections ───────────────────────────────── */}
+      <nav className="flex-1 px-3 py-4 space-y-6">
+        {SECTIONS.map((section) => (
+          <div key={section.heading}>
+            {/* Section heading */}
+            <p
+              className="px-3 mb-2 text-xs font-bold tracking-[0.14em] uppercase"
+              style={{ color: 'rgba(255,255,255,0.4)' }}
+            >
+              {section.heading}
+            </p>
+
+            <div className="space-y-0.5">
+              {section.items.map((item) => {
+                const hasChildren = !!item.children;
+                const isExpanded = expanded[item.key];
+                const isActiveParent = hasChildren && item.children.some((c) => c.id === active?.id);
+
+                if (hasChildren) {
+                  return (
+                    <div key={item.label}>
+                      {/* Expandable parent */}
+                      <button
+                        onClick={() => setExpanded((e) => ({ ...e, [item.key]: !e[item.key] }))}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150 focus:outline-none"
+                        style={{
+                          color: isActiveParent || isExpanded ? '#fff' : 'rgba(255,255,255,0.72)',
+                          backgroundColor: isActiveParent ? 'rgba(212,175,55,0.15)' : isExpanded ? 'rgba(255,255,255,0.08)' : 'transparent',
+                        }}
+                        onMouseEnter={(e) => { if (!isActiveParent) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)'; }}
+                        onMouseLeave={(e) => { if (!isActiveParent) e.currentTarget.style.backgroundColor = isExpanded ? 'rgba(255,255,255,0.08)' : 'transparent'; }}
+                      >
+                        <span style={{ color: isActiveParent ? '#D4AF37' : 'rgba(255,255,255,0.6)' }}>{item.icon}</span>
+                        <span className="flex-1 text-left">{item.label}</span>
+                        <svg
+                          width="10" height="10" viewBox="0 0 10 10" fill="none"
+                          stroke="rgba(255,255,255,0.4)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
+                          style={{ transition: 'transform 0.2s', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', flexShrink: 0 }}
+                        >
+                          <polyline points="1 3 5 7 9 3" />
+                        </svg>
+                      </button>
+
+                      {/* Sub-items */}
+                      <div
+                        className="overflow-hidden transition-all duration-250"
+                        style={{ maxHeight: isExpanded ? '200px' : '0px' }}
+                      >
+                        <div className="mt-0.5 ml-4 space-y-0.5">
+                          {item.children.map((child) => {
+                            const isActive = active?.id === child.id;
+                            return (
+                              <button
+                                key={child.id}
+                                onClick={() => navigate(child)}
+                                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-120 focus:outline-none"
+                                style={{
+                                  color: isActive ? '#D4AF37' : 'rgba(255,255,255,0.65)',
+                                  backgroundColor: isActive ? 'rgba(212,175,55,0.18)' : 'transparent',
+                                  borderLeft: isActive ? '2px solid #D4AF37' : '2px solid transparent',
+                                }}
+                                onMouseEnter={(e) => { if (!isActive) { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.07)'; e.currentTarget.style.color = '#fff'; } }}
+                                onMouseLeave={(e) => { if (!isActive) { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.65)'; } }}
+                              >
+                                <span
+                                  className="w-1.5 h-1.5 rounded-full shrink-0"
+                                  style={{ backgroundColor: isActive ? '#D4AF37' : 'rgba(255,255,255,0.3)' }}
+                                />
+                                <span className="flex-1 text-left">{child.label}</span>
+                                <span className="shrink-0 text-xs" style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.65rem' }}>
+                                  {child.subtitle}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+
+                // Direct nav item (no children)
+                const isActive = active?.id === item.project?.id;
+                return (
+                  <button
+                    key={item.label}
+                    onClick={() => navigate(item.project)}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150 focus:outline-none"
+                    style={{
+                      color: isActive ? '#D4AF37' : 'rgba(255,255,255,0.72)',
+                      backgroundColor: isActive ? 'rgba(212,175,55,0.18)' : 'transparent',
+                      borderLeft: isActive ? '2px solid #D4AF37' : '2px solid transparent',
+                    }}
+                    onMouseEnter={(e) => { if (!isActive) { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#fff'; } }}
+                    onMouseLeave={(e) => { if (!isActive) { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.72)'; } }}
+                  >
+                    <span style={{ color: isActive ? '#D4AF37' : 'rgba(255,255,255,0.55)' }}>{item.icon}</span>
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </nav>
+
+      {/* ── Footer ─────────────────────────────────────── */}
+      <div
+        className="px-5 py-4 shrink-0"
+        style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}
+      >
+        <p className="text-xs text-center" style={{ color: 'rgba(255,255,255,0.3)' }}>
+          © 2025 Orozco Homes
+        </p>
+      </div>
+    </aside>
+  );
+
+  return (
+    <>
+      {/* Desktop: permanent fixed sidebar */}
+      <div className="hidden md:flex fixed left-0 top-0 h-full z-40" style={{ width: '260px' }}>
+        {sidebar}
+      </div>
+
+      {/* Mobile: slide-in overlay */}
+      {/* Backdrop */}
+      <div
+        className="md:hidden fixed inset-0 z-40 transition-opacity duration-300"
+        style={{
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          opacity: isOpen ? 1 : 0,
+          pointerEvents: isOpen ? 'auto' : 'none',
+        }}
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      {/* Drawer */}
+      <div
+        className="md:hidden fixed left-0 top-0 h-full z-50 transition-transform duration-300 flex"
+        style={{
+          width: '260px',
+          transform: isOpen ? 'translateX(0)' : 'translateX(-100%)',
+        }}
+      >
+        {sidebar}
+      </div>
+    </>
+  );
+}
