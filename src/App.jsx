@@ -8,6 +8,7 @@ import ClientPortal from './pages/ClientPortal';
 import PhotoLog from './pages/PhotoLog';
 import Approvals from './pages/Approvals';
 import MessageCenter from './pages/MessageCenter';
+import WeeklyUpdates from './pages/WeeklyUpdates';
 import './index.css';
 
 function AppContent() {
@@ -37,7 +38,8 @@ function AppContent() {
           {page === 'client-portal' && <ClientPortal />}
           {page === 'photo-log'     && <PhotoLog />}
           {page === 'approvals'     && <Approvals />}
-          {page === 'messages'      && <MessageCenter />}
+          {page === 'messages'        && <MessageCenter />}
+          {page === 'weekly-updates'  && <WeeklyUpdates />}
         </main>
       </div>
     </div>
