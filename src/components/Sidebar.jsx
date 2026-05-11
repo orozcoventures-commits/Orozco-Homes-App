@@ -3,6 +3,7 @@ import { PROJECT_TYPES } from '../data/projectTypes';
 import { useProject } from '../context/ProjectContext';
 import { useAuth } from '../context/AuthContext';
 import { getInitials, getAvatarColour } from '../lib/utils';
+import { supabase } from '../lib/supabase';
 
 const SIDEBAR_COLOR = '#1B4F6B';
 
@@ -138,7 +139,7 @@ const CONTRACTOR_TOOLS = [
   {
     label: 'Approvals',
     page: 'approvals',
-    badge: '2',
+    badge: null,
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -149,7 +150,7 @@ const CONTRACTOR_TOOLS = [
   {
     label: 'Messages',
     page: 'messages',
-    badge: '3',
+    badge: null,
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
@@ -163,6 +164,30 @@ export default function Sidebar({ isOpen, onClose }) {
   const { user, profile, isAdmin, isAuthenticated, logout } = useAuth();
   const active = state.activeProject;
   const activePage = state.activePage;
+
+  const [pendingApprovals, setPendingApprovals] = useState(0);
+  const [unreadMessages, setUnreadMessages]     = useState(0);
+
+  // Fetch live badge counts whenever auth state is ready
+  useEffect(() => {
+    if (!isAuthenticated || !user) return;
+
+    // Pending approvals: change_works with status = 'pending'
+    supabase
+      .from('change_works')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'pending')
+      .then(({ count }) => setPendingApprovals(count ?? 0));
+
+    // Unread messages: messages from others newer than last time the user visited Messages
+    const lastViewed = localStorage.getItem('messages_last_viewed') ?? '1970-01-01T00:00:00Z';
+    supabase
+      .from('messages')
+      .select('id', { count: 'exact', head: true })
+      .neq('sender_id', user.id)
+      .gt('created_at', lastViewed)
+      .then(({ count }) => setUnreadMessages(count ?? 0));
+  }, [isAuthenticated, user?.id]);
 
   function toolVisible(tool) {
     if (tool.adminOnly) return isAdmin;
@@ -187,6 +212,11 @@ export default function Sidebar({ isOpen, onClose }) {
   }
 
   function navigatePage(page) {
+    if (page === 'messages') {
+      // Mark all current messages as seen
+      localStorage.setItem('messages_last_viewed', new Date().toISOString());
+      setUnreadMessages(0);
+    }
     dispatch({ type: 'SET_PAGE', page });
     onClose();
   }
@@ -267,14 +297,19 @@ export default function Sidebar({ isOpen, onClose }) {
                 >
                   <span style={{ color: isActive ? '#D4AF37' : 'rgba(255,255,255,0.55)' }}>{tool.icon}</span>
                   <span className="flex-1 text-left">{tool.label}</span>
-                  {tool.badge && (
-                    <span
-                      className="text-xs font-bold px-1.5 py-0.5 rounded-full shrink-0"
-                      style={{ backgroundColor: '#EF4444', color: '#fff', fontSize: '0.6rem', minWidth: '18px', textAlign: 'center' }}
-                    >
-                      {tool.badge}
-                    </span>
-                  )}
+                  {(() => {
+                    const count = tool.page === 'approvals' ? pendingApprovals
+                                : tool.page === 'messages'  ? unreadMessages
+                                : 0;
+                    return count > 0 ? (
+                      <span
+                        className="text-xs font-bold px-1.5 py-0.5 rounded-full shrink-0"
+                        style={{ backgroundColor: '#EF4444', color: '#fff', fontSize: '0.6rem', minWidth: '18px', textAlign: 'center' }}
+                      >
+                        {count}
+                      </span>
+                    ) : null;
+                  })()}
                 </button>
               );
             })}
