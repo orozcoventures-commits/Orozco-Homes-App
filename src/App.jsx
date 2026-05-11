@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { ProjectProvider, useProject } from './context/ProjectContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { supabaseConfigError } from './lib/supabase';
+import ErrorBoundary from './components/ErrorBoundary';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import Login from './pages/Login';
@@ -13,7 +15,75 @@ import MessageCenter from './pages/MessageCenter';
 import WeeklyUpdates from './pages/WeeklyUpdates';
 import './index.css';
 
-// Full-screen spinner shown while the Supabase session is rehydrating
+// Shown when VITE_SUPABASE_* env vars are missing in Netlify
+function EnvErrorScreen() {
+  return (
+    <div
+      className="min-h-screen flex items-center justify-center px-6"
+      style={{ backgroundColor: '#F5F4F0' }}
+    >
+      <div
+        className="w-full max-w-lg rounded-2xl p-8"
+        style={{ backgroundColor: '#fff', border: '1.5px solid #FECACA', boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}
+      >
+        <div className="flex items-center gap-3 mb-5">
+          <div
+            className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+            style={{ backgroundColor: '#FEF2F2' }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#DC2626' }}>Configuration Error</p>
+            <p className="text-base font-bold" style={{ color: '#002147' }}>Missing environment variables</p>
+          </div>
+        </div>
+
+        <p className="text-sm mb-5" style={{ color: '#374151' }}>{supabaseConfigError}</p>
+
+        <div
+          className="rounded-xl px-4 py-3 mb-6 text-xs font-mono space-y-1"
+          style={{ backgroundColor: '#F9FAFB', border: '1px solid #E5E7EB', color: '#374151' }}
+        >
+          <p>VITE_SUPABASE_URL={import.meta.env.VITE_SUPABASE_URL || '(not set)'}</p>
+          <p>VITE_SUPABASE_ANON_KEY={import.meta.env.VITE_SUPABASE_ANON_KEY ? '(set)' : '(not set)'}</p>
+        </div>
+
+        <ol className="text-sm space-y-2 mb-6" style={{ color: '#374151' }}>
+          {[
+            'Go to Netlify → your site → Site configuration → Environment variables',
+            'Add VITE_SUPABASE_URL with your Supabase project URL',
+            'Add VITE_SUPABASE_ANON_KEY with your Supabase anon/public key',
+            'Trigger a new deploy (Deploys → Trigger deploy → Deploy site)',
+          ].map((step, i) => (
+            <li key={i} className="flex items-start gap-2">
+              <span
+                className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-0.5"
+                style={{ backgroundColor: '#002147', color: '#D4AF37' }}
+              >
+                {i + 1}
+              </span>
+              {step}
+            </li>
+          ))}
+        </ol>
+
+        <button
+          onClick={() => window.location.reload()}
+          className="w-full py-3 rounded-xl text-sm font-bold"
+          style={{ backgroundColor: '#002147', color: '#D4AF37' }}
+        >
+          Reload after fixing
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function LoadingScreen() {
   return (
     <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#F5F4F0' }}>
@@ -39,13 +109,12 @@ function AppContent() {
   const { isAuthenticated, loading } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Wait for Supabase to restore the session before rendering
-  if (loading) return <LoadingScreen />;
+  const page = state.activePage;
+  console.log('[App] rendering — loading:', loading, '| authenticated:', isAuthenticated, '| page:', page);
 
-  // Gate: every page requires a valid session
+  if (loading) return <LoadingScreen />;
   if (!isAuthenticated) return <Login />;
 
-  const page       = state.activePage;
   const isMessages = page === 'messages';
 
   return (
@@ -53,9 +122,8 @@ function AppContent() {
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       <div className="md:ml-[260px] flex flex-col min-h-screen">
-        {/* Messages page has its own header chrome on desktop */}
         {!isMessages && <Header onMenuToggle={() => setSidebarOpen((o) => !o)} />}
-        {isMessages  && (
+        {isMessages && (
           <div className="md:hidden">
             <Header onMenuToggle={() => setSidebarOpen((o) => !o)} />
           </div>
@@ -76,11 +144,16 @@ function AppContent() {
 }
 
 export default function App() {
+  // Surface missing env vars immediately instead of a blank screen
+  if (supabaseConfigError) return <EnvErrorScreen />;
+
   return (
-    <AuthProvider>
-      <ProjectProvider>
-        <AppContent />
-      </ProjectProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <ProjectProvider>
+          <AppContent />
+        </ProjectProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
