@@ -161,11 +161,78 @@ function CopyButton({ text }) {
   );
 }
 
+function SendEmailButton({ client, inviteUrl }) {
+  const [status, setStatus] = useState('idle'); // idle | sending | sent | error
+  const [errMsg, setErrMsg] = useState('');
+
+  async function handleSend() {
+    setStatus('sending');
+    setErrMsg('');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await supabase.functions.invoke('send-invite-email', {
+        body: {
+          clientEmail: client.email,
+          clientName:  client.full_name,
+          inviteUrl,
+        },
+        headers: session?.access_token
+          ? { Authorization: `Bearer ${session.access_token}` }
+          : {},
+      });
+      if (res.error) throw new Error(res.error.message ?? 'Failed to send');
+      setStatus('sent');
+      setTimeout(() => setStatus('idle'), 3000);
+    } catch (err) {
+      setErrMsg(err.message);
+      setStatus('error');
+      setTimeout(() => setStatus('idle'), 4000);
+    }
+  }
+
+  const cfg = {
+    idle:    { bg: '#EFF6FF', color: '#1D4ED8', border: '#BFDBFE', label: 'Send Invite Email', icon: (
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+        <polyline points="22,6 12,13 2,6" />
+      </svg>
+    )},
+    sending: { bg: '#EFF6FF', color: '#93C5FD', border: '#BFDBFE', label: 'Sending…', icon: (
+      <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+        <circle cx="12" cy="12" r="10" strokeOpacity="0.25" /><path d="M12 2a10 10 0 0 1 10 10" />
+      </svg>
+    )},
+    sent:    { bg: '#ECFDF5', color: '#059669', border: '#A7F3D0', label: 'Email Sent!', icon: (
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="20 6 9 17 4 12" />
+      </svg>
+    )},
+    error:   { bg: '#FEF2F2', color: '#DC2626', border: '#FECACA', label: errMsg || 'Failed', icon: (
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+      </svg>
+    )},
+  }[status];
+
+  return (
+    <button
+      onClick={handleSend}
+      disabled={status === 'sending'}
+      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 focus:outline-none shrink-0"
+      style={{ backgroundColor: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}`, cursor: status === 'sending' ? 'not-allowed' : 'pointer' }}
+      title="Send invite email"
+    >
+      {cfg.icon}
+      <span className="hidden sm:inline">{cfg.label}</span>
+    </button>
+  );
+}
+
 function ClientRow({ client }) {
   const inviteUrl = `${window.location.origin}?invite=${encodeURIComponent(client.email)}&name=${encodeURIComponent(client.full_name)}`;
   return (
     <div
-      className="flex items-center gap-4 px-5 py-4"
+      className="flex items-center gap-3 px-5 py-4"
       style={{ borderBottom: '1px solid #F3F2EE' }}
     >
       <div
@@ -178,7 +245,10 @@ function ClientRow({ client }) {
         <p className="text-sm font-semibold truncate" style={{ color: '#002147' }}>{client.full_name}</p>
         <p className="text-xs truncate" style={{ color: '#6B7280' }}>{client.email}{client.phone ? ` · ${client.phone}` : ''}</p>
       </div>
-      <CopyButton text={inviteUrl} />
+      <div className="flex items-center gap-2 shrink-0">
+        <SendEmailButton client={client} inviteUrl={inviteUrl} />
+        <CopyButton text={inviteUrl} />
+      </div>
     </div>
   );
 }
@@ -211,6 +281,14 @@ export default function ManageClients() {
   function handleAdded(newClient) {
     setClients((prev) => [newClient, ...prev]);
     setShowForm(false);
+    // Auto-send invite email in background — failure is non-blocking
+    const inviteUrl = `${window.location.origin}?invite=${encodeURIComponent(newClient.email)}&name=${encodeURIComponent(newClient.full_name)}`;
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      supabase.functions.invoke('send-invite-email', {
+        body: { clientEmail: newClient.email, clientName: newClient.full_name, inviteUrl },
+        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
+      });
+    });
   }
 
   return (
