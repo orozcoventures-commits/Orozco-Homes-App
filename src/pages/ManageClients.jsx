@@ -161,7 +161,12 @@ function CopyButton({ text }) {
   );
 }
 
-function SendEmailButton({ client, inviteUrl }) {
+// Sends a Supabase magic-link email via the built-in Auth email service.
+// Uses signInWithOtp (anon-key safe) with shouldCreateUser:true so Supabase
+// creates the auth user and emails them a one-click login link.
+// The client's full_name is stored in user_metadata so the profile trigger
+// picks it up on first sign-in.
+function SendMagicLinkButton({ client }) {
   const [status, setStatus] = useState('idle'); // idle | sending | sent | error
   const [errMsg, setErrMsg] = useState('');
 
@@ -169,58 +174,50 @@ function SendEmailButton({ client, inviteUrl }) {
     setStatus('sending');
     setErrMsg('');
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await supabase.functions.invoke('send-invite-email', {
-        body: {
-          clientEmail: client.email,
-          clientName:  client.full_name,
-          inviteUrl,
+      const { error } = await supabase.auth.signInWithOtp({
+        email: client.email,
+        options: {
+          shouldCreateUser: true,
+          data: { full_name: client.full_name },
+          emailRedirectTo: window.location.origin,
         },
-        headers: session?.access_token
-          ? { Authorization: `Bearer ${session.access_token}` }
-          : {},
       });
-      if (res.error) throw new Error(res.error.message ?? 'Failed to send');
+      if (error) throw error;
       setStatus('sent');
-      setTimeout(() => setStatus('idle'), 3000);
+      setTimeout(() => setStatus('idle'), 3500);
     } catch (err) {
-      setErrMsg(err.message);
+      setErrMsg(err.message || 'Failed to send');
       setStatus('error');
       setTimeout(() => setStatus('idle'), 4000);
     }
   }
 
   const cfg = {
-    idle:    { bg: '#EFF6FF', color: '#1D4ED8', border: '#BFDBFE', label: 'Send Invite Email', icon: (
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-        <polyline points="22,6 12,13 2,6" />
-      </svg>
-    )},
-    sending: { bg: '#EFF6FF', color: '#93C5FD', border: '#BFDBFE', label: 'Sending…', icon: (
-      <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-        <circle cx="12" cy="12" r="10" strokeOpacity="0.25" /><path d="M12 2a10 10 0 0 1 10 10" />
-      </svg>
-    )},
-    sent:    { bg: '#ECFDF5', color: '#059669', border: '#A7F3D0', label: 'Email Sent!', icon: (
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="20 6 9 17 4 12" />
-      </svg>
-    )},
-    error:   { bg: '#FEF2F2', color: '#DC2626', border: '#FECACA', label: errMsg || 'Failed', icon: (
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-        <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-      </svg>
-    )},
+    idle: {
+      bg: '#EFF6FF', color: '#1D4ED8', border: '#BFDBFE', label: 'Send Magic Link',
+      icon: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></svg>,
+    },
+    sending: {
+      bg: '#EFF6FF', color: '#93C5FD', border: '#BFDBFE', label: 'Sending…',
+      icon: <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10" strokeOpacity="0.25" /><path d="M12 2a10 10 0 0 1 10 10" /></svg>,
+    },
+    sent: {
+      bg: '#ECFDF5', color: '#059669', border: '#A7F3D0', label: 'Email Sent!',
+      icon: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>,
+    },
+    error: {
+      bg: '#FEF2F2', color: '#DC2626', border: '#FECACA', label: errMsg || 'Failed',
+      icon: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>,
+    },
   }[status];
 
   return (
     <button
       onClick={handleSend}
       disabled={status === 'sending'}
+      title="Send magic-link email via Supabase Auth"
       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 focus:outline-none shrink-0"
       style={{ backgroundColor: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}`, cursor: status === 'sending' ? 'not-allowed' : 'pointer' }}
-      title="Send invite email"
     >
       {cfg.icon}
       <span className="hidden sm:inline">{cfg.label}</span>
@@ -246,7 +243,7 @@ function ClientRow({ client }) {
         <p className="text-xs truncate" style={{ color: '#6B7280' }}>{client.email}{client.phone ? ` · ${client.phone}` : ''}</p>
       </div>
       <div className="flex items-center gap-2 shrink-0">
-        <SendEmailButton client={client} inviteUrl={inviteUrl} />
+        <SendMagicLinkButton client={client} />
         <CopyButton text={inviteUrl} />
       </div>
     </div>
@@ -281,13 +278,14 @@ export default function ManageClients() {
   function handleAdded(newClient) {
     setClients((prev) => [newClient, ...prev]);
     setShowForm(false);
-    // Auto-send invite email in background — failure is non-blocking
-    const inviteUrl = `${window.location.origin}?invite=${encodeURIComponent(newClient.email)}&name=${encodeURIComponent(newClient.full_name)}`;
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      supabase.functions.invoke('send-invite-email', {
-        body: { clientEmail: newClient.email, clientName: newClient.full_name, inviteUrl },
-        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
-      });
+    // Auto-send magic link on new client creation — non-blocking, failure is silent
+    supabase.auth.signInWithOtp({
+      email: newClient.email,
+      options: {
+        shouldCreateUser: true,
+        data: { full_name: newClient.full_name },
+        emailRedirectTo: window.location.origin,
+      },
     });
   }
 
@@ -333,7 +331,7 @@ export default function ManageClients() {
           <div className="px-6 pt-5 pb-1">
             <p className="text-sm font-bold" style={{ color: '#002147' }}>New Client</p>
             <p className="text-xs mt-0.5" style={{ color: '#9CA3AF' }}>
-              After saving, use the invite link to send them a signup URL.
+              A magic-link email will be sent automatically via Supabase Auth.
             </p>
           </div>
           <AddClientForm onAdded={handleAdded} />
@@ -392,7 +390,7 @@ export default function ManageClients() {
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-0.5">
             <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
           </svg>
-          Copy the invite link and send it to your client. When they open it and sign up, their account is automatically pre-filled with their name and email.
+          <strong>Send Magic Link</strong> emails a one-click login directly from Supabase — no extra accounts needed. The client clicks the link and is signed in instantly. You can also <strong>Copy Invite Link</strong> to share manually.
         </div>
       )}
     </div>
