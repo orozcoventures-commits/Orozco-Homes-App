@@ -160,24 +160,40 @@ export default function Approvals() {
   const { state } = useProject();
   const activeDbProject = state.activeDbProject;
 
-  const [orders,    setOrders]    = useState([]);
-  const [projects,  setProjects]  = useState([]);
-  const [loading,   setLoading]   = useState(true);
-  const [signing,   setSigning]   = useState(null);
-  const [showForm,  setShowForm]  = useState(false);
+  const [orders,      setOrders]      = useState([]);
+  const [projects,    setProjects]    = useState([]);
+  const [loading,     setLoading]     = useState(true);
+  const [fetchError,  setFetchError]  = useState('');
+  const [signing,     setSigning]     = useState(null);
+  const [showForm,    setShowForm]    = useState(false);
 
   const fetchOrders = useCallback(async () => {
+    setFetchError('');
     let query = supabase
       .from('change_works')
-      .select('*, project:projects(project_name)')
+      .select('id, project_id, title, description, category, original_cost, new_cost, status, approved_at, approved_by, declined_at, submitted_at, project:projects(project_name)')
       .order('submitted_at', { ascending: false });
 
     if (activeDbProject?.id) {
       query = query.eq('project_id', activeDbProject.id);
     }
 
-    const { data } = await query;
-    setOrders(data ?? []);
+    const { data, error } = await query;
+    if (error) {
+      // submitted_at may not exist in older DBs — fall back to created_at order
+      if (error.message?.includes('submitted_at')) {
+        const { data: data2, error: err2 } = await supabase
+          .from('change_works')
+          .select('id, project_id, title, description, category, original_cost, new_cost, status, approved_at, approved_by, declined_at, submitted_at, project:projects(project_name)')
+          .order('id', { ascending: false });
+        if (err2) setFetchError(err2.message);
+        else setOrders(data2 ?? []);
+      } else {
+        setFetchError(error.message);
+      }
+    } else {
+      setOrders(data ?? []);
+    }
     setLoading(false);
   }, [activeDbProject?.id]);
 
@@ -282,6 +298,17 @@ export default function Approvals() {
           </div>
         ))}
       </div>
+
+      {/* Fetch error */}
+      {fetchError && (
+        <div className="flex items-start gap-2.5 px-4 py-3 rounded-xl text-sm mb-6"
+          style={{ backgroundColor: '#FEF2F2', border: '1px solid #FECACA', color: '#991B1B' }}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-0.5">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          {fetchError}
+        </div>
+      )}
 
       {/* Loading */}
       {loading && (
