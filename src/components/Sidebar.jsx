@@ -72,9 +72,56 @@ const SECTIONS = [
   },
 ];
 
+const CONTRACTOR_TOOLS = [
+  {
+    label: 'Client Portal',
+    page: 'client-portal',
+    badge: null,
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
+      </svg>
+    ),
+  },
+  {
+    label: 'Photo Log',
+    page: 'photo-log',
+    badge: null,
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+        <circle cx="12" cy="13" r="4" />
+      </svg>
+    ),
+  },
+  {
+    label: 'Approvals',
+    page: 'approvals',
+    badge: '2',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <polyline points="14 2 14 8 20 8" /><polyline points="9 15 11 17 15 13" />
+      </svg>
+    ),
+  },
+  {
+    label: 'Messages',
+    page: 'messages',
+    badge: '3',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+      </svg>
+    ),
+  },
+];
+
 export default function Sidebar({ isOpen, onClose }) {
   const { state, dispatch } = useProject();
   const active = state.activeProject;
+  const activePage = state.activePage;
 
   // Track which expandable items are open
   const [expanded, setExpanded] = useState({ bathrooms: true, kitchens: false });
@@ -87,6 +134,11 @@ export default function Sidebar({ isOpen, onClose }) {
 
   function navigate(project) {
     dispatch({ type: 'SET_PROJECT', project });
+    onClose();
+  }
+
+  function navigatePage(page) {
+    dispatch({ type: 'SET_PAGE', page });
     onClose();
   }
 
@@ -140,6 +192,49 @@ export default function Sidebar({ isOpen, onClose }) {
 
       {/* ── Nav sections ───────────────────────────────── */}
       <nav className="flex-1 px-3 py-4 space-y-6">
+        {/* ── Contractor tools ───────────────────────────── */}
+        <div>
+          <p
+            className="px-3 mb-2 text-xs font-bold tracking-[0.14em] uppercase"
+            style={{ color: 'rgba(255,255,255,0.4)' }}
+          >
+            Contractor Tools
+          </p>
+          <div className="space-y-0.5">
+            {CONTRACTOR_TOOLS.map((tool) => {
+              const isActive = activePage === tool.page;
+              return (
+                <button
+                  key={tool.page}
+                  onClick={() => navigatePage(tool.page)}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150 focus:outline-none"
+                  style={{
+                    color: isActive ? '#D4AF37' : 'rgba(255,255,255,0.72)',
+                    backgroundColor: isActive ? 'rgba(212,175,55,0.18)' : 'transparent',
+                    borderLeft: isActive ? '2px solid #D4AF37' : '2px solid transparent',
+                  }}
+                  onMouseEnter={(e) => { if (!isActive) { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#fff'; } }}
+                  onMouseLeave={(e) => { if (!isActive) { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.72)'; } }}
+                >
+                  <span style={{ color: isActive ? '#D4AF37' : 'rgba(255,255,255,0.55)' }}>{tool.icon}</span>
+                  <span className="flex-1 text-left">{tool.label}</span>
+                  {tool.badge && (
+                    <span
+                      className="text-xs font-bold px-1.5 py-0.5 rounded-full shrink-0"
+                      style={{ backgroundColor: '#EF4444', color: '#fff', fontSize: '0.6rem', minWidth: '18px', textAlign: 'center' }}
+                    >
+                      {tool.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Divider */}
+        <div className="h-px" style={{ backgroundColor: 'rgba(255,255,255,0.08)' }} />
+
         {SECTIONS.map((section) => (
           <div key={section.heading}>
             {/* Section heading */}

@@ -4,13 +4,20 @@ const ProjectContext = createContext(null);
 
 const initialState = {
   activeProject: null,
+  activePage: 'home', // 'home' | 'project' | 'client-portal' | 'photo-log' | 'approvals' | 'messages'
   selections: {},
 };
 
 function reducer(state, action) {
   switch (action.type) {
     case 'SET_PROJECT':
-      return { ...state, activeProject: action.project };
+      return {
+        ...state,
+        activeProject: action.project,
+        activePage: action.project ? 'project' : 'home',
+      };
+    case 'SET_PAGE':
+      return { ...state, activePage: action.page };
     case 'SET_MATERIAL_STATUS': {
       const { materialId, status } = action;
       const current = state.selections[materialId];
