@@ -193,6 +193,84 @@ async function test7_ClientCannotEscalateRole() {
   }
 }
 
+async function test8_ClientCannotDeleteOwnMessage(projectId) {
+  console.log('\n── Test 8: Client cannot delete a message they sent ──');
+  if (!CLIENT_A_EMAIL || !CLIENT_A_PASSWORD) {
+    console.log('  ⚠️   Skipped — TEST_CLIENT_A_* env vars not set');
+    return;
+  }
+  const sb = await signedInClient(CLIENT_A_EMAIL, CLIENT_A_PASSWORD);
+  const { data: { user } } = await sb.auth.getUser();
+
+  // Insert a throwaway message to attempt deletion on
+  const { data: inserted, error: insertErr } = await sb
+    .from('messages')
+    .insert({ project_id: projectId, sender_id: user.id, sender_role: 'client', content: '__rls_delete_test__' })
+    .select('id')
+    .single();
+
+  if (insertErr) {
+    console.log(`  ⚠️   Could not insert test message (skipping delete test): ${insertErr.message}`);
+    return;
+  }
+
+  const { error: deleteErr } = await sb
+    .from('messages')
+    .delete()
+    .eq('id', inserted.id);
+
+  if (deleteErr) {
+    pass(`DELETE blocked by RLS: "${deleteErr.message}"`);
+  } else {
+    // Confirm it was actually removed — a silent no-op also means no policy matched
+    const { data: check } = await sb.from('messages').select('id').eq('id', inserted.id);
+    if (!check || check.length === 0) {
+      fail('Client DELETE succeeded — message was removed! RLS DELETE policy is MISSING.');
+    } else {
+      pass('DELETE call returned no error but row still exists — RLS silently blocked it');
+    }
+  }
+}
+
+async function test9_ClientCannotEditOwnMessage(projectId) {
+  console.log('\n── Test 9: Client cannot edit (UPDATE) a message they sent ──');
+  if (!CLIENT_A_EMAIL || !CLIENT_A_PASSWORD) {
+    console.log('  ⚠️   Skipped — TEST_CLIENT_A_* env vars not set');
+    return;
+  }
+  const sb = await signedInClient(CLIENT_A_EMAIL, CLIENT_A_PASSWORD);
+  const { data: { user } } = await sb.auth.getUser();
+
+  // Insert a throwaway message to attempt editing
+  const { data: inserted, error: insertErr } = await sb
+    .from('messages')
+    .insert({ project_id: projectId, sender_id: user.id, sender_role: 'client', content: '__rls_update_test__' })
+    .select('id')
+    .single();
+
+  if (insertErr) {
+    console.log(`  ⚠️   Could not insert test message (skipping update test): ${insertErr.message}`);
+    return;
+  }
+
+  const { error: updateErr } = await sb
+    .from('messages')
+    .update({ content: '__tampered__' })
+    .eq('id', inserted.id);
+
+  if (updateErr) {
+    pass(`UPDATE blocked by RLS: "${updateErr.message}"`);
+  } else {
+    // Confirm content was NOT changed
+    const { data: check } = await sb.from('messages').select('content').eq('id', inserted.id).single();
+    if (check?.content === '__tampered__') {
+      fail('Client UPDATE succeeded — message content was changed! RLS UPDATE policy is MISSING.');
+    } else {
+      pass('UPDATE call returned no error but content is unchanged — RLS silently blocked it');
+    }
+  }
+}
+
 // ── main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -220,6 +298,8 @@ async function main() {
     await test2_ClientBCannotReadClientAProject(clientAProjectId);
     await test3_ClientBCannotReadClientAMessages(clientAProjectId);
     await test4_ClientBCannotReadClientAChangeWorks(clientAProjectId);
+    await test8_ClientCannotDeleteOwnMessage(clientAProjectId);
+    await test9_ClientCannotEditOwnMessage(clientAProjectId);
   }
 
   await test6_AdminSeesAllProjects();
