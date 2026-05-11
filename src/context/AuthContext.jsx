@@ -4,45 +4,46 @@ import { supabase } from '../lib/supabase';
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUser]       = useState(null);   // supabase auth user
-  const [profile, setProfile] = useState(null);   // { role, full_name } from profiles table
+  const [user, setUser]       = useState(null);
+  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Effect 1: sync auth state only — no Supabase API calls inside this callback.
+  // Calling supabase.from() inside onAuthStateChange can deadlock the auth client's
+  // internal lock in supabase-js v2, causing loadProfile to never resolve.
   useEffect(() => {
-    // Rehydrate session on mount (handles page refresh)
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        loadProfile(session.user.id);
-      } else {
-        setLoading(false);
-      }
-    });
-
-    // Keep state in sync across tabs / token refreshes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         setUser(session?.user ?? null);
-        if (session?.user) {
-          loadProfile(session.user.id);
-        } else {
+        if (!session?.user) {
           setProfile(null);
           setLoading(false);
         }
       }
     );
-
     return () => subscription.unsubscribe();
   }, []);
 
+  // Effect 2: fetch profile whenever the logged-in user changes.
+  // Depends on user?.id so a mere token refresh (same user, new object reference)
+  // does not trigger an unnecessary round-trip.
+  useEffect(() => {
+    if (!user) return;
+    loadProfile(user.id);
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   async function loadProfile(userId) {
-    const { data } = await supabase
-      .from('profiles')
-      .select('role, full_name')
-      .eq('id', userId)
-      .single();
-    setProfile(data ?? null);
-    setLoading(false);
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('role, full_name')
+        .eq('id', userId)
+        .single();
+      setProfile(data ?? null);
+    } finally {
+      // Always clear the loading gate, even if the query errored or returned no row.
+      setLoading(false);
+    }
   }
 
   async function login(email, password) {
@@ -59,14 +60,16 @@ export function AuthProvider({ children }) {
     if (error) throw error;
   }
 
-  // Promotes the current user to admin only if no admins exist yet (one-time bootstrap).
-  // Returns true if promotion succeeded, false if an admin already exists.
+  // Promotes the caller to admin only when no admin exists yet.
+  // Uses getSession() for the user ID instead of the `user` state variable,
+  // because this is called right after login() before React has re-rendered
+  // and the `user` closure value is still null.
   async function claimFirstAdmin() {
     const { data, error } = await supabase.rpc('promote_to_first_admin');
     if (error) throw error;
     if (data) {
-      // Reload profile so isAdmin updates immediately
-      if (user) await loadProfile(user.id);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) await loadProfile(session.user.id);
     }
     return data;
   }
