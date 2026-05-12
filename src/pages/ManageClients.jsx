@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 
@@ -122,41 +122,43 @@ function AddClientForm({ onAdded }) {
   );
 }
 
-function CopyButton({ text }) {
-  const [copied, setCopied] = useState(false);
+function Toast({ message }) {
+  if (!message) return null;
+  return (
+    <div
+      className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-3 rounded-2xl text-sm font-semibold shadow-xl"
+      style={{ backgroundColor: '#002147', color: '#D4AF37', pointerEvents: 'none', whiteSpace: 'nowrap' }}
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="20 6 9 17 4 12" />
+      </svg>
+      {message}
+    </div>
+  );
+}
+
+function CopyInviteButton({ client, firstProject, onCopy }) {
+  const portalUrl = window.location.origin;
+  function buildText() {
+    if (firstProject?.project_pin) {
+      return `Hi ${client.full_name}! You can track your ${firstProject.project_name} progress here: ${portalUrl}. Your 4-digit access code is: ${firstProject.project_pin}.`;
+    }
+    return `Hi ${client.full_name}! You can access your Orozco Homes project portal here: ${portalUrl}.`;
+  }
   function handleCopy() {
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
+    navigator.clipboard.writeText(buildText()).then(() => onCopy('Copied to clipboard!'));
   }
   return (
     <button
       onClick={handleCopy}
       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 focus:outline-none shrink-0"
-      style={{
-        backgroundColor: copied ? '#ECFDF5' : '#F5F4F0',
-        color: copied ? '#059669' : '#374151',
-        border: `1px solid ${copied ? '#A7F3D0' : '#E8E6E1'}`,
-      }}
-      title="Copy invite link"
+      style={{ backgroundColor: '#F5F4F0', color: '#374151', border: '1px solid #E8E6E1' }}
+      title={firstProject?.project_pin ? 'Copy invite message with PIN' : 'Copy invite link'}
     >
-      {copied ? (
-        <>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
-          Copied!
-        </>
-      ) : (
-        <>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-          </svg>
-          Copy Invite Link
-        </>
-      )}
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+      </svg>
+      <span className="hidden sm:inline">Copy Invite</span>
     </button>
   );
 }
@@ -225,12 +227,13 @@ function SendMagicLinkButton({ client }) {
   );
 }
 
-function PinBadge({ pin }) {
+function PinBadge({ pin, clientName, projectName, onCopy }) {
   const [revealed, setRevealed] = useState(false);
-  const [copied, setCopied] = useState(false);
   if (!pin) return null;
-  function handleCopy() {
-    navigator.clipboard.writeText(pin).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
+  const portalUrl = window.location.origin;
+  function handleShare() {
+    const msg = `Hi ${clientName}! You can track your ${projectName} progress here: ${portalUrl}. Your 4-digit access code is: ${pin}.`;
+    navigator.clipboard.writeText(msg).then(() => onCopy('Copied to clipboard!'));
   }
   return (
     <div className="flex items-center gap-1.5">
@@ -245,23 +248,30 @@ function PinBadge({ pin }) {
       </div>
       <button onClick={() => setRevealed((v) => !v)}
         className="text-xs px-2 py-1 rounded-lg transition-colors focus:outline-none"
-        style={{ backgroundColor: '#F5F4F0', color: '#6B7280' }}>
+        style={{ backgroundColor: '#F5F4F0', color: '#6B7280', border: '1px solid #E8E6E1' }}>
         {revealed ? 'Hide' : 'Show'}
       </button>
-      {revealed && (
-        <button onClick={handleCopy}
-          className="text-xs px-2 py-1 rounded-lg transition-colors focus:outline-none"
-          style={{ backgroundColor: copied ? '#ECFDF5' : '#F5F4F0', color: copied ? '#059669' : '#6B7280' }}>
-          {copied ? '✓' : 'Copy'}
-        </button>
-      )}
+      {/* Share button — always visible, copies full invite message */}
+      <button
+        onClick={handleShare}
+        title="Copy invite message with PIN"
+        className="flex items-center gap-1 px-2 py-1 rounded-lg transition-all duration-150 focus:outline-none"
+        style={{ backgroundColor: '#002147', color: '#D4AF37', border: '1px solid transparent' }}
+        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#003166'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#002147'; }}
+      >
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+        </svg>
+        <span className="text-xs font-semibold">Share</span>
+      </button>
     </div>
   );
 }
 
-function ClientRow({ client, projects }) {
-  const inviteUrl = `${window.location.origin}?invite=${encodeURIComponent(client.email)}&name=${encodeURIComponent(client.full_name)}`;
+function ClientRow({ client, projects, onCopy }) {
   const clientProjects = projects.filter((p) => p.managed_client_id === client.id);
+  const firstProject   = clientProjects[0] ?? null;
   return (
     <div style={{ borderBottom: '1px solid #F3F2EE' }}>
       <div className="flex items-center gap-3 px-5 py-4">
@@ -275,10 +285,10 @@ function ClientRow({ client, projects }) {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <SendMagicLinkButton client={client} />
-          <CopyButton text={inviteUrl} />
+          <CopyInviteButton client={client} firstProject={firstProject} onCopy={onCopy} />
         </div>
       </div>
-      {/* Project PINs */}
+      {/* Project PINs with per-project Share buttons */}
       {clientProjects.length > 0 && (
         <div className="px-5 pb-3 space-y-2">
           {clientProjects.map((p) => (
@@ -288,7 +298,12 @@ function ClientRow({ client, projects }) {
                 <p className="text-xs font-semibold truncate" style={{ color: '#002147' }}>{p.project_name}</p>
                 <p className="text-xs" style={{ color: '#9CA3AF' }}>Project PIN</p>
               </div>
-              <PinBadge pin={p.project_pin} />
+              <PinBadge
+                pin={p.project_pin}
+                clientName={client.full_name}
+                projectName={p.project_name}
+                onCopy={onCopy}
+              />
             </div>
           ))}
         </div>
@@ -303,6 +318,15 @@ export default function ManageClients() {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading]   = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [toast, setToast]       = useState('');
+  const toastTimer              = useRef(null);
+
+  function showToast(msg) {
+    clearTimeout(toastTimer.current);
+    setToast(msg);
+    toastTimer.current = setTimeout(() => setToast(''), 2500);
+  }
+  useEffect(() => () => clearTimeout(toastTimer.current), []);
 
   const fetchClients = useCallback(async () => {
     const [{ data: clientData }, { data: projectData }] = await Promise.all([
@@ -346,6 +370,7 @@ export default function ManageClients() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <Toast message={toast} />
 
       {/* Header */}
       <div className="flex items-start justify-between mb-8 gap-4">
@@ -430,7 +455,7 @@ export default function ManageClients() {
         ) : (
           <div>
             {clients.map((client) => (
-              <ClientRow key={client.id} client={client} projects={projects} />
+              <ClientRow key={client.id} client={client} projects={projects} onCopy={showToast} />
             ))}
           </div>
         )}
@@ -445,7 +470,7 @@ export default function ManageClients() {
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-0.5">
             <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
           </svg>
-          <strong>Send Magic Link</strong> emails a one-click login directly from Supabase — no extra accounts needed. The client clicks the link and is signed in instantly. You can also <strong>Copy Invite Link</strong> to share manually.
+          Click <strong>Share</strong> next to a project PIN to copy a ready-to-send message with the portal link and access code. Use <strong>Copy Invite</strong> at the top of a client card to copy their invite message, then paste it into a text or WhatsApp.
         </div>
       )}
     </div>
