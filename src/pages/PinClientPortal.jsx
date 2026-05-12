@@ -85,11 +85,19 @@ export default function PinClientPortal() {
     setError('');
     const { data: result, error: err } = await supabase.rpc('get_pin_portal_data', {
       p_project_id: pinSession.projectId,
-      p_pin:        pinSession.pin,
+      p_pin:        String(pinSession.pin),
     });
     setLoading(false);
-    if (err || !result) {
-      setError('Could not load project data. Please check your PIN and try again.');
+    if (err) {
+      console.error('[PinPortal] get_pin_portal_data error:', err);
+      setError(`Could not load project data. (${err.message})`);
+      return;
+    }
+    if (!result) {
+      console.warn('[PinPortal] get_pin_portal_data returned null', {
+        projectId: pinSession.projectId, pin: pinSession.pin,
+      });
+      setError('Your session has expired or the PIN no longer matches. Please sign in again.');
       return;
     }
     setData(result);
@@ -172,10 +180,24 @@ export default function PinClientPortal() {
           )}
 
           {error && !loading && (
-            <div className="flex flex-col items-center gap-4 py-24 text-center">
-              <p className="text-sm" style={{ color: '#EF4444' }}>{error}</p>
-              <button onClick={exitPinMode} className="px-5 py-2.5 rounded-xl text-sm font-bold"
-                style={{ backgroundColor: '#002147', color: '#D4AF37' }}>Back to Login</button>
+            <div className="flex flex-col items-center gap-4 py-24 text-center px-4">
+              <div className="w-12 h-12 rounded-2xl flex items-center justify-center"
+                style={{ backgroundColor: '#FEF2F2' }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+              </div>
+              <p className="text-sm max-w-xs" style={{ color: '#374151' }}>{error}</p>
+              <div className="flex gap-3">
+                <button onClick={fetchData} className="px-5 py-2.5 rounded-xl text-sm font-bold"
+                  style={{ backgroundColor: '#F5F4F0', color: '#374151', border: '1px solid #E8E6E1' }}>
+                  Try Again
+                </button>
+                <button onClick={exitPinMode} className="px-5 py-2.5 rounded-xl text-sm font-bold"
+                  style={{ backgroundColor: '#002147', color: '#D4AF37' }}>
+                  Back to Login
+                </button>
+              </div>
             </div>
           )}
 
