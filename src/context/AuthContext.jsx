@@ -8,6 +8,11 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // PIN session — persisted in localStorage, no Supabase auth required
+  const [pinSession, setPinSession] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('pin_session') ?? 'null'); } catch { return null; }
+  });
+
   // Effect 1: sync auth state only — no Supabase API calls inside this callback.
   // Calling supabase.from() inside onAuthStateChange can deadlock the auth client's
   // internal lock in supabase-js v2, causing loadProfile to never resolve.
@@ -89,11 +94,43 @@ export function AuthProvider({ children }) {
     await supabase.auth.signOut();
   }
 
+  async function verifyPin(email, pin) {
+    const { data, error } = await supabase.rpc('verify_project_pin', {
+      p_email: email.trim(),
+      p_pin:   pin.trim(),
+    });
+    if (error) throw new Error(error.message);
+    if (!data || data.length === 0) throw new Error('Invalid email or PIN. Please try again.');
+    const row = data[0];
+    const session = {
+      projectId:   row.project_id,
+      projectName: row.project_name,
+      clientName:  row.client_name,
+      label:       row.label,
+      category:    row.category,
+      email:       email.trim().toLowerCase(),
+      pin:         pin.trim(),
+    };
+    localStorage.setItem('pin_session', JSON.stringify(session));
+    setPinSession(session);
+    return session;
+  }
+
+  function exitPinMode() {
+    localStorage.removeItem('pin_session');
+    setPinSession(null);
+  }
+
   const isAuthenticated = !!user && !loading;
   const isAdmin         = profile?.role === 'admin';
+  const isPinMode       = !!pinSession;
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, isAuthenticated, isAdmin, login, signup, claimFirstAdmin, logout }}>
+    <AuthContext.Provider value={{
+      user, profile, loading, isAuthenticated, isAdmin,
+      login, signup, claimFirstAdmin, logout,
+      pinSession, isPinMode, verifyPin, exitPinMode,
+    }}>
       {children}
     </AuthContext.Provider>
   );

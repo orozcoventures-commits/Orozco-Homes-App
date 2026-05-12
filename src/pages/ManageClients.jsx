@@ -225,27 +225,74 @@ function SendMagicLinkButton({ client }) {
   );
 }
 
-function ClientRow({ client }) {
-  const inviteUrl = `${window.location.origin}?invite=${encodeURIComponent(client.email)}&name=${encodeURIComponent(client.full_name)}`;
+function PinBadge({ pin }) {
+  const [revealed, setRevealed] = useState(false);
+  const [copied, setCopied] = useState(false);
+  if (!pin) return null;
+  function handleCopy() {
+    navigator.clipboard.writeText(pin).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
+  }
   return (
-    <div
-      className="flex items-center gap-3 px-5 py-4"
-      style={{ borderBottom: '1px solid #F3F2EE' }}
-    >
-      <div
-        className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white shrink-0"
-        style={{ backgroundColor: avatarColor(client.id), fontSize: '0.75rem' }}
-      >
-        {getInitials(client.full_name)}
+    <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg"
+        style={{ backgroundColor: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.3)' }}>
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+        <span className="text-xs font-bold tracking-[0.18em]" style={{ color: '#002147', fontFamily: 'monospace' }}>
+          {revealed ? pin : '••••'}
+        </span>
       </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold truncate" style={{ color: '#002147' }}>{client.full_name}</p>
-        <p className="text-xs truncate" style={{ color: '#6B7280' }}>{client.email}{client.phone ? ` · ${client.phone}` : ''}</p>
+      <button onClick={() => setRevealed((v) => !v)}
+        className="text-xs px-2 py-1 rounded-lg transition-colors focus:outline-none"
+        style={{ backgroundColor: '#F5F4F0', color: '#6B7280' }}>
+        {revealed ? 'Hide' : 'Show'}
+      </button>
+      {revealed && (
+        <button onClick={handleCopy}
+          className="text-xs px-2 py-1 rounded-lg transition-colors focus:outline-none"
+          style={{ backgroundColor: copied ? '#ECFDF5' : '#F5F4F0', color: copied ? '#059669' : '#6B7280' }}>
+          {copied ? '✓' : 'Copy'}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function ClientRow({ client, projects }) {
+  const inviteUrl = `${window.location.origin}?invite=${encodeURIComponent(client.email)}&name=${encodeURIComponent(client.full_name)}`;
+  const clientProjects = projects.filter((p) => p.managed_client_id === client.id);
+  return (
+    <div style={{ borderBottom: '1px solid #F3F2EE' }}>
+      <div className="flex items-center gap-3 px-5 py-4">
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white shrink-0"
+          style={{ backgroundColor: avatarColor(client.id), fontSize: '0.75rem' }}>
+          {getInitials(client.full_name)}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold truncate" style={{ color: '#002147' }}>{client.full_name}</p>
+          <p className="text-xs truncate" style={{ color: '#6B7280' }}>{client.email}{client.phone ? ` · ${client.phone}` : ''}</p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <SendMagicLinkButton client={client} />
+          <CopyButton text={inviteUrl} />
+        </div>
       </div>
-      <div className="flex items-center gap-2 shrink-0">
-        <SendMagicLinkButton client={client} />
-        <CopyButton text={inviteUrl} />
-      </div>
+      {/* Project PINs */}
+      {clientProjects.length > 0 && (
+        <div className="px-5 pb-3 space-y-2">
+          {clientProjects.map((p) => (
+            <div key={p.id} className="flex items-center justify-between gap-3 px-3 py-2 rounded-xl"
+              style={{ backgroundColor: '#F9F8F6', border: '1px solid #F0EEE9' }}>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold truncate" style={{ color: '#002147' }}>{p.project_name}</p>
+                <p className="text-xs" style={{ color: '#9CA3AF' }}>Project PIN</p>
+              </div>
+              <PinBadge pin={p.project_pin} />
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -253,15 +300,23 @@ function ClientRow({ client }) {
 export default function ManageClients() {
   const { isAdmin } = useAuth();
   const [clients, setClients]   = useState([]);
+  const [projects, setProjects] = useState([]);
   const [loading, setLoading]   = useState(true);
   const [showForm, setShowForm] = useState(false);
 
   const fetchClients = useCallback(async () => {
-    const { data } = await supabase
-      .from('clients')
-      .select('id, full_name, email, phone, created_at')
-      .order('created_at', { ascending: false });
-    setClients(data ?? []);
+    const [{ data: clientData }, { data: projectData }] = await Promise.all([
+      supabase
+        .from('clients')
+        .select('id, full_name, email, phone, created_at')
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('projects')
+        .select('id, project_name, project_pin, managed_client_id')
+        .order('project_name'),
+    ]);
+    setClients(clientData ?? []);
+    setProjects(projectData ?? []);
     setLoading(false);
   }, []);
 
@@ -375,7 +430,7 @@ export default function ManageClients() {
         ) : (
           <div>
             {clients.map((client) => (
-              <ClientRow key={client.id} client={client} />
+              <ClientRow key={client.id} client={client} projects={projects} />
             ))}
           </div>
         )}

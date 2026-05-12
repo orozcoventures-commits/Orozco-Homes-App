@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 
 // ── Password field with show/hide ─────────────────────────────────────────────
@@ -330,15 +330,148 @@ function CreateAccountForm({ onSuccess }) {
   );
 }
 
+// ── PIN Login form ────────────────────────────────────────────────────────────
+function PinLoginForm() {
+  const { verifyPin } = useAuth();
+  const [email, setEmail]   = useState('');
+  const [digits, setDigits] = useState(['', '', '', '']);
+  const [error, setError]   = useState('');
+  const [loading, setLoading] = useState(false);
+  const inputRefs = [useRef(), useRef(), useRef(), useRef()];
+
+  useEffect(() => { inputRefs[0].current?.focus(); }, []);
+
+  function handleDigit(i, value) {
+    const v = value.replace(/\D/g, '').slice(-1);
+    const next = [...digits];
+    next[i] = v;
+    setDigits(next);
+    if (v && i < 3) inputRefs[i + 1].current?.focus();
+  }
+
+  function handleKeyDown(i, e) {
+    if (e.key === 'Backspace' && !digits[i] && i > 0) {
+      inputRefs[i - 1].current?.focus();
+    }
+    if (e.key === 'ArrowLeft' && i > 0) inputRefs[i - 1].current?.focus();
+    if (e.key === 'ArrowRight' && i < 3) inputRefs[i + 1].current?.focus();
+  }
+
+  function handlePaste(e) {
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 4);
+    if (pasted.length === 4) {
+      setDigits(pasted.split(''));
+      inputRefs[3].current?.focus();
+      e.preventDefault();
+    }
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    const pin = digits.join('');
+    if (!email.trim() || pin.length < 4) return;
+    setError('');
+    setLoading(true);
+    try {
+      await verifyPin(email.trim(), pin);
+      // AuthContext sets pinSession → App re-renders to PinClientPortal
+    } catch (err) {
+      setError(err.message || 'Invalid email or PIN. Please try again.');
+      setDigits(['', '', '', '']);
+      inputRefs[0].current?.focus();
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const pin = digits.join('');
+  const canSubmit = email.trim() && pin.length === 4 && !loading;
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6" noValidate>
+      {/* Explainer */}
+      <div className="px-4 py-3 rounded-xl text-xs"
+        style={{ backgroundColor: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.3)', color: '#92400E' }}>
+        <p className="font-semibold mb-0.5" style={{ color: '#002147' }}>Client PIN Access</p>
+        Enter the email address your contractor has on file, then the 4-digit PIN they gave you.
+      </div>
+
+      {/* Email */}
+      <div>
+        <label className="block text-xs font-bold mb-2" style={{ color: '#374151' }}>Email address</label>
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="you@example.com"
+          autoComplete="email"
+          required
+          className="w-full text-sm rounded-xl px-4 py-3 focus:outline-none transition-colors duration-150"
+          style={{ border: '1.5px solid #E8E6E1', color: '#002147', backgroundColor: '#fff' }}
+          onFocus={(e) => { e.target.style.borderColor = '#D4AF37'; }}
+          onBlur={(e)  => { e.target.style.borderColor = '#E8E6E1'; }}
+        />
+      </div>
+
+      {/* 4-digit PIN boxes */}
+      <div>
+        <label className="block text-xs font-bold mb-3" style={{ color: '#374151' }}>Project PIN</label>
+        <div className="flex gap-3 justify-center" onPaste={handlePaste}>
+          {digits.map((d, i) => (
+            <input
+              key={i}
+              ref={inputRefs[i]}
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={1}
+              value={d}
+              onChange={(e) => handleDigit(i, e.target.value)}
+              onKeyDown={(e) => handleKeyDown(i, e)}
+              className="w-14 h-16 text-center text-2xl font-bold rounded-2xl focus:outline-none transition-all duration-150"
+              style={{
+                border: `2px solid ${d ? '#D4AF37' : '#E8E6E1'}`,
+                color: '#002147',
+                backgroundColor: d ? 'rgba(212,175,55,0.07)' : '#fff',
+                boxShadow: d ? '0 0 0 3px rgba(212,175,55,0.15)' : 'none',
+              }}
+              onFocus={(e) => {
+                e.target.style.borderColor = '#D4AF37';
+                e.target.style.boxShadow = '0 0 0 3px rgba(212,175,55,0.2)';
+                e.target.select();
+              }}
+              onBlur={(e) => {
+                if (!d) {
+                  e.target.style.borderColor = '#E8E6E1';
+                  e.target.style.boxShadow = 'none';
+                }
+              }}
+            />
+          ))}
+        </div>
+      </div>
+
+      <ErrorBanner message={error} />
+
+      <SubmitButton
+        loading={loading}
+        disabled={!canSubmit}
+        label="Access My Project"
+        loadingLabel="Verifying PIN…"
+      />
+    </form>
+  );
+}
+
 // ── Main Login page ───────────────────────────────────────────────────────────
 export default function Login() {
   const hasInvite = !!new URLSearchParams(window.location.search).get('invite');
-  const [tab, setTab] = useState(hasInvite ? 'signup' : 'signin');
+  const [tab, setTab] = useState(hasInvite ? 'signup' : 'pin');
 
   const tabStyle = (active) => ({
     flex: 1,
     padding: '0.5rem',
-    fontSize: '0.8125rem',
+    fontSize: '0.75rem',
     fontWeight: active ? '700' : '500',
     borderRadius: '0.625rem',
     cursor: 'pointer',
@@ -426,10 +559,10 @@ export default function Login() {
           </p>
 
           {/* Tab switcher */}
-          <div
-            className="flex p-1 mb-6 rounded-xl"
-            style={{ backgroundColor: '#EDEBE6' }}
-          >
+          <div className="flex p-1 mb-6 rounded-xl" style={{ backgroundColor: '#EDEBE6' }}>
+            <button type="button" style={tabStyle(tab === 'pin')} onClick={() => setTab('pin')}>
+              Project PIN
+            </button>
             <button type="button" style={tabStyle(tab === 'signin')} onClick={() => setTab('signin')}>
               Sign In
             </button>
@@ -438,14 +571,18 @@ export default function Login() {
             </button>
           </div>
 
-          {tab === 'signin'
-            ? <SignInForm />
-            : <CreateAccountForm onSuccess={() => setTab('signin')} />
-          }
+          {tab === 'pin'    && <PinLoginForm />}
+          {tab === 'signin' && <SignInForm />}
+          {tab === 'signup' && <CreateAccountForm onSuccess={() => setTab('signin')} />}
 
+          {tab === 'pin' && (
+            <p className="text-xs text-center mt-8" style={{ color: '#9CA3AF' }}>
+              Your contractor gives you your Project PIN. No account required.
+            </p>
+          )}
           {tab === 'signin' && (
             <p className="text-xs text-center mt-8" style={{ color: '#9CA3AF' }}>
-              Don't have an account? Contact your Orozco Homes contractor to receive your login credentials.
+              Clients: use the <button onClick={() => setTab('pin')} className="underline" style={{ color: '#D4AF37' }}>Project PIN</button> tab instead.
             </p>
           )}
         </div>

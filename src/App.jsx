@@ -15,6 +15,7 @@ import MessageCenter from './pages/MessageCenter';
 import WeeklyUpdates from './pages/WeeklyUpdates';
 import AdminCreateProject from './pages/AdminCreateProject';
 import ManageClients from './pages/ManageClients';
+import PinClientPortal from './pages/PinClientPortal';
 import './index.css';
 
 // Shown when VITE_SUPABASE_* env vars are missing in Netlify
@@ -108,12 +109,13 @@ function LoadingScreen() {
 
 function AppContent() {
   const { state } = useProject();
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, isPinMode } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const page = state.activePage;
 
   if (loading) return <LoadingScreen />;
+  if (isPinMode) return <PinClientPortal />;
   if (!isAuthenticated) return <Login />;
 
   const isMessages = page === 'messages';
