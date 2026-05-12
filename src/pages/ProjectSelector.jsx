@@ -94,7 +94,7 @@ export default function ProjectSelector() {
       const { data } = await supabase
         .from('projects')
         .select(`
-          id, project_name, label, category, created_at,
+          id, project_name, label, category, created_at, project_pin,
           managed_client:clients(full_name, email),
           client_profile:profiles(full_name),
           weekly_updates(status, progress_percent, current_phase, updated_at)
