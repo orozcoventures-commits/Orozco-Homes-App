@@ -83,23 +83,38 @@ export default function PinClientPortal() {
   async function fetchData() {
     setLoading(true);
     setError('');
+
+    const pin        = String(pinSession.pin ?? '').trim();
+    const projectId  = String(pinSession.projectId ?? '').trim();
+
+    console.log('[PinPortal] fetching data', { projectId, pin });
+
     const { data: result, error: err } = await supabase.rpc('get_pin_portal_data', {
-      p_project_id: pinSession.projectId,
-      p_pin:        String(pinSession.pin),
+      p_project_id: projectId,
+      p_pin:        pin,
     });
+
     setLoading(false);
+
     if (err) {
-      console.error('[PinPortal] get_pin_portal_data error:', err);
-      setError(`Could not load project data. (${err.message})`);
+      // Distinguish function-not-found (42883) from other errors
+      const isNotFound = err.code === 'PGRST202' || err.code === '42883';
+      console.error('[PinPortal] RPC error', { code: err.code, message: err.message, hint: err.hint, details: err.details });
+      if (isNotFound) {
+        setError('The portal function is not set up yet. Please ask your contractor to run the latest database migration (016).');
+      } else {
+        setError(`Could not load project data. Error ${err.code}: ${err.message}`);
+      }
       return;
     }
+
     if (!result) {
-      console.warn('[PinPortal] get_pin_portal_data returned null', {
-        projectId: pinSession.projectId, pin: pinSession.pin,
-      });
-      setError('Your session has expired or the PIN no longer matches. Please sign in again.');
+      console.warn('[PinPortal] RPC returned null — PIN mismatch or project not found', { projectId, pin });
+      setError('Your PIN session no longer matches the project record. Please sign out and sign in again.');
       return;
     }
+
+    console.log('[PinPortal] data loaded successfully', result);
     setData(result);
     setLocalMsgs(result.messages ?? []);
   }
