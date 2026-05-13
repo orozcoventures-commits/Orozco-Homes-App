@@ -97,13 +97,12 @@ export default function PinClientPortal() {
     setLoading(false);
 
     if (err) {
-      // Distinguish function-not-found (42883) from other errors
       const isNotFound = err.code === 'PGRST202' || err.code === '42883';
       console.error('[PinPortal] RPC error', { code: err.code, message: err.message, hint: err.hint, details: err.details });
       if (isNotFound) {
-        setError('The portal function is not set up yet. Please ask your contractor to run the latest database migration (016).');
+        setError('Portal not configured yet (function missing). Contractor: run migration 017 in Supabase SQL Editor.');
       } else {
-        setError(`Could not load project data. Error ${err.code}: ${err.message}`);
+        setError(`Error ${err.code || 'unknown'}: ${err.message}`);
       }
       return;
     }
@@ -145,11 +144,12 @@ export default function PinClientPortal() {
     setSending(false);
   }
 
-  const project     = data?.project ?? {};
-  const weekly      = data?.weekly_update;
-  const orders      = data?.change_orders ?? [];
-  const photos      = data?.photo_logs ?? [];
-  const statusCfg   = STATUS_CFG[weekly?.status ?? project.status] ?? STATUS_CFG['on-track'];
+  const project   = data?.project ?? {};
+  const weekly    = data?.weekly_update;
+  const orders    = data?.change_orders ?? [];
+  const photos    = data?.photo_logs ?? [];
+  // projects table has no 'status' column — status always comes from weekly_update
+  const statusCfg = STATUS_CFG[weekly?.status] ?? STATUS_CFG['on-track'];
 
   return (
     <>
