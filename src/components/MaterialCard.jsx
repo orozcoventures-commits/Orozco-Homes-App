@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useProject } from '../context/ProjectContext';
 import SupplierBadge from './SupplierBadge';
 import { SUPPLIERS } from '../data/materials';
+import { supabase } from '../lib/supabase';
+import { getBreakdown, hasDimensions, fmtMoney, LABOR_RATES } from '../utils/estimate';
 
 const STATUS_CONFIG = {
   Considering: {
@@ -42,12 +44,20 @@ const CATEGORY_FALLBACK_BG = {
 
 export default function MaterialCard({ material, category }) {
   const { state, dispatch } = useProject();
+  const { dimensions, activeDbProject } = state;
   const selection = state.selections[material.id];
   const currentStatus = selection?.status ?? null;
   const [imgError, setImgError] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
+  const [showBreakdown, setShowBreakdown] = useState(false);
 
-  function setStatus(status) {
+  // Calculate installed cost breakdown
+  const breakdown = getBreakdown(material, category, dimensions);
+  const dims = dimensions;
+  const showInstalled = hasDimensions(dims) && breakdown.quantity > 0;
+
+  async function setStatus(status) {
+    // Optimistic dispatch first
     dispatch({
       type: 'SET_MATERIAL_STATUS',
       materialId: material.id,
@@ -56,6 +66,43 @@ export default function MaterialCard({ material, category }) {
       name: material.name,
       category,
     });
+
+    // DB persistence (fire-and-forget)
+    if (activeDbProject?.id) {
+      const isToggleOff = currentStatus === status;
+      if (isToggleOff) {
+        // Delete from material_selections
+        supabase
+          .from('material_selections')
+          .delete()
+          .eq('project_id', activeDbProject.id)
+          .eq('material_id', material.id)
+          .then(({ error }) => {
+            if (error) console.warn('[MaterialCard] delete selection error:', error.message);
+          });
+      } else {
+        // Upsert
+        supabase
+          .from('material_selections')
+          .upsert(
+            {
+              project_id:    activeDbProject.id,
+              material_id:   material.id,
+              category,
+              product_name:  material.name,
+              unit_price:    material.price,
+              unit_type:     material.unit ?? 'sq ft',
+              labor_rate:    LABOR_RATES[category] ?? 0,
+              installed_cost: breakdown.total,
+              status,
+            },
+            { onConflict: 'project_id,material_id' }
+          )
+          .then(({ error }) => {
+            if (error) console.warn('[MaterialCard] upsert selection error:', error.message);
+          });
+      }
+    }
   }
 
   const supplier = SUPPLIERS[material.supplier];
@@ -83,6 +130,7 @@ export default function MaterialCard({ material, category }) {
         boxShadow: isActive
           ? '0 8px 24px rgba(0,33,71,0.12)'
           : '0 2px 10px rgba(0,33,71,0.07)',
+        position: 'relative',
       }}
       onMouseEnter={(e) => {
         if (!isActive) e.currentTarget.style.boxShadow = '0 12px 32px rgba(0,33,71,0.13)';
@@ -188,7 +236,7 @@ export default function MaterialCard({ material, category }) {
       </div>
 
       {/* ── Card body ─────────────────────────────────────────────────────── */}
-      <div className="p-5 flex-1 flex flex-col gap-4">
+      <div className="p-5 flex-1 flex flex-col gap-4" style={{ position: 'relative' }}>
 
         {/* Supplier name + product name + SKU */}
         <div>
@@ -223,12 +271,55 @@ export default function MaterialCard({ material, category }) {
 
         {/* Price + status buttons */}
         <div className="mt-auto pt-4" style={{ borderTop: '1px solid #F0EEE9' }}>
-          <div className="flex items-baseline justify-between mb-4">
-            <span className="text-xl font-bold" style={{ color: '#002147' }}>
-              ${material.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </span>
-            <span className="text-xs" style={{ color: '#9CA3AF' }}>/ {material.unit}</span>
-          </div>
+          {showInstalled ? (
+            /* ── Installed cost mode ── */
+            <div className="mb-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold tracking-wide mb-0.5" style={{ color: '#9CA3AF' }}>
+                    Fully Installed
+                  </p>
+                  <p className="text-xl font-bold leading-tight" style={{ color: '#D4AF37' }}>
+                    {fmtMoney(breakdown.total)}
+                  </p>
+                  <p className="text-xs mt-0.5" style={{ color: '#9CA3AF' }}>
+                    {fmtMoney(material.price)} / {material.unit}
+                  </p>
+                </div>
+                {/* Info button to toggle breakdown */}
+                <button
+                  onClick={() => setShowBreakdown((v) => !v)}
+                  title="View price breakdown"
+                  className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center transition-colors duration-150"
+                  style={{
+                    backgroundColor: showBreakdown ? '#002147' : 'rgba(0,33,71,0.07)',
+                    color: showBreakdown ? '#D4AF37' : '#002147',
+                    border: '1.5px solid rgba(0,33,71,0.12)',
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  ⓘ
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* ── Per-unit price mode ── */
+            <div className="flex items-baseline justify-between mb-4">
+              <span className="text-xl font-bold" style={{ color: '#002147' }}>
+                ${material.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+              <span className="text-xs" style={{ color: '#9CA3AF' }}>/ {material.unit}</span>
+            </div>
+          )}
+
+          {/* Hint when no dimensions */}
+          {!showInstalled && (
+            <p className="text-xs mb-3" style={{ color: '#C4B89A', fontStyle: 'italic' }}>
+              Add dimensions above for installed cost
+            </p>
+          )}
 
           <div className="flex gap-1.5">
             {STATUSES.map((s) => {
@@ -263,6 +354,91 @@ export default function MaterialCard({ material, category }) {
                 </button>
               );
             })}
+          </div>
+        </div>
+
+        {/* ── Breakdown Overlay ─────────────────────────────────────────── */}
+        <div
+          className="absolute left-0 right-0 bottom-0 rounded-b-2xl overflow-hidden"
+          style={{
+            top: showBreakdown ? '0' : '100%',
+            opacity: showBreakdown ? 1 : 0,
+            transform: showBreakdown ? 'translateY(0)' : 'translateY(8px)',
+            transition: 'opacity 0.22s ease, transform 0.22s ease, top 0s linear ' + (showBreakdown ? '0s' : '0.22s'),
+            backgroundColor: 'rgba(0,33,71,0.97)',
+            zIndex: 20,
+            pointerEvents: showBreakdown ? 'auto' : 'none',
+            backdropFilter: 'blur(4px)',
+            padding: '1.25rem',
+          }}
+        >
+          {/* Close button */}
+          <button
+            onClick={() => setShowBreakdown(false)}
+            className="absolute top-3 right-3 w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold transition-colors"
+            style={{ color: 'rgba(255,255,255,0.5)', backgroundColor: 'rgba(255,255,255,0.08)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.5)'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)'; }}
+          >
+            ✕
+          </button>
+
+          <p
+            className="text-xs font-bold tracking-widest uppercase mb-4"
+            style={{ color: 'rgba(212,175,55,0.8)' }}
+          >
+            Price Breakdown
+          </p>
+
+          <div className="flex flex-col gap-2">
+            {/* Material row */}
+            <div className="flex justify-between items-baseline">
+              <span className="text-xs" style={{ color: 'rgba(255,255,255,0.55)' }}>
+                Material
+                <span className="ml-1 text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                  ({breakdown.quantity} {material.unit})
+                </span>
+              </span>
+              <span className="text-sm font-semibold" style={{ color: '#fff' }}>
+                {fmtMoney(breakdown.materialCost)}
+              </span>
+            </div>
+
+            {/* Labor row */}
+            <div className="flex justify-between items-baseline">
+              <span className="text-xs" style={{ color: 'rgba(255,255,255,0.55)' }}>
+                Labor
+                <span className="ml-1 text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                  (${breakdown.laborRate}/{material.unit})
+                </span>
+              </span>
+              <span className="text-sm font-semibold" style={{ color: '#fff' }}>
+                {fmtMoney(breakdown.laborCost)}
+              </span>
+            </div>
+
+            {/* Waste row */}
+            <div className="flex justify-between items-baseline">
+              <span className="text-xs" style={{ color: 'rgba(255,255,255,0.55)' }}>
+                15% Waste Factor
+              </span>
+              <span className="text-sm font-semibold" style={{ color: '#fff' }}>
+                {fmtMoney(breakdown.wasteCost)}
+              </span>
+            </div>
+
+            {/* Divider */}
+            <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', marginTop: '4px', paddingTop: '4px' }} />
+
+            {/* Total */}
+            <div className="flex justify-between items-baseline">
+              <span className="text-xs font-bold tracking-wide uppercase" style={{ color: 'rgba(255,255,255,0.7)' }}>
+                Total Installed
+              </span>
+              <span className="text-base font-bold" style={{ color: '#D4AF37' }}>
+                {fmtMoney(breakdown.total)}
+              </span>
+            </div>
           </div>
         </div>
       </div>

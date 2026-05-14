@@ -7,6 +7,7 @@ const initialState = {
   activeDbProject: null,  // real Supabase projects row
   activePage: 'home',
   selections: {},
+  dimensions: { floor_sqft: '', wall_sqft: '', linear_feet: '' },
 };
 
 function reducer(state, action) {
@@ -45,6 +46,8 @@ function reducer(state, action) {
       return { ...state, activeDbProject: null };
     case 'CLEAR_SELECTIONS':
       return { ...state, selections: {} };
+    case 'SET_DIMENSIONS':
+      return { ...state, dimensions: { ...state.dimensions, ...action.dimensions } };
     default:
       return state;
   }

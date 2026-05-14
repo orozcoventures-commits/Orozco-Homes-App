@@ -1,4 +1,5 @@
 import { useProject } from '../context/ProjectContext';
+import { getQuantity, calculateLineItem, hasDimensions, LABOR_RATES, fmtMoney } from '../utils/estimate';
 
 const STATUS_PILLS = {
   Considering: { bg: 'rgba(212,175,55,0.15)', text: '#D4AF37', border: 'rgba(212,175,55,0.4)' },
@@ -8,16 +9,30 @@ const STATUS_PILLS = {
 
 export default function BudgetTracker() {
   const { state, dispatch } = useProject();
+  const { dimensions } = state;
   const entries = Object.values(state.selections);
 
   if (entries.length === 0) return null;
 
+  const usingInstalled = hasDimensions(dimensions);
+
+  // Calculate installed cost per entry when dimensions are available
+  function getEntryTotal(item) {
+    if (usingInstalled) {
+      const laborRate = LABOR_RATES[item.category] ?? 0;
+      const qty = getQuantity(item.category, dimensions);
+      return calculateLineItem(item.price, laborRate, qty);
+    }
+    return item.price;
+  }
+
   const byStatus = entries.reduce((acc, item) => {
-    acc[item.status] = (acc[item.status] || 0) + item.price;
+    const val = getEntryTotal(item);
+    acc[item.status] = (acc[item.status] || 0) + val;
     return acc;
   }, {});
 
-  const total = entries.reduce((sum, item) => sum + item.price, 0);
+  const total = entries.reduce((sum, item) => sum + getEntryTotal(item), 0);
   const committedTotal = (byStatus['Selected'] ?? 0) + (byStatus['Ordered'] ?? 0);
 
   return (
@@ -53,7 +68,7 @@ export default function BudgetTracker() {
                 >
                   <span>{count}× {status}</span>
                   <span className="font-bold">
-                    ${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    {fmtMoney(amount)}
                   </span>
                 </div>
               );
@@ -68,17 +83,31 @@ export default function BudgetTracker() {
                 className="text-2xl font-bold"
                 style={{ color: '#D4AF37', fontFamily: 'Inter, sans-serif' }}
               >
-                ${committedTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                {fmtMoney(committedTotal)}
               </p>
             </div>
             <div
               className="text-right pl-5"
               style={{ borderLeft: '1px solid rgba(255,255,255,0.1)' }}
             >
-              <p className="text-xs text-white/40 mb-0.5">Total Tracked</p>
-              <p className="text-xl font-bold text-white">
-                ${total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-              </p>
+              {usingInstalled ? (
+                <>
+                  <p className="text-xs text-white/40 mb-0.5">Installed Project Estimate</p>
+                  <p className="text-xl font-bold" style={{ color: '#D4AF37' }}>
+                    {fmtMoney(total)}
+                  </p>
+                  <p className="text-xs mt-0.5" style={{ color: 'rgba(212,175,55,0.5)' }}>
+                    based on your room dimensions
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-xs text-white/40 mb-0.5">Total Tracked</p>
+                  <p className="text-xl font-bold text-white">
+                    {fmtMoney(total)}
+                  </p>
+                </>
+              )}
             </div>
             <button
               onClick={() => dispatch({ type: 'CLEAR_SELECTIONS' })}

@@ -1,12 +1,239 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import MaterialCard from './MaterialCard';
 import { MATERIALS, SUPPLIERS } from '../data/materials';
 import { MATERIAL_CATEGORY_LABELS } from '../data/projectTypes';
+import { useProject } from '../context/ProjectContext';
+import { supabase } from '../lib/supabase';
+import { fmtMoney, hasDimensions } from '../utils/estimate';
 
+// ─── DimensionPanel ────────────────────────────────────────────────────────────
+function DimensionPanel() {
+  const { state, dispatch } = useProject();
+  const { dimensions, activeDbProject } = state;
+  const [saved, setSaved] = useState(false);
+  const debounceRef = useRef(null);
+
+  const upsertDimensions = useCallback(async (dims) => {
+    if (!activeDbProject?.id) return;
+    const { error } = await supabase
+      .from('project_dimensions')
+      .upsert(
+        {
+          project_id:  activeDbProject.id,
+          floor_sqft:  Number(dims.floor_sqft)  || 0,
+          wall_sqft:   Number(dims.wall_sqft)   || 0,
+          linear_feet: Number(dims.linear_feet) || 0,
+        },
+        { onConflict: 'project_id' }
+      );
+    if (!error) {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    }
+  }, [activeDbProject?.id]);
+
+  function handleChange(field, value) {
+    const next = { ...dimensions, [field]: value };
+    dispatch({ type: 'SET_DIMENSIONS', dimensions: { [field]: value } });
+
+    if (activeDbProject) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => upsertDimensions(next), 800);
+    }
+  }
+
+  const fields = [
+    { key: 'floor_sqft',  label: 'Floor Area (sq ft)' },
+    { key: 'wall_sqft',   label: 'Wall Area (sq ft)'  },
+    { key: 'linear_feet', label: 'Baseboard LF'        },
+  ];
+
+  return (
+    <div
+      className="rounded-2xl mb-6 p-5"
+      style={{
+        backgroundColor: '#fff',
+        border: '1.5px solid #D4AF37',
+        boxShadow: '0 2px 12px rgba(212,175,55,0.08)',
+      }}
+    >
+      <div className="flex items-center justify-between mb-4">
+        <h3
+          className="text-xs font-bold tracking-widest uppercase"
+          style={{ color: '#002147' }}
+        >
+          Room Dimensions
+        </h3>
+        {saved && (
+          <span
+            className="text-xs font-semibold px-2 py-0.5 rounded-full"
+            style={{ backgroundColor: 'rgba(212,175,55,0.15)', color: '#D4AF37', border: '1px solid rgba(212,175,55,0.4)' }}
+          >
+            ✓ Saved
+          </span>
+        )}
+        {!activeDbProject && (
+          <span className="text-xs" style={{ color: '#9CA3AF' }}>
+            Select a project to persist dimensions
+          </span>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {fields.map(({ key, label }) => (
+          <div key={key}>
+            <label
+              className="block text-xs font-semibold mb-1.5 tracking-wide uppercase"
+              style={{ color: '#002147', fontSize: '0.68rem', letterSpacing: '0.07em' }}
+            >
+              {label}
+            </label>
+            <input
+              type="number"
+              min="0"
+              step="0.5"
+              value={dimensions[key]}
+              onChange={(e) => handleChange(key, e.target.value)}
+              placeholder="0"
+              className="w-full rounded-xl px-3 py-2 text-sm transition-all duration-150"
+              style={{
+                border: '1.5px solid #E8E6E1',
+                color: '#002147',
+                fontFamily: 'ui-monospace, SFMono-Regular, monospace',
+                outline: 'none',
+                backgroundColor: '#FAFAF8',
+              }}
+              onFocus={(e) => { e.target.style.borderColor = '#D4AF37'; e.target.style.backgroundColor = '#fff'; }}
+              onBlur={(e)  => { e.target.style.borderColor = '#E8E6E1'; e.target.style.backgroundColor = '#FAFAF8'; }}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── ComparisonPanel ───────────────────────────────────────────────────────────
+function ComparisonPanel({ activeCategory }) {
+  const { state } = useProject();
+  const { selections, dimensions } = state;
+
+  const selected = Object.entries(selections)
+    .filter(([, v]) => v.category === activeCategory)
+    .slice(0, 2);
+
+  if (selected.length < 2) return null;
+
+  const [[, itemA], [, itemB]] = selected;
+  const diff = Math.abs(itemA.price - itemB.price);
+  const cheaper = itemA.price <= itemB.price ? 'A' : 'B';
+
+  const dimLabel = hasDimensions(dimensions) ? 'Installed Cost' : 'Unit Price';
+
+  return (
+    <div
+      className="rounded-2xl mb-6 p-5"
+      style={{
+        backgroundColor: '#fff',
+        border: '1.5px solid #E8E6E1',
+        boxShadow: '0 2px 12px rgba(0,33,71,0.06)',
+      }}
+    >
+      <p
+        className="text-xs font-bold tracking-widest uppercase mb-4"
+        style={{ color: '#002147' }}
+      >
+        Quick Comparison
+      </p>
+
+      <div className="flex items-stretch gap-4">
+        {/* Side A */}
+        <div
+          className="flex-1 rounded-xl p-4 flex flex-col gap-1"
+          style={{
+            backgroundColor: cheaper === 'A' ? 'rgba(16,185,129,0.06)' : '#FAFAF8',
+            border: cheaper === 'A' ? '1.5px solid rgba(16,185,129,0.3)' : '1.5px solid #F0EEE9',
+          }}
+        >
+          <p className="text-xs font-semibold leading-snug" style={{ color: '#4A4A4A' }}>
+            {itemA.name}
+          </p>
+          <p className="text-lg font-bold" style={{ color: '#D4AF37' }}>
+            {fmtMoney(itemA.price)}
+          </p>
+          <p className="text-xs" style={{ color: '#9CA3AF' }}>{dimLabel}</p>
+          {cheaper === 'A' && (
+            <p className="text-xs font-semibold mt-1" style={{ color: '#059669' }}>
+              saves {fmtMoney(diff)}
+            </p>
+          )}
+        </div>
+
+        {/* Divider */}
+        <div className="flex items-center">
+          <span
+            className="text-sm font-bold px-2"
+            style={{ color: '#002147', opacity: 0.4 }}
+          >
+            vs
+          </span>
+        </div>
+
+        {/* Side B */}
+        <div
+          className="flex-1 rounded-xl p-4 flex flex-col gap-1"
+          style={{
+            backgroundColor: cheaper === 'B' ? 'rgba(16,185,129,0.06)' : '#FAFAF8',
+            border: cheaper === 'B' ? '1.5px solid rgba(16,185,129,0.3)' : '1.5px solid #F0EEE9',
+          }}
+        >
+          <p className="text-xs font-semibold leading-snug" style={{ color: '#4A4A4A' }}>
+            {itemB.name}
+          </p>
+          <p className="text-lg font-bold" style={{ color: '#D4AF37' }}>
+            {fmtMoney(itemB.price)}
+          </p>
+          <p className="text-xs" style={{ color: '#9CA3AF' }}>{dimLabel}</p>
+          {cheaper === 'B' && (
+            <p className="text-xs font-semibold mt-1" style={{ color: '#059669' }}>
+              saves {fmtMoney(diff)}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── MaterialSection ───────────────────────────────────────────────────────────
 export default function MaterialSection({ categories }) {
   const [activeCategory, setActiveCategory] = useState(categories[0]);
   const [supplierFilter, setSupplierFilter] = useState([]);
   const [search, setSearch] = useState('');
+  const { state, dispatch } = useProject();
+
+  // Load project_dimensions from Supabase when activeDbProject is set
+  useEffect(() => {
+    if (!state.activeDbProject?.id) return;
+    (async () => {
+      const { data, error } = await supabase
+        .from('project_dimensions')
+        .select('floor_sqft, wall_sqft, linear_feet')
+        .eq('project_id', state.activeDbProject.id)
+        .maybeSingle();
+
+      if (!error && data) {
+        dispatch({
+          type: 'SET_DIMENSIONS',
+          dimensions: {
+            floor_sqft:  String(data.floor_sqft  ?? ''),
+            wall_sqft:   String(data.wall_sqft   ?? ''),
+            linear_feet: String(data.linear_feet ?? ''),
+          },
+        });
+      }
+    })();
+  }, [state.activeDbProject?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const items = MATERIALS[activeCategory] ?? [];
 
@@ -28,8 +255,16 @@ export default function MaterialSection({ categories }) {
 
   const suppliersInCategory = [...new Set(items.map((m) => m.supplier))];
 
+  // Count selected items in active category for ComparisonPanel
+  const selectedInCategory = Object.values(state.selections).filter(
+    (v) => v.category === activeCategory
+  );
+
   return (
     <div>
+      {/* Dimension panel — always visible at the top */}
+      <DimensionPanel />
+
       {/* Category tabs */}
       <div className="flex gap-2 flex-wrap mb-5">
         {categories.map((cat) => {
@@ -123,6 +358,11 @@ export default function MaterialSection({ categories }) {
           )}
         </div>
       </div>
+
+      {/* Comparison panel — shown when 2+ items selected in current category */}
+      {selectedInCategory.length >= 2 && (
+        <ComparisonPanel activeCategory={activeCategory} />
+      )}
 
       {/* Results count */}
       {(search || supplierFilter.length > 0) && (
