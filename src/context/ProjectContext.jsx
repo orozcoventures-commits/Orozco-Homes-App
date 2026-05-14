@@ -8,6 +8,8 @@ const initialState = {
   activePage: 'home',
   selections: {},
   dimensions: { floor_sqft: '', wall_sqft: '', linear_feet: '' },
+  wasteFactor: 15,        // percentage, 0–100
+  isLocked: false,
 };
 
 function reducer(state, action) {
@@ -27,6 +29,7 @@ function reducer(state, action) {
     case 'SET_PAGE':
       return { ...state, activePage: action.page };
     case 'SET_MATERIAL_STATUS': {
+      if (state.isLocked) return state;
       const { materialId, status } = action;
       const current = state.selections[materialId];
       if (current?.status === status) {
@@ -45,9 +48,15 @@ function reducer(state, action) {
     case 'CLEAR_DB_PROJECT':
       return { ...state, activeDbProject: null };
     case 'CLEAR_SELECTIONS':
-      return { ...state, selections: {} };
+      return { ...state, selections: {}, isLocked: false };
     case 'SET_DIMENSIONS':
       return { ...state, dimensions: { ...state.dimensions, ...action.dimensions } };
+    case 'SET_WASTE_FACTOR':
+      return { ...state, wasteFactor: Math.min(100, Math.max(0, Number(action.value) || 0)) };
+    case 'LOCK_ESTIMATE':
+      return { ...state, isLocked: true };
+    case 'UNLOCK_ESTIMATE':
+      return { ...state, isLocked: false };
     default:
       return state;
   }

@@ -1,63 +1,54 @@
 import { useState } from 'react';
 import { useProject } from '../context/ProjectContext';
-import SupplierBadge from './SupplierBadge';
 import { SUPPLIERS } from '../data/materials';
 import { supabase } from '../lib/supabase';
 import { getBreakdown, hasDimensions, fmtMoney, LABOR_RATES } from '../utils/estimate';
 
 const STATUS_CONFIG = {
-  Considering: {
-    activeBg: '#FFFBEB', activeText: '#92400E', activeBorder: '#FCD34D',
-  },
-  Selected: {
-    activeBg: '#ECFDF5', activeText: '#065F46', activeBorder: '#6EE7B7',
-  },
-  Ordered: {
-    activeBg: '#EFF6FF', activeText: '#1E40AF', activeBorder: '#93C5FD',
-  },
+  Considering: { activeBg: '#FFFBEB', activeText: '#92400E', activeBorder: '#FCD34D' },
+  Selected:    { activeBg: '#ECFDF5', activeText: '#065F46', activeBorder: '#6EE7B7' },
+  Ordered:     { activeBg: '#EFF6FF', activeText: '#1E40AF', activeBorder: '#93C5FD' },
 };
 
 const STATUSES = ['Considering', 'Selected', 'Ordered'];
 
-// Fallback gradient shown while image loads or if it fails to load
 const CATEGORY_FALLBACK_BG = {
-  tile:              'linear-gradient(135deg, #F5F0EB 0%, #E8E0D5 100%)',
-  'tile-backsplash': 'linear-gradient(135deg, #F5F0EB 0%, #E8E0D5 100%)',
-  flooring:          'linear-gradient(135deg, #EDE8DC 0%, #D9D0C0 100%)',
-  vanity:            'linear-gradient(135deg, #EFF4FA 0%, #D9E6F5 100%)',
-  fixtures:          'linear-gradient(135deg, #F0F4F0 0%, #D5E3D5 100%)',
-  shower:            'linear-gradient(135deg, #EEF4F7 0%, #CCE0EB 100%)',
-  tub:               'linear-gradient(135deg, #F4EEF8 0%, #E2D0EE 100%)',
-  lighting:          'linear-gradient(135deg, #FDFBEE 0%, #F5EFC5 100%)',
-  cabinets:          'linear-gradient(135deg, #F5EFE8 0%, #E5D9C8 100%)',
-  countertops:       'linear-gradient(135deg, #F2F2F0 0%, #DCDCD5 100%)',
-  'appliances':      'linear-gradient(135deg, #EFF2F5 0%, #D5DDE8 100%)',
-  exterior:          'linear-gradient(135deg, #EEF0EC 0%, #D5DAD0 100%)',
-  roofing:           'linear-gradient(135deg, #EEECEA 0%, #D8D3CC 100%)',
-  columns:           'linear-gradient(135deg, #F2F0ED 0%, #DDD8D0 100%)',
-  insulation:        'linear-gradient(135deg, #F5F5F3 0%, #E0DFDB 100%)',
-  island:            'linear-gradient(135deg, #F5EFEA 0%, #E2D5C8 100%)',
-  'custom-millwork': 'linear-gradient(135deg, #F3EDE6 0%, #DDD0C0 100%)',
-  'windows-doors':   'linear-gradient(135deg, #EDF2F4 0%, #D0DCE3 100%)',
-  accessories:       'linear-gradient(135deg, #F4EFF5 0%, #E0D3E8 100%)',
+  tile:              'linear-gradient(145deg, #F5F0EB 0%, #E0D5C8 100%)',
+  'tile-backsplash': 'linear-gradient(145deg, #F5F0EB 0%, #E0D5C8 100%)',
+  flooring:          'linear-gradient(145deg, #EDE8DC 0%, #D0C8B4 100%)',
+  vanity:            'linear-gradient(145deg, #EFF4FA 0%, #C8DBED 100%)',
+  fixtures:          'linear-gradient(145deg, #F0F4F0 0%, #C5D8C5 100%)',
+  shower:            'linear-gradient(145deg, #EEF4F7 0%, #BACED9 100%)',
+  tub:               'linear-gradient(145deg, #F4EEF8 0%, #D5BEE8 100%)',
+  lighting:          'linear-gradient(145deg, #FDFBEE 0%, #EDE7A8 100%)',
+  cabinets:          'linear-gradient(145deg, #F5EFE8 0%, #D8C5AA 100%)',
+  countertops:       'linear-gradient(145deg, #F2F2F0 0%, #CCCCBF 100%)',
+  appliances:        'linear-gradient(145deg, #EFF2F5 0%, #C2CDD8 100%)',
+  exterior:          'linear-gradient(145deg, #EEF0EC 0%, #C5CCBE 100%)',
+  roofing:           'linear-gradient(145deg, #EEECEA 0%, #C4BDAF 100%)',
+  columns:           'linear-gradient(145deg, #F2F0ED 0%, #CBC3B5 100%)',
+  insulation:        'linear-gradient(145deg, #F5F5F3 0%, #CECDCA 100%)',
+  island:            'linear-gradient(145deg, #F5EFEA 0%, #D4C2AE 100%)',
+  'custom-millwork': 'linear-gradient(145deg, #F3EDE6 0%, #CCBAA8 100%)',
+  'windows-doors':   'linear-gradient(145deg, #EDF2F4 0%, #BCCDD6 100%)',
+  accessories:       'linear-gradient(145deg, #F4EFF5 0%, #CFC0D8 100%)',
 };
 
 export default function MaterialCard({ material, category }) {
   const { state, dispatch } = useProject();
-  const { dimensions, activeDbProject } = state;
+  const { dimensions, activeDbProject, wasteFactor, isLocked } = state;
   const selection = state.selections[material.id];
   const currentStatus = selection?.status ?? null;
   const [imgError, setImgError] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
   const [showBreakdown, setShowBreakdown] = useState(false);
 
-  // Calculate installed cost breakdown
-  const breakdown = getBreakdown(material, category, dimensions);
-  const dims = dimensions;
-  const showInstalled = hasDimensions(dims) && breakdown.quantity > 0;
+  const breakdown = getBreakdown(material, category, dimensions, wasteFactor);
+  const showInstalled = hasDimensions(dimensions) && breakdown.quantity > 0;
 
   async function setStatus(status) {
-    // Optimistic dispatch first
+    if (isLocked) return;
+
     dispatch({
       type: 'SET_MATERIAL_STATUS',
       materialId: material.id,
@@ -67,39 +58,36 @@ export default function MaterialCard({ material, category }) {
       category,
     });
 
-    // DB persistence (fire-and-forget)
     if (activeDbProject?.id) {
       const isToggleOff = currentStatus === status;
       if (isToggleOff) {
-        // Delete from material_selections
         supabase
           .from('material_selections')
           .delete()
           .eq('project_id', activeDbProject.id)
           .eq('material_id', material.id)
           .then(({ error }) => {
-            if (error) console.warn('[MaterialCard] delete selection error:', error.message);
+            if (error) console.warn('[MaterialCard] delete error:', error.message);
           });
       } else {
-        // Upsert
         supabase
           .from('material_selections')
           .upsert(
             {
-              project_id:    activeDbProject.id,
-              material_id:   material.id,
+              project_id:     activeDbProject.id,
+              material_id:    material.id,
               category,
-              product_name:  material.name,
-              unit_price:    material.price,
-              unit_type:     material.unit ?? 'sq ft',
-              labor_rate:    LABOR_RATES[category] ?? 0,
+              product_name:   material.name,
+              unit_price:     material.price,
+              unit_type:      material.unit ?? 'sq ft',
+              labor_rate:     LABOR_RATES[category] ?? 0,
               installed_cost: breakdown.total,
               status,
             },
             { onConflict: 'project_id,material_id' }
           )
           .then(({ error }) => {
-            if (error) console.warn('[MaterialCard] upsert selection error:', error.message);
+            if (error) console.warn('[MaterialCard] upsert error:', error.message);
           });
       }
     }
@@ -108,18 +96,18 @@ export default function MaterialCard({ material, category }) {
   const supplier = SUPPLIERS[material.supplier];
   const cfg = currentStatus ? STATUS_CONFIG[currentStatus] : null;
   const isActive = !!currentStatus;
-  const fallbackBg = CATEGORY_FALLBACK_BG[category] ?? 'linear-gradient(135deg, #F0EEE9 0%, #E8E5DF 100%)';
+  const fallbackBg = CATEGORY_FALLBACK_BG[category] ?? 'linear-gradient(145deg, #F0EEE9 0%, #DDD9D0 100%)';
 
   const details = [
-    material.finish    && `${material.finish}`,
-    material.size      && `${material.size}`,
-    material.material  && `${material.material}`,
-    material.style     && `${material.style}`,
-    material.brand     && `${material.brand}`,
-    material.type      && `${material.type}`,
-    material.width     && `${material.width}`,
-    material.thickness && `${material.thickness}`,
-    material.pattern   && `${material.pattern}`,
+    material.finish,
+    material.size,
+    material.material,
+    material.style,
+    material.brand,
+    material.type,
+    material.width,
+    material.thickness,
+    material.pattern,
   ].filter(Boolean);
 
   return (
@@ -130,32 +118,25 @@ export default function MaterialCard({ material, category }) {
         boxShadow: isActive
           ? '0 8px 24px rgba(0,33,71,0.12)'
           : '0 2px 10px rgba(0,33,71,0.07)',
+        opacity: isLocked && !isActive ? 0.72 : 1,
         position: 'relative',
+        fontFamily: 'Inter, system-ui, sans-serif',
       }}
       onMouseEnter={(e) => {
-        if (!isActive) e.currentTarget.style.boxShadow = '0 12px 32px rgba(0,33,71,0.13)';
+        if (!isActive && !isLocked) e.currentTarget.style.boxShadow = '0 12px 32px rgba(0,33,71,0.13)';
       }}
       onMouseLeave={(e) => {
-        if (!isActive) e.currentTarget.style.boxShadow = '0 2px 10px rgba(0,33,71,0.07)';
+        if (!isActive) e.currentTarget.style.boxShadow = isActive ? '0 8px 24px rgba(0,33,71,0.12)' : '0 2px 10px rgba(0,33,71,0.07)';
       }}
     >
-      {/* ── Product image ──────────────────────────────────────────────── */}
+      {/* ── Product image ───────────────────────────────────────────── */}
       <div
         className="relative overflow-hidden flex-shrink-0"
-        style={{
-          height: '200px',
-          background: fallbackBg,
-        }}
+        style={{ height: '180px', background: fallbackBg }}
       >
-        {/* Skeleton shimmer shown while a real image is loading */}
         {material.imageURL && !imgLoaded && !imgError && (
-          <div
-            className="absolute inset-0 animate-pulse"
-            style={{ background: fallbackBg }}
-          />
+          <div className="absolute inset-0 animate-pulse" style={{ background: fallbackBg }} />
         )}
-
-        {/* Actual product image */}
         {!imgError && material.imageURL && (
           <img
             src={material.imageURL}
@@ -164,104 +145,79 @@ export default function MaterialCard({ material, category }) {
             onLoad={() => setImgLoaded(true)}
             onError={() => setImgError(true)}
             className="w-full h-full transition-opacity duration-300"
-            style={{
-              objectFit: 'cover',
-              objectPosition: 'center',
-              opacity: imgLoaded ? 1 : 0,
-            }}
+            style={{ objectFit: 'cover', objectPosition: 'center', opacity: imgLoaded ? 1 : 0 }}
           />
         )}
 
-        {/* Professional "No Image Available" box shown when imageURL is empty or fails */}
-        {(imgError || !material.imageURL) && (
-          <div
-            className="absolute inset-0 flex flex-col items-center justify-center gap-2"
-            style={{ background: fallbackBg }}
-          >
-            <svg
-              width="36" height="36" viewBox="0 0 24 24" fill="none"
-              stroke="#002147" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"
-              style={{ opacity: 0.25 }}
-            >
-              <rect x="3" y="3" width="18" height="18" rx="2" />
-              <circle cx="8.5" cy="8.5" r="1.5" />
-              <polyline points="21 15 16 10 5 21" />
-            </svg>
-            <span
-              className="text-xs font-semibold tracking-wide uppercase"
-              style={{ color: '#002147', opacity: 0.3, letterSpacing: '0.08em' }}
-            >
-              No Image Available
-            </span>
-          </div>
-        )}
-
-        {/* Supplier badge — top right */}
-        <div className="absolute top-3 right-3 z-10">
-          <SupplierBadge supplierId={material.supplier} />
+        {/* Supplier badge — top right, minimal pill */}
+        <div className="absolute top-2.5 right-2.5 z-10">
+          <SupplierChip supplierId={material.supplier} />
         </div>
 
         {/* Status pill — top left */}
         {currentStatus && (
           <div
-            className="absolute top-3 left-3 z-10 px-2.5 py-0.5 rounded-full text-xs font-bold"
+            className="absolute top-2.5 left-2.5 z-10 px-2 py-0.5 rounded-full text-xs font-bold"
             style={{
               backgroundColor: cfg.activeBg,
               color: cfg.activeText,
               border: `1px solid ${cfg.activeBorder}`,
-              backdropFilter: 'blur(4px)',
+              fontSize: '0.65rem',
+              letterSpacing: '0.04em',
             }}
           >
             {currentStatus}
           </div>
         )}
 
-        {/* Gold active bottom line */}
-        {isActive && (
+        {/* Locked overlay chip */}
+        {isLocked && (
           <div
-            className="absolute bottom-0 left-0 right-0 z-10"
-            style={{ height: '3px', backgroundColor: '#D4AF37' }}
-          />
+            className="absolute bottom-2.5 left-2.5 z-10 px-2 py-0.5 rounded-md text-xs font-semibold"
+            style={{ backgroundColor: 'rgba(0,0,0,0.5)', color: 'rgba(212,175,55,0.9)', fontSize: '0.6rem', letterSpacing: '0.06em', backdropFilter: 'blur(4px)' }}
+          >
+            LOCKED
+          </div>
         )}
 
-        {/* Subtle dark gradient at the bottom for text legibility */}
+        {/* Gold active bottom bar */}
+        {isActive && (
+          <div className="absolute bottom-0 left-0 right-0 z-10" style={{ height: '3px', backgroundColor: '#D4AF37' }} />
+        )}
+
+        {/* Bottom fade */}
         <div
-          className="absolute bottom-0 left-0 right-0"
-          style={{
-            height: '60px',
-            background: 'linear-gradient(to top, rgba(0,0,0,0.18) 0%, transparent 100%)',
-            pointerEvents: 'none',
-          }}
+          className="absolute bottom-0 left-0 right-0 pointer-events-none"
+          style={{ height: '50px', background: 'linear-gradient(to top, rgba(0,0,0,0.14) 0%, transparent 100%)' }}
         />
       </div>
 
-      {/* ── Card body ─────────────────────────────────────────────────────── */}
-      <div className="p-5 flex-1 flex flex-col gap-4" style={{ position: 'relative' }}>
+      {/* ── Card body ───────────────────────────────────────────────── */}
+      <div className="p-4 flex-1 flex flex-col gap-3" style={{ position: 'relative' }}>
 
-        {/* Supplier name + product name + SKU */}
+        {/* Supplier name + product name */}
         <div>
-          <p className="text-xs font-semibold mb-1 tracking-wide" style={{ color: '#D4AF37' }}>
+          <p className="text-xs font-semibold mb-0.5 tracking-wide" style={{ color: '#D4AF37', fontSize: '0.65rem' }}>
             {supplier?.name}
           </p>
-          <h3
-            className="font-semibold leading-snug"
-            style={{ color: '#002147', fontSize: '0.9rem', letterSpacing: '0.01em' }}
-          >
+          <h3 className="font-semibold leading-snug" style={{ color: '#002147', fontSize: '0.875rem' }}>
             {material.name}
           </h3>
           {material.sku && (
-            <p className="text-xs mt-1" style={{ color: '#9CA3AF' }}>SKU: {material.sku}</p>
+            <p className="text-xs mt-0.5" style={{ color: '#C4B89A', fontSize: '0.65rem' }}>
+              {material.sku}
+            </p>
           )}
         </div>
 
         {/* Detail chips */}
         {details.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {details.slice(0, 4).map((d) => (
+          <div className="flex flex-wrap gap-1">
+            {details.slice(0, 3).map((d) => (
               <span
                 key={d}
                 className="text-xs px-2 py-0.5 rounded-full"
-                style={{ backgroundColor: '#F0EEE9', color: '#4A4A4A' }}
+                style={{ backgroundColor: '#F5F4F1', color: '#6B7280', fontSize: '0.65rem', fontWeight: 500 }}
               >
                 {d}
               </span>
@@ -269,33 +225,31 @@ export default function MaterialCard({ material, category }) {
           </div>
         )}
 
-        {/* Price + status buttons */}
-        <div className="mt-auto pt-4" style={{ borderTop: '1px solid #F0EEE9' }}>
+        {/* Price section */}
+        <div className="mt-auto pt-3" style={{ borderTop: '1px solid #F0EEE9' }}>
           {showInstalled ? (
-            /* ── Installed cost mode ── */
-            <div className="mb-4">
+            <div className="mb-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold tracking-wide mb-0.5" style={{ color: '#9CA3AF' }}>
-                    Fully Installed
+                  <p style={{ color: '#9CA3AF', fontSize: '0.6rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '2px' }}>
+                    Total Project Cost
                   </p>
-                  <p className="text-xl font-bold leading-tight" style={{ color: '#D4AF37' }}>
+                  <p className="font-bold leading-tight" style={{ color: '#D4AF37', fontSize: '1.25rem' }}>
                     {fmtMoney(breakdown.total)}
                   </p>
-                  <p className="text-xs mt-0.5" style={{ color: '#9CA3AF' }}>
+                  <p style={{ color: '#B0A898', fontSize: '0.7rem', marginTop: '2px' }}>
                     {fmtMoney(material.price)} / {material.unit}
                   </p>
                 </div>
-                {/* Info button to toggle breakdown */}
                 <button
                   onClick={() => setShowBreakdown((v) => !v)}
                   title="View price breakdown"
-                  className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center transition-colors duration-150"
+                  className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-colors duration-150"
                   style={{
-                    backgroundColor: showBreakdown ? '#002147' : 'rgba(0,33,71,0.07)',
-                    color: showBreakdown ? '#D4AF37' : '#002147',
-                    border: '1.5px solid rgba(0,33,71,0.12)',
-                    fontSize: '0.8rem',
+                    backgroundColor: showBreakdown ? '#002147' : 'rgba(0,33,71,0.06)',
+                    color: showBreakdown ? '#D4AF37' : '#6B7280',
+                    border: '1px solid rgba(0,33,71,0.1)',
+                    fontSize: '0.7rem',
                     fontWeight: 700,
                     cursor: 'pointer',
                   }}
@@ -305,22 +259,22 @@ export default function MaterialCard({ material, category }) {
               </div>
             </div>
           ) : (
-            /* ── Per-unit price mode ── */
-            <div className="flex items-baseline justify-between mb-4">
-              <span className="text-xl font-bold" style={{ color: '#002147' }}>
-                ${material.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            <div className="flex items-baseline justify-between mb-3">
+              <span className="font-bold" style={{ color: '#002147', fontSize: '1.15rem' }}>
+                {fmtMoney(material.price)}
               </span>
-              <span className="text-xs" style={{ color: '#9CA3AF' }}>/ {material.unit}</span>
+              <span style={{ color: '#9CA3AF', fontSize: '0.7rem' }}>/ {material.unit}</span>
             </div>
           )}
 
           {/* Hint when no dimensions */}
           {!showInstalled && (
-            <p className="text-xs mb-3" style={{ color: '#C4B89A', fontStyle: 'italic' }}>
-              Add dimensions above for installed cost
+            <p className="mb-2" style={{ color: '#C4B89A', fontSize: '0.65rem', fontStyle: 'italic' }}>
+              Enter dimensions above for installed cost
             </p>
           )}
 
+          {/* Status buttons */}
           <div className="flex gap-1.5">
             {STATUSES.map((s) => {
               const active = currentStatus === s;
@@ -329,14 +283,19 @@ export default function MaterialCard({ material, category }) {
                 <button
                   key={s}
                   onClick={() => setStatus(s)}
-                  className="flex-1 text-xs font-semibold py-2 rounded-lg transition-all duration-150"
-                  style={
-                    active
+                  disabled={isLocked}
+                  className="flex-1 font-semibold py-1.5 rounded-lg transition-all duration-150"
+                  style={{
+                    fontSize: '0.65rem',
+                    letterSpacing: '0.03em',
+                    cursor: isLocked ? 'not-allowed' : 'pointer',
+                    ...(active
                       ? { backgroundColor: c.activeBg, color: c.activeText, border: `1.5px solid ${c.activeBorder}` }
-                      : { backgroundColor: '#F9F8F6', color: '#6B7280', border: '1.5px solid #E8E6E1' }
-                  }
+                      : { backgroundColor: '#F9F8F6', color: isLocked ? '#C4B89A' : '#6B7280', border: '1.5px solid #E8E6E1' }
+                    ),
+                  }}
                   onMouseEnter={(e) => {
-                    if (!active) {
+                    if (!active && !isLocked) {
                       e.currentTarget.style.backgroundColor = c.activeBg;
                       e.currentTarget.style.color = c.activeText;
                       e.currentTarget.style.borderColor = c.activeBorder;
@@ -345,7 +304,7 @@ export default function MaterialCard({ material, category }) {
                   onMouseLeave={(e) => {
                     if (!active) {
                       e.currentTarget.style.backgroundColor = '#F9F8F6';
-                      e.currentTarget.style.color = '#6B7280';
+                      e.currentTarget.style.color = isLocked ? '#C4B89A' : '#6B7280';
                       e.currentTarget.style.borderColor = '#E8E6E1';
                     }
                   }}
@@ -357,91 +316,103 @@ export default function MaterialCard({ material, category }) {
           </div>
         </div>
 
-        {/* ── Breakdown Overlay ─────────────────────────────────────────── */}
+        {/* ── Breakdown overlay ──────────────────────────────────────── */}
         <div
           className="absolute left-0 right-0 bottom-0 rounded-b-2xl overflow-hidden"
           style={{
             top: showBreakdown ? '0' : '100%',
             opacity: showBreakdown ? 1 : 0,
             transform: showBreakdown ? 'translateY(0)' : 'translateY(8px)',
-            transition: 'opacity 0.22s ease, transform 0.22s ease, top 0s linear ' + (showBreakdown ? '0s' : '0.22s'),
-            backgroundColor: 'rgba(0,33,71,0.97)',
+            transition: 'opacity 0.2s ease, transform 0.2s ease, top 0s linear ' + (showBreakdown ? '0s' : '0.2s'),
+            backgroundColor: 'rgba(0,26,57,0.97)',
             zIndex: 20,
             pointerEvents: showBreakdown ? 'auto' : 'none',
-            backdropFilter: 'blur(4px)',
-            padding: '1.25rem',
+            padding: '1.1rem',
           }}
         >
-          {/* Close button */}
           <button
             onClick={() => setShowBreakdown(false)}
-            className="absolute top-3 right-3 w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold transition-colors"
-            style={{ color: 'rgba(255,255,255,0.5)', backgroundColor: 'rgba(255,255,255,0.08)' }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.5)'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)'; }}
+            className="absolute top-2.5 right-2.5 w-6 h-6 flex items-center justify-center rounded-full text-xs transition-colors"
+            style={{ color: 'rgba(255,255,255,0.4)', backgroundColor: 'rgba(255,255,255,0.07)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.4)'; }}
           >
             ✕
           </button>
 
-          <p
-            className="text-xs font-bold tracking-widest uppercase mb-4"
-            style={{ color: 'rgba(212,175,55,0.8)' }}
-          >
+          <p style={{ color: 'rgba(212,175,55,0.7)', fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '0.75rem' }}>
             Price Breakdown
           </p>
 
           <div className="flex flex-col gap-2">
-            {/* Material row */}
-            <div className="flex justify-between items-baseline">
-              <span className="text-xs" style={{ color: 'rgba(255,255,255,0.55)' }}>
-                Material
-                <span className="ml-1 text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>
-                  ({breakdown.quantity} {material.unit})
+            <BreakdownRow
+              label="Material"
+              sub={`${breakdown.quantity} ${material.unit}`}
+              value={fmtMoney(breakdown.materialCost)}
+            />
+            <BreakdownRow
+              label="Labor"
+              sub={`$${breakdown.laborRate}/${material.unit}`}
+              value={fmtMoney(breakdown.laborCost)}
+            />
+            <BreakdownRow
+              label={`Waste (${breakdown.wastePct}%)`}
+              value={fmtMoney(breakdown.wasteCost)}
+            />
+            <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', marginTop: '2px', paddingTop: '8px' }}>
+              <div className="flex justify-between items-baseline">
+                <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                  Total Installed
                 </span>
-              </span>
-              <span className="text-sm font-semibold" style={{ color: '#fff' }}>
-                {fmtMoney(breakdown.materialCost)}
-              </span>
-            </div>
-
-            {/* Labor row */}
-            <div className="flex justify-between items-baseline">
-              <span className="text-xs" style={{ color: 'rgba(255,255,255,0.55)' }}>
-                Labor
-                <span className="ml-1 text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>
-                  (${breakdown.laborRate}/{material.unit})
+                <span style={{ color: '#D4AF37', fontSize: '1rem', fontWeight: 700 }}>
+                  {fmtMoney(breakdown.total)}
                 </span>
-              </span>
-              <span className="text-sm font-semibold" style={{ color: '#fff' }}>
-                {fmtMoney(breakdown.laborCost)}
-              </span>
-            </div>
-
-            {/* Waste row */}
-            <div className="flex justify-between items-baseline">
-              <span className="text-xs" style={{ color: 'rgba(255,255,255,0.55)' }}>
-                15% Waste Factor
-              </span>
-              <span className="text-sm font-semibold" style={{ color: '#fff' }}>
-                {fmtMoney(breakdown.wasteCost)}
-              </span>
-            </div>
-
-            {/* Divider */}
-            <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', marginTop: '4px', paddingTop: '4px' }} />
-
-            {/* Total */}
-            <div className="flex justify-between items-baseline">
-              <span className="text-xs font-bold tracking-wide uppercase" style={{ color: 'rgba(255,255,255,0.7)' }}>
-                Total Installed
-              </span>
-              <span className="text-base font-bold" style={{ color: '#D4AF37' }}>
-                {fmtMoney(breakdown.total)}
-              </span>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+function BreakdownRow({ label, sub, value }) {
+  return (
+    <div className="flex justify-between items-baseline">
+      <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.7rem' }}>
+        {label}
+        {sub && <span style={{ marginLeft: '4px', color: 'rgba(255,255,255,0.25)', fontSize: '0.62rem' }}>({sub})</span>}
+      </span>
+      <span style={{ color: '#fff', fontSize: '0.8rem', fontWeight: 600 }}>{value}</span>
+    </div>
+  );
+}
+
+function SupplierChip({ supplierId }) {
+  const colors = {
+    ferguson:    { bg: '#003087', label: 'FG' },
+    homedepot:   { bg: '#F96302', label: 'HD' },
+    floordecor:  { bg: '#1B5E20', label: 'F&D' },
+    lowes:       { bg: '#004990', label: 'LW' },
+    wayfair:     { bg: '#7B2D8B', label: 'WF' },
+    msisurfaces: { bg: '#8B1A1A', label: 'MSI' },
+  };
+  const c = colors[supplierId] ?? { bg: '#374151', label: (supplierId ?? '').slice(0, 3).toUpperCase() };
+  return (
+    <span
+      style={{
+        backgroundColor: c.bg,
+        color: '#fff',
+        fontSize: '0.55rem',
+        fontWeight: 700,
+        letterSpacing: '0.06em',
+        padding: '2px 6px',
+        borderRadius: '4px',
+        lineHeight: 1.4,
+        display: 'inline-block',
+      }}
+    >
+      {c.label}
+    </span>
   );
 }

@@ -46,16 +46,18 @@ export function hasDimensions(dims) {
 }
 
 // Core formula: fully installed project cost with waste
+// wasteFactor is a decimal (e.g. 0.15 for 15%)
 export function calculateLineItem(materialPrice, laborRate, quantity, wasteFactor = 0.15) {
   if (quantity <= 0) return 0;
   return (materialPrice + laborRate) * quantity * (1 + wasteFactor);
 }
 
 // Returns a complete breakdown object for a material
-export function getBreakdown(material, category, dims) {
+// wastePct is a percentage integer (e.g. 15 for 15%) — defaults to 15
+export function getBreakdown(material, category, dims, wastePct = 15) {
   const laborRate   = LABOR_RATES[category] ?? 0;
   const quantity    = getQuantity(category, dims);
-  const wasteFactor = 0.15;
+  const wasteFactor = (Number(wastePct) || 0) / 100;
   const isUnit      = !DIMENSION_MAP[category];
 
   const materialCost = material.price * quantity;
@@ -64,7 +66,7 @@ export function getBreakdown(material, category, dims) {
   const wasteCost    = subtotal * wasteFactor;
   const total        = subtotal + wasteCost;
 
-  return { materialCost, laborCost, wasteCost, total, quantity, laborRate, wasteFactor, isUnit };
+  return { materialCost, laborCost, wasteCost, total, quantity, laborRate, wasteFactor, wastePct: Number(wastePct) || 0, isUnit };
 }
 
 export function fmtMoney(n) {

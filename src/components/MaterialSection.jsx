@@ -4,12 +4,12 @@ import { MATERIALS, SUPPLIERS } from '../data/materials';
 import { MATERIAL_CATEGORY_LABELS } from '../data/projectTypes';
 import { useProject } from '../context/ProjectContext';
 import { supabase } from '../lib/supabase';
-import { fmtMoney, hasDimensions } from '../utils/estimate';
+import { fmtMoney, hasDimensions, getBreakdown } from '../utils/estimate';
 
 // ─── DimensionPanel ────────────────────────────────────────────────────────────
 function DimensionPanel() {
   const { state, dispatch } = useProject();
-  const { dimensions, activeDbProject } = state;
+  const { dimensions, activeDbProject, wasteFactor, isLocked } = state;
   const [saved, setSaved] = useState(false);
   const debounceRef = useRef(null);
 
@@ -32,82 +32,189 @@ function DimensionPanel() {
     }
   }, [activeDbProject?.id]);
 
-  function handleChange(field, value) {
+  function handleDimChange(field, value) {
+    if (isLocked) return;
     const next = { ...dimensions, [field]: value };
     dispatch({ type: 'SET_DIMENSIONS', dimensions: { [field]: value } });
-
     if (activeDbProject) {
       clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => upsertDimensions(next), 800);
     }
   }
 
-  const fields = [
-    { key: 'floor_sqft',  label: 'Floor Area (sq ft)' },
-    { key: 'wall_sqft',   label: 'Wall Area (sq ft)'  },
-    { key: 'linear_feet', label: 'Baseboard LF'        },
+  function handleWasteChange(value) {
+    if (isLocked) return;
+    dispatch({ type: 'SET_WASTE_FACTOR', value });
+  }
+
+  const dimFields = [
+    { key: 'floor_sqft',  label: 'Floor Area', unit: 'sq ft' },
+    { key: 'wall_sqft',   label: 'Wall Area',  unit: 'sq ft' },
+    { key: 'linear_feet', label: 'Baseboard',  unit: 'LF'    },
   ];
 
   return (
     <div
-      className="rounded-2xl mb-6 p-5"
+      className="rounded-2xl mb-6 overflow-hidden"
       style={{
         backgroundColor: '#fff',
-        border: '1.5px solid #D4AF37',
-        boxShadow: '0 2px 12px rgba(212,175,55,0.08)',
+        border: isLocked ? '1.5px solid #D4AF37' : '1.5px solid #E8E6E1',
+        boxShadow: isLocked
+          ? '0 2px 20px rgba(212,175,55,0.18)'
+          : '0 2px 12px rgba(0,33,71,0.06)',
       }}
     >
-      <div className="flex items-center justify-between mb-4">
-        <h3
-          className="text-xs font-bold tracking-widest uppercase"
-          style={{ color: '#002147' }}
-        >
-          Room Dimensions
-        </h3>
-        {saved && (
+      {/* Header bar */}
+      <div
+        className="flex items-center justify-between px-5 py-3"
+        style={{
+          borderBottom: '1px solid #F0EEE9',
+          backgroundColor: isLocked ? 'rgba(212,175,55,0.04)' : 'transparent',
+        }}
+      >
+        <div className="flex items-center gap-2.5">
           <span
-            className="text-xs font-semibold px-2 py-0.5 rounded-full"
-            style={{ backgroundColor: 'rgba(212,175,55,0.15)', color: '#D4AF37', border: '1px solid rgba(212,175,55,0.4)' }}
+            className="text-xs font-bold tracking-widest uppercase"
+            style={{ color: '#002147' }}
           >
-            ✓ Saved
+            Calculations Engine
           </span>
-        )}
-        {!activeDbProject && (
-          <span className="text-xs" style={{ color: '#9CA3AF' }}>
-            Select a project to persist dimensions
-          </span>
-        )}
+          {isLocked && (
+            <span
+              className="text-xs font-bold px-2 py-0.5 rounded-full"
+              style={{ backgroundColor: 'rgba(212,175,55,0.15)', color: '#B8942A', border: '1px solid rgba(212,175,55,0.4)' }}
+            >
+              Estimate Locked
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          {saved && !isLocked && (
+            <span
+              className="text-xs font-semibold px-2 py-0.5 rounded-full"
+              style={{ backgroundColor: 'rgba(16,185,129,0.1)', color: '#059669', border: '1px solid rgba(16,185,129,0.3)' }}
+            >
+              ✓ Saved
+            </span>
+          )}
+          {!activeDbProject && (
+            <span className="text-xs hidden sm:block" style={{ color: '#C4B89A' }}>
+              Select a project to persist
+            </span>
+          )}
+          <button
+            onClick={() => dispatch({ type: isLocked ? 'UNLOCK_ESTIMATE' : 'LOCK_ESTIMATE' })}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150"
+            style={
+              isLocked
+                ? { backgroundColor: 'rgba(212,175,55,0.1)', color: '#B8942A', border: '1.5px solid rgba(212,175,55,0.35)' }
+                : { backgroundColor: '#002147', color: '#D4AF37', border: '1.5px solid #002147' }
+            }
+          >
+            {isLocked ? '🔓 Unlock' : '🔒 Lock Estimate'}
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {fields.map(({ key, label }) => (
-          <div key={key}>
+      {/* Inputs */}
+      <div className="px-5 py-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {dimFields.map(({ key, label, unit }) => (
+            <div key={key}>
+              <label
+                className="flex items-center gap-1 mb-1.5"
+                style={{ color: '#6B7280', fontSize: '0.65rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}
+              >
+                {label}
+                <span style={{ color: '#C4B89A', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>
+                  ({unit})
+                </span>
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="0.5"
+                value={dimensions[key]}
+                onChange={(e) => handleDimChange(key, e.target.value)}
+                placeholder="0"
+                disabled={isLocked}
+                className="w-full rounded-xl px-3 py-2.5 text-sm transition-all duration-150"
+                style={{
+                  border: '1.5px solid #E8E6E1',
+                  color: '#002147',
+                  fontFamily: 'Inter, ui-monospace, monospace',
+                  fontWeight: 600,
+                  outline: 'none',
+                  backgroundColor: isLocked ? '#F5F5F3' : '#FAFAF8',
+                  cursor: isLocked ? 'not-allowed' : 'text',
+                  opacity: isLocked ? 0.55 : 1,
+                }}
+                onFocus={(e) => {
+                  if (!isLocked) {
+                    e.target.style.borderColor = '#D4AF37';
+                    e.target.style.backgroundColor = '#fff';
+                  }
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = '#E8E6E1';
+                  e.target.style.backgroundColor = isLocked ? '#F5F5F3' : '#FAFAF8';
+                }}
+              />
+            </div>
+          ))}
+
+          {/* Waste Factor */}
+          <div>
             <label
-              className="block text-xs font-semibold mb-1.5 tracking-wide uppercase"
-              style={{ color: '#002147', fontSize: '0.68rem', letterSpacing: '0.07em' }}
+              className="flex items-center gap-1 mb-1.5"
+              style={{ color: '#6B7280', fontSize: '0.65rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}
             >
-              {label}
+              Waste Factor
+              <span style={{ color: '#C4B89A', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(%)</span>
             </label>
-            <input
-              type="number"
-              min="0"
-              step="0.5"
-              value={dimensions[key]}
-              onChange={(e) => handleChange(key, e.target.value)}
-              placeholder="0"
-              className="w-full rounded-xl px-3 py-2 text-sm transition-all duration-150"
-              style={{
-                border: '1.5px solid #E8E6E1',
-                color: '#002147',
-                fontFamily: 'ui-monospace, SFMono-Regular, monospace',
-                outline: 'none',
-                backgroundColor: '#FAFAF8',
-              }}
-              onFocus={(e) => { e.target.style.borderColor = '#D4AF37'; e.target.style.backgroundColor = '#fff'; }}
-              onBlur={(e)  => { e.target.style.borderColor = '#E8E6E1'; e.target.style.backgroundColor = '#FAFAF8'; }}
-            />
+            <div className="relative">
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="1"
+                value={wasteFactor}
+                onChange={(e) => handleWasteChange(e.target.value)}
+                disabled={isLocked}
+                className="w-full rounded-xl px-3 pr-7 py-2.5 text-sm transition-all duration-150"
+                style={{
+                  border: '1.5px solid rgba(212,175,55,0.4)',
+                  color: '#B8942A',
+                  fontFamily: 'Inter, ui-monospace, monospace',
+                  fontWeight: 700,
+                  outline: 'none',
+                  backgroundColor: isLocked ? '#F5F5F3' : '#FDFCF5',
+                  cursor: isLocked ? 'not-allowed' : 'text',
+                  opacity: isLocked ? 0.55 : 1,
+                }}
+                onFocus={(e) => {
+                  if (!isLocked) {
+                    e.target.style.borderColor = '#D4AF37';
+                    e.target.style.backgroundColor = '#fff';
+                  }
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = 'rgba(212,175,55,0.4)';
+                  e.target.style.backgroundColor = isLocked ? '#F5F5F3' : '#FDFCF5';
+                }}
+              />
+              <span
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold pointer-events-none"
+                style={{ color: '#D4AF37', opacity: isLocked ? 0.55 : 1 }}
+              >
+                %
+              </span>
+            </div>
+            <p className="text-xs mt-1" style={{ color: '#C4B89A', fontSize: '0.62rem' }}>
+              Material cut & overages
+            </p>
           </div>
-        ))}
+        </div>
       </div>
     </div>
   );
@@ -116,7 +223,7 @@ function DimensionPanel() {
 // ─── ComparisonPanel ───────────────────────────────────────────────────────────
 function ComparisonPanel({ activeCategory }) {
   const { state } = useProject();
-  const { selections, dimensions } = state;
+  const { selections, dimensions, wasteFactor } = state;
 
   const selected = Object.entries(selections)
     .filter(([, v]) => v.category === activeCategory)
@@ -125,10 +232,18 @@ function ComparisonPanel({ activeCategory }) {
   if (selected.length < 2) return null;
 
   const [[, itemA], [, itemB]] = selected;
-  const diff = Math.abs(itemA.price - itemB.price);
-  const cheaper = itemA.price <= itemB.price ? 'A' : 'B';
+  const useDims = hasDimensions(dimensions);
 
-  const dimLabel = hasDimensions(dimensions) ? 'Installed Cost' : 'Unit Price';
+  const costA = useDims
+    ? getBreakdown({ price: itemA.price }, activeCategory, dimensions, wasteFactor).total
+    : itemA.price;
+  const costB = useDims
+    ? getBreakdown({ price: itemB.price }, activeCategory, dimensions, wasteFactor).total
+    : itemB.price;
+
+  const diff = Math.abs(costA - costB);
+  const cheaper = costA <= costB ? 'A' : 'B';
+  const dimLabel = useDims ? 'Installed Cost' : 'Unit Price';
 
   return (
     <div
@@ -146,59 +261,29 @@ function ComparisonPanel({ activeCategory }) {
         Quick Comparison
       </p>
 
-      <div className="flex items-stretch gap-4">
-        {/* Side A */}
-        <div
-          className="flex-1 rounded-xl p-4 flex flex-col gap-1"
-          style={{
-            backgroundColor: cheaper === 'A' ? 'rgba(16,185,129,0.06)' : '#FAFAF8',
-            border: cheaper === 'A' ? '1.5px solid rgba(16,185,129,0.3)' : '1.5px solid #F0EEE9',
-          }}
-        >
-          <p className="text-xs font-semibold leading-snug" style={{ color: '#4A4A4A' }}>
-            {itemA.name}
-          </p>
-          <p className="text-lg font-bold" style={{ color: '#D4AF37' }}>
-            {fmtMoney(itemA.price)}
-          </p>
-          <p className="text-xs" style={{ color: '#9CA3AF' }}>{dimLabel}</p>
-          {cheaper === 'A' && (
-            <p className="text-xs font-semibold mt-1" style={{ color: '#059669' }}>
-              saves {fmtMoney(diff)}
-            </p>
-          )}
-        </div>
-
-        {/* Divider */}
-        <div className="flex items-center">
-          <span
-            className="text-sm font-bold px-2"
-            style={{ color: '#002147', opacity: 0.4 }}
+      <div className="flex items-stretch gap-3">
+        {[{ item: itemA, cost: costA, side: 'A' }, { item: itemB, cost: costB, side: 'B' }].map(({ item, cost, side }) => (
+          <div
+            key={side}
+            className="flex-1 rounded-xl p-4 flex flex-col gap-1"
+            style={{
+              backgroundColor: cheaper === side ? 'rgba(16,185,129,0.06)' : '#FAFAF8',
+              border: cheaper === side ? '1.5px solid rgba(16,185,129,0.3)' : '1.5px solid #F0EEE9',
+            }}
           >
-            vs
-          </span>
-        </div>
+            <p className="text-xs font-semibold leading-snug" style={{ color: '#4A4A4A' }}>{item.name}</p>
+            <p className="text-lg font-bold" style={{ color: '#D4AF37' }}>{fmtMoney(cost)}</p>
+            <p className="text-xs" style={{ color: '#9CA3AF' }}>{dimLabel}</p>
+            {cheaper === side && (
+              <p className="text-xs font-semibold mt-1" style={{ color: '#059669' }}>
+                saves {fmtMoney(diff)}
+              </p>
+            )}
+          </div>
+        ))}
 
-        {/* Side B */}
-        <div
-          className="flex-1 rounded-xl p-4 flex flex-col gap-1"
-          style={{
-            backgroundColor: cheaper === 'B' ? 'rgba(16,185,129,0.06)' : '#FAFAF8',
-            border: cheaper === 'B' ? '1.5px solid rgba(16,185,129,0.3)' : '1.5px solid #F0EEE9',
-          }}
-        >
-          <p className="text-xs font-semibold leading-snug" style={{ color: '#4A4A4A' }}>
-            {itemB.name}
-          </p>
-          <p className="text-lg font-bold" style={{ color: '#D4AF37' }}>
-            {fmtMoney(itemB.price)}
-          </p>
-          <p className="text-xs" style={{ color: '#9CA3AF' }}>{dimLabel}</p>
-          {cheaper === 'B' && (
-            <p className="text-xs font-semibold mt-1" style={{ color: '#059669' }}>
-              saves {fmtMoney(diff)}
-            </p>
-          )}
+        <div className="flex items-center flex-shrink-0">
+          <span className="text-sm font-bold px-1" style={{ color: '#002147', opacity: 0.3 }}>vs</span>
         </div>
       </div>
     </div>
@@ -255,14 +340,22 @@ export default function MaterialSection({ categories }) {
 
   const suppliersInCategory = [...new Set(items.map((m) => m.supplier))];
 
-  // Count selected items in active category for ComparisonPanel
   const selectedInCategory = Object.values(state.selections).filter(
     (v) => v.category === activeCategory
   );
 
+  const supplierColors = {
+    ferguson:    { bg: '#003087', label: 'FG' },
+    homedepot:   { bg: '#F96302', label: 'HD' },
+    floordecor:  { bg: '#1B5E20', label: 'F&D' },
+    lowes:       { bg: '#004990', label: 'LW' },
+    wayfair:     { bg: '#7B2D8B', label: 'WF' },
+    msisurfaces: { bg: '#8B1A1A', label: 'MSI' },
+  };
+
   return (
     <div>
-      {/* Dimension panel — always visible at the top */}
+      {/* Calculations Engine panel */}
       <DimensionPanel />
 
       {/* Category tabs */}
@@ -310,7 +403,7 @@ export default function MaterialSection({ categories }) {
             border: '1.5px solid #E8E6E1',
             color: '#002147',
             outline: 'none',
-            fontFamily: 'inherit',
+            fontFamily: 'Inter, inherit',
           }}
           onFocus={(e) => { e.target.style.borderColor = '#D4AF37'; }}
           onBlur={(e) => { e.target.style.borderColor = '#E8E6E1'; }}
@@ -320,28 +413,19 @@ export default function MaterialSection({ categories }) {
             Filter:
           </span>
           {suppliersInCategory.map((sid) => {
-            const s = SUPPLIERS[sid];
             const active = supplierFilter.includes(sid);
-            const supplierColors = {
-              ferguson:    { bg: '#003087', label: 'FG' },
-              homedepot:   { bg: '#F96302', label: 'HD' },
-              floordecor:  { bg: '#1B5E20', label: 'F&D' },
-              lowes:       { bg: '#004990', label: 'LW' },
-              wayfair:     { bg: '#7B2D8B', label: 'WF' },
-              msisurfaces: { bg: '#8B1A1A', label: 'MSI' },
-            };
             const sc = supplierColors[sid];
             return (
               <button
                 key={sid}
                 onClick={() => toggleSupplier(sid)}
-                className="px-3 py-1.5 rounded-lg text-xs font-bold tracking-wider transition-all duration-150"
+                className="px-2.5 py-1 rounded-md text-xs font-bold tracking-wide transition-all duration-150"
                 style={
                   active
-                    ? { backgroundColor: sc?.bg ?? '#374151', color: '#fff', border: `1.5px solid ${sc?.bg ?? '#374151'}` }
-                    : { backgroundColor: '#fff', color: sc?.bg ?? '#374151', border: `1.5px solid #E8E6E1` }
+                    ? { backgroundColor: sc?.bg ?? '#374151', color: '#fff', border: `1px solid ${sc?.bg ?? '#374151'}` }
+                    : { backgroundColor: '#fff', color: sc?.bg ?? '#374151', border: '1px solid #E8E6E1' }
                 }
-                title={s?.name}
+                title={SUPPLIERS[sid]?.name}
               >
                 {sc?.label ?? sid.toUpperCase()}
               </button>
@@ -359,7 +443,7 @@ export default function MaterialSection({ categories }) {
         </div>
       </div>
 
-      {/* Comparison panel — shown when 2+ items selected in current category */}
+      {/* Comparison panel */}
       {selectedInCategory.length >= 2 && (
         <ComparisonPanel activeCategory={activeCategory} />
       )}

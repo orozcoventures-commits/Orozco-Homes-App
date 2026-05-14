@@ -2,26 +2,26 @@ import { useProject } from '../context/ProjectContext';
 import { getQuantity, calculateLineItem, hasDimensions, LABOR_RATES, fmtMoney } from '../utils/estimate';
 
 const STATUS_PILLS = {
-  Considering: { bg: 'rgba(212,175,55,0.15)', text: '#D4AF37', border: 'rgba(212,175,55,0.4)' },
-  Selected:    { bg: 'rgba(110,231,183,0.15)', text: '#6EE7B7', border: 'rgba(110,231,183,0.4)' },
-  Ordered:     { bg: 'rgba(147,197,253,0.15)', text: '#93C5FD', border: 'rgba(147,197,253,0.4)' },
+  Considering: { bg: 'rgba(212,175,55,0.15)',  text: '#D4AF37',  border: 'rgba(212,175,55,0.4)'  },
+  Selected:    { bg: 'rgba(110,231,183,0.15)', text: '#6EE7B7',  border: 'rgba(110,231,183,0.4)' },
+  Ordered:     { bg: 'rgba(147,197,253,0.15)', text: '#93C5FD',  border: 'rgba(147,197,253,0.4)' },
 };
 
 export default function BudgetTracker() {
   const { state, dispatch } = useProject();
-  const { dimensions } = state;
+  const { dimensions, wasteFactor, isLocked } = state;
   const entries = Object.values(state.selections);
 
   if (entries.length === 0) return null;
 
   const usingInstalled = hasDimensions(dimensions);
+  const wasteDecimal = (Number(wasteFactor) || 0) / 100;
 
-  // Calculate installed cost per entry when dimensions are available
   function getEntryTotal(item) {
     if (usingInstalled) {
       const laborRate = LABOR_RATES[item.category] ?? 0;
       const qty = getQuantity(item.category, dimensions);
-      return calculateLineItem(item.price, laborRate, qty);
+      return calculateLineItem(item.price, laborRate, qty, wasteDecimal);
     }
     return item.price;
   }
@@ -39,85 +39,101 @@ export default function BudgetTracker() {
     <div
       className="fixed bottom-0 left-0 right-0 z-40"
       style={{
-        backgroundColor: '#002147',
-        borderTop: '2px solid rgba(212,175,55,0.4)',
-        boxShadow: '0 -8px 32px rgba(0,33,71,0.3)',
+        backgroundColor: '#001A39',
+        borderTop: isLocked ? '2px solid #D4AF37' : '2px solid rgba(212,175,55,0.35)',
+        boxShadow: '0 -8px 40px rgba(0,0,0,0.35)',
+        fontFamily: 'Inter, system-ui, sans-serif',
       }}
     >
-      {/* Gold top accent */}
-      <div style={{ backgroundColor: '#D4AF37', height: '2px' }} />
+      {/* Accent line */}
+      <div style={{ height: '2px', backgroundColor: '#D4AF37', opacity: isLocked ? 1 : 0.6 }} />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
 
-          {/* Left — item count + status pills */}
+          {/* Left — items tracked + status pills */}
           <div className="flex items-center gap-3 flex-wrap">
-            <span className="text-xs font-semibold tracking-widest uppercase text-white/60">
-              {entries.length} item{entries.length !== 1 ? 's' : ''} tracked
+            {isLocked && (
+              <span
+                className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold"
+                style={{ backgroundColor: 'rgba(212,175,55,0.15)', color: '#D4AF37', border: '1px solid rgba(212,175,55,0.35)' }}
+              >
+                🔒 Locked
+              </span>
+            )}
+            <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.65rem', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+              {entries.length} item{entries.length !== 1 ? 's' : ''}
             </span>
             {['Considering', 'Selected', 'Ordered'].map((status) => {
               const count = entries.filter((e) => e.status === status).length;
-              const amount = byStatus[status] ?? 0;
               if (!count) return null;
               const p = STATUS_PILLS[status];
               return (
                 <div
                   key={status}
-                  className="flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold"
-                  style={{ backgroundColor: p.bg, color: p.text, border: `1px solid ${p.border}` }}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-full"
+                  style={{ backgroundColor: p.bg, color: p.text, border: `1px solid ${p.border}`, fontSize: '0.65rem', fontWeight: 700 }}
                 >
-                  <span>{count}× {status}</span>
-                  <span className="font-bold">
-                    {fmtMoney(amount)}
-                  </span>
+                  <span>{count}×</span>
+                  <span>{status}</span>
+                  <span style={{ opacity: 0.8 }}>{fmtMoney(byStatus[status] ?? 0)}</span>
                 </div>
               );
             })}
           </div>
 
-          {/* Right — totals */}
-          <div className="flex items-center gap-6">
-            <div className="text-right">
-              <p className="text-xs text-white/40 mb-0.5">Committed (Selected + Ordered)</p>
-              <p
-                className="text-2xl font-bold"
-                style={{ color: '#D4AF37', fontFamily: 'Inter, sans-serif' }}
-              >
-                {fmtMoney(committedTotal)}
-              </p>
-            </div>
+          {/* Right — totals + clear */}
+          <div className="flex items-center gap-5">
+            {committedTotal > 0 && (
+              <div className="text-right">
+                <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.6rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '1px' }}>
+                  Committed
+                </p>
+                <p style={{ color: '#D4AF37', fontSize: '1.1rem', fontWeight: 700 }}>
+                  {fmtMoney(committedTotal)}
+                </p>
+              </div>
+            )}
+
             <div
-              className="text-right pl-5"
-              style={{ borderLeft: '1px solid rgba(255,255,255,0.1)' }}
+              className="text-right"
+              style={{ paddingLeft: committedTotal > 0 ? '1.25rem' : 0, borderLeft: committedTotal > 0 ? '1px solid rgba(255,255,255,0.08)' : 'none' }}
             >
               {usingInstalled ? (
                 <>
-                  <p className="text-xs text-white/40 mb-0.5">Installed Project Estimate</p>
-                  <p className="text-xl font-bold" style={{ color: '#D4AF37' }}>
+                  <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.6rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '1px' }}>
+                    Installed Project Estimate
+                  </p>
+                  <p style={{ color: '#D4AF37', fontSize: '1.4rem', fontWeight: 800, lineHeight: 1 }}>
                     {fmtMoney(total)}
                   </p>
-                  <p className="text-xs mt-0.5" style={{ color: 'rgba(212,175,55,0.5)' }}>
-                    based on your room dimensions
+                  <p style={{ color: 'rgba(212,175,55,0.4)', fontSize: '0.6rem', marginTop: '2px' }}>
+                    incl. labor + {wasteFactor}% waste
                   </p>
                 </>
               ) : (
                 <>
-                  <p className="text-xs text-white/40 mb-0.5">Total Tracked</p>
-                  <p className="text-xl font-bold text-white">
+                  <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.6rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '1px' }}>
+                    Materials Total
+                  </p>
+                  <p style={{ color: '#fff', fontSize: '1.4rem', fontWeight: 800, lineHeight: 1 }}>
                     {fmtMoney(total)}
                   </p>
                 </>
               )}
             </div>
-            <button
-              onClick={() => dispatch({ type: 'CLEAR_SELECTIONS' })}
-              className="text-xs font-medium underline transition-colors"
-              style={{ color: 'rgba(255,255,255,0.35)' }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = '#FCA5A5'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.35)'; }}
-            >
-              Clear all
-            </button>
+
+            {!isLocked && (
+              <button
+                onClick={() => dispatch({ type: 'CLEAR_SELECTIONS' })}
+                className="text-xs font-medium underline transition-colors"
+                style={{ color: 'rgba(255,255,255,0.25)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = '#FCA5A5'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.25)'; }}
+              >
+                Clear
+              </button>
+            )}
           </div>
         </div>
       </div>
