@@ -45,30 +45,69 @@ export function hasDimensions(dims) {
   return dims && (Number(dims.floor_sqft) > 0 || Number(dims.wall_sqft) > 0 || Number(dims.linear_feet) > 0);
 }
 
-// Core formula: fully installed project cost with waste
+// Core formula: hard cost per line item (material + labor + waste)
 // wasteFactor is a decimal (e.g. 0.15 for 15%)
 export function calculateLineItem(materialPrice, laborRate, quantity, wasteFactor = 0.15) {
   if (quantity <= 0) return 0;
   return (materialPrice + laborRate) * quantity * (1 + wasteFactor);
 }
 
-// Returns a complete breakdown object for a material
-// wastePct is a percentage integer (e.g. 15 for 15%) — defaults to 15
-export function getBreakdown(material, category, dims, wastePct = 15) {
-  const laborRate   = LABOR_RATES[category] ?? 0;
-  const quantity    = getQuantity(category, dims);
-  const wasteFactor = (Number(wastePct) || 0) / 100;
-  const isUnit      = !DIMENSION_MAP[category];
+// Professional Gross Margin formula:
+//   Client Price = Hard Costs / (1 - overheadPct - profitPct)
+// Using gross margin (NOT markup) protects the contractor's actual margin.
+// overheadPct and profitPct are decimals (e.g. 0.18, 0.12)
+export function calculateGrossEstimate(hardCosts, overheadPct = 0.18, profitPct = 0.12) {
+  const divisor = 1 - overheadPct - profitPct;
+  if (divisor <= 0) return hardCosts; // guard against invalid rates
+  return hardCosts / divisor;
+}
 
+// Returns a complete breakdown object for a material including gross margin
+// wastePct:     percentage integer (e.g. 15)
+// overheadPct:  percentage integer (e.g. 18)
+// profitPct:    percentage integer (e.g. 12)
+export function getBreakdown(material, category, dims, wastePct = 15, overheadPct = 18, profitPct = 12) {
+  const laborRate     = LABOR_RATES[category] ?? 0;
+  const quantity      = getQuantity(category, dims);
+  const wasteFactor   = (Number(wastePct)    || 0) / 100;
+  const ohDecimal     = (Number(overheadPct) || 0) / 100;
+  const profitDecimal = (Number(profitPct)   || 0) / 100;
+  const isUnit        = !DIMENSION_MAP[category];
+
+  // Hard costs
   const materialCost = material.price * quantity;
   const laborCost    = laborRate * quantity;
   const subtotal     = materialCost + laborCost;
   const wasteCost    = subtotal * wasteFactor;
-  const total        = subtotal + wasteCost;
+  const hardCosts    = subtotal + wasteCost;
 
-  return { materialCost, laborCost, wasteCost, total, quantity, laborRate, wasteFactor, wastePct: Number(wastePct) || 0, isUnit };
+  // Gross margin uplift
+  const clientPrice  = calculateGrossEstimate(hardCosts, ohDecimal, profitDecimal);
+  const ohAmount     = clientPrice * ohDecimal;
+  const profitAmount = clientPrice * profitDecimal;
+
+  return {
+    materialCost,
+    laborCost,
+    wasteCost,
+    hardCosts,
+    ohAmount,
+    profitAmount,
+    clientPrice,     // what the client sees / pays
+    quantity,
+    laborRate,
+    wasteFactor,
+    wastePct:     Number(wastePct)    || 0,
+    overheadPct:  Number(overheadPct) || 0,
+    profitPct:    Number(profitPct)   || 0,
+    isUnit,
+  };
 }
 
 export function fmtMoney(n) {
   return '$' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+export function fmtPct(n) {
+  return (Number(n) || 0).toFixed(1) + '%';
 }

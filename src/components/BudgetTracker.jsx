@@ -1,5 +1,5 @@
 import { useProject } from '../context/ProjectContext';
-import { getQuantity, calculateLineItem, hasDimensions, LABOR_RATES, fmtMoney } from '../utils/estimate';
+import { getQuantity, calculateLineItem, calculateGrossEstimate, hasDimensions, LABOR_RATES, fmtMoney } from '../utils/estimate';
 
 const STATUS_PILLS = {
   Considering: { bg: 'rgba(212,175,55,0.15)',  text: '#D4AF37',  border: 'rgba(212,175,55,0.4)'  },
@@ -9,31 +9,42 @@ const STATUS_PILLS = {
 
 export default function BudgetTracker() {
   const { state, dispatch } = useProject();
-  const { dimensions, wasteFactor, isLocked } = state;
+  const { dimensions, wasteFactor, overheadPct, profitPct, contractorView, isLocked } = state;
   const entries = Object.values(state.selections);
 
   if (entries.length === 0) return null;
 
   const usingInstalled = hasDimensions(dimensions);
-  const wasteDecimal = (Number(wasteFactor) || 0) / 100;
+  const wasteDecimal   = (Number(wasteFactor)  || 0) / 100;
+  const ohDecimal      = (Number(overheadPct)  || 0) / 100;
+  const profitDecimal  = (Number(profitPct)    || 0) / 100;
 
-  function getEntryTotal(item) {
-    if (usingInstalled) {
-      const laborRate = LABOR_RATES[item.category] ?? 0;
-      const qty = getQuantity(item.category, dimensions);
-      return calculateLineItem(item.price, laborRate, qty, wasteDecimal);
-    }
-    return item.price;
+  function getHardCost(item) {
+    if (!usingInstalled) return item.price;
+    const laborRate = LABOR_RATES[item.category] ?? 0;
+    const qty       = getQuantity(item.category, dimensions);
+    return calculateLineItem(item.price, laborRate, qty, wasteDecimal);
   }
 
-  const byStatus = entries.reduce((acc, item) => {
-    const val = getEntryTotal(item);
-    acc[item.status] = (acc[item.status] || 0) + val;
-    return acc;
-  }, {});
+  function getClientPrice(item) {
+    return calculateGrossEstimate(getHardCost(item), ohDecimal, profitDecimal);
+  }
 
-  const total = entries.reduce((sum, item) => sum + getEntryTotal(item), 0);
-  const committedTotal = (byStatus['Selected'] ?? 0) + (byStatus['Ordered'] ?? 0);
+  // Totals by status
+  const hardByStatus   = {};
+  const clientByStatus = {};
+  entries.forEach((item) => {
+    const hc = getHardCost(item);
+    const cp = getClientPrice(item);
+    hardByStatus[item.status]   = (hardByStatus[item.status]   || 0) + hc;
+    clientByStatus[item.status] = (clientByStatus[item.status] || 0) + cp;
+  });
+
+  const totalHard        = entries.reduce((s, i) => s + getHardCost(i), 0);
+  const totalClient      = entries.reduce((s, i) => s + getClientPrice(i), 0);
+  const totalOH          = totalClient * ohDecimal;
+  const totalProfit      = totalClient * profitDecimal;
+  const committedClient  = (clientByStatus['Selected'] ?? 0) + (clientByStatus['Ordered'] ?? 0);
 
   return (
     <div
@@ -45,23 +56,20 @@ export default function BudgetTracker() {
         fontFamily: 'Inter, system-ui, sans-serif',
       }}
     >
-      {/* Accent line */}
-      <div style={{ height: '2px', backgroundColor: '#D4AF37', opacity: isLocked ? 1 : 0.6 }} />
+      <div style={{ height: '2px', backgroundColor: '#D4AF37', opacity: isLocked ? 1 : 0.5 }} />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
 
-          {/* Left — items tracked + status pills */}
-          <div className="flex items-center gap-3 flex-wrap">
+          {/* Left — status pills */}
+          <div className="flex items-center gap-2.5 flex-wrap">
             {isLocked && (
-              <span
-                className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold"
-                style={{ backgroundColor: 'rgba(212,175,55,0.15)', color: '#D4AF37', border: '1px solid rgba(212,175,55,0.35)' }}
-              >
+              <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold"
+                style={{ backgroundColor: 'rgba(212,175,55,0.15)', color: '#D4AF37', border: '1px solid rgba(212,175,55,0.35)' }}>
                 🔒 Locked
               </span>
             )}
-            <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.65rem', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+            <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.6rem', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
               {entries.length} item{entries.length !== 1 ? 's' : ''}
             </span>
             {['Considering', 'Selected', 'Ordered'].map((status) => {
@@ -69,70 +77,92 @@ export default function BudgetTracker() {
               if (!count) return null;
               const p = STATUS_PILLS[status];
               return (
-                <div
-                  key={status}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-full"
-                  style={{ backgroundColor: p.bg, color: p.text, border: `1px solid ${p.border}`, fontSize: '0.65rem', fontWeight: 700 }}
-                >
+                <div key={status} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full"
+                  style={{ backgroundColor: p.bg, color: p.text, border: `1px solid ${p.border}`, fontSize: '0.65rem', fontWeight: 700 }}>
                   <span>{count}×</span>
                   <span>{status}</span>
-                  <span style={{ opacity: 0.8 }}>{fmtMoney(byStatus[status] ?? 0)}</span>
+                  <span style={{ opacity: 0.85 }}>{fmtMoney(clientByStatus[status] ?? 0)}</span>
                 </div>
               );
             })}
           </div>
 
-          {/* Right — totals + clear */}
-          <div className="flex items-center gap-5">
-            {committedTotal > 0 && (
-              <div className="text-right">
-                <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.6rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '1px' }}>
-                  Committed
+          {/* Right — financial totals */}
+          <div className="flex items-stretch gap-0">
+
+            {/* Contractor-only: hard costs + OH + profit */}
+            {contractorView && usingInstalled && (
+              <div className="text-right pr-5 mr-5" style={{ borderRight: '1px solid rgba(255,255,255,0.08)' }}>
+                <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.58rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '3px' }}>
+                  Cost Structure
                 </p>
-                <p style={{ color: '#D4AF37', fontSize: '1.1rem', fontWeight: 700 }}>
-                  {fmtMoney(committedTotal)}
-                </p>
+                <div className="flex flex-col gap-0.5">
+                  <div className="flex justify-between gap-4 items-baseline">
+                    <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.62rem' }}>Hard Costs</span>
+                    <span style={{ color: '#fff', fontSize: '0.75rem', fontWeight: 600 }}>{fmtMoney(totalHard)}</span>
+                  </div>
+                  <div className="flex justify-between gap-4 items-baseline">
+                    <span style={{ color: 'rgba(212,175,55,0.55)', fontSize: '0.62rem' }}>Overhead ({overheadPct}%)</span>
+                    <span style={{ color: '#D4AF37', fontSize: '0.75rem', fontWeight: 600 }}>{fmtMoney(totalOH)}</span>
+                  </div>
+                  <div className="flex justify-between gap-4 items-baseline">
+                    <span style={{ color: 'rgba(212,175,55,0.55)', fontSize: '0.62rem' }}>Net Profit ({profitPct}%)</span>
+                    <span style={{ color: '#D4AF37', fontSize: '0.75rem', fontWeight: 600 }}>{fmtMoney(totalProfit)}</span>
+                  </div>
+                </div>
               </div>
             )}
 
-            <div
-              className="text-right"
-              style={{ paddingLeft: committedTotal > 0 ? '1.25rem' : 0, borderLeft: committedTotal > 0 ? '1px solid rgba(255,255,255,0.08)' : 'none' }}
-            >
+            {/* Committed */}
+            {committedClient > 0 && (
+              <div className="text-right pr-5 mr-5" style={{ borderRight: '1px solid rgba(255,255,255,0.08)' }}>
+                <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.58rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '1px' }}>
+                  Committed
+                </p>
+                <p style={{ color: '#D4AF37', fontSize: '1.05rem', fontWeight: 700 }}>{fmtMoney(committedClient)}</p>
+              </div>
+            )}
+
+            {/* Grand total */}
+            <div className="text-right">
               {usingInstalled ? (
                 <>
-                  <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.6rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '1px' }}>
-                    Installed Project Estimate
+                  <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.58rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '1px' }}>
+                    {contractorView ? 'Client Quote' : 'Total Installed Price'}
                   </p>
-                  <p style={{ color: '#D4AF37', fontSize: '1.4rem', fontWeight: 800, lineHeight: 1 }}>
-                    {fmtMoney(total)}
+                  <p style={{ color: '#D4AF37', fontSize: '1.5rem', fontWeight: 800, lineHeight: 1 }}>
+                    {fmtMoney(totalClient)}
                   </p>
-                  <p style={{ color: 'rgba(212,175,55,0.4)', fontSize: '0.6rem', marginTop: '2px' }}>
-                    incl. labor + {wasteFactor}% waste
+                  <p style={{ color: 'rgba(212,175,55,0.35)', fontSize: '0.58rem', marginTop: '2px' }}>
+                    {contractorView
+                      ? `${wasteFactor}% waste · ${overheadPct}% OH · ${profitPct}% profit`
+                      : `incl. labor & ${wasteFactor}% waste`}
                   </p>
                 </>
               ) : (
                 <>
-                  <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.6rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '1px' }}>
+                  <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.58rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '1px' }}>
                     Materials Total
                   </p>
-                  <p style={{ color: '#fff', fontSize: '1.4rem', fontWeight: 800, lineHeight: 1 }}>
-                    {fmtMoney(total)}
+                  <p style={{ color: '#fff', fontSize: '1.5rem', fontWeight: 800, lineHeight: 1 }}>
+                    {fmtMoney(totalClient)}
                   </p>
                 </>
               )}
             </div>
 
             {!isLocked && (
-              <button
-                onClick={() => dispatch({ type: 'CLEAR_SELECTIONS' })}
-                className="text-xs font-medium underline transition-colors"
-                style={{ color: 'rgba(255,255,255,0.25)' }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = '#FCA5A5'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.25)'; }}
-              >
-                Clear
-              </button>
+              <div className="flex items-center pl-5 ml-5" style={{ borderLeft: '1px solid rgba(255,255,255,0.08)' }}>
+                <button
+                  onClick={() => dispatch({ type: 'CLEAR_SELECTIONS' })}
+                  className="text-xs font-medium underline transition-colors"
+                  style={{ color: 'rgba(255,255,255,0.2)' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = '#FCA5A5'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.2)'; }}
+                >
+                  Clear
+                </button>
+              </div>
             )}
           </div>
         </div>
