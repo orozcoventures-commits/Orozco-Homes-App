@@ -80,6 +80,37 @@ export default function PinClientPortal() {
     msgEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [localMsgs, data?.messages]);
 
+  // Poll for new messages every 5 s — PIN clients have no Supabase auth session
+  // so Realtime cannot deliver events to them via RLS-gated postgres_changes.
+  useEffect(() => {
+    if (!pinSession || !data) return;
+
+    const poll = async () => {
+      // Find the latest confirmed (non-optimistic) message timestamp
+      const confirmed = localMsgs.filter((m) => !String(m.id).startsWith('tmp-'));
+      const after = confirmed.length > 0
+        ? confirmed[confirmed.length - 1].created_at
+        : new Date(0).toISOString();
+
+      const { data: fresh } = await supabase.rpc('get_new_pin_messages', {
+        p_project_id: pinSession.projectId,
+        p_pin:        pinSession.pin,
+        p_after:      after,
+      });
+
+      if (fresh && fresh.length > 0) {
+        setLocalMsgs((prev) => {
+          const existingIds = new Set(prev.map((m) => m.id));
+          const added = fresh.filter((m) => !existingIds.has(m.id));
+          return added.length > 0 ? [...prev, ...added] : prev;
+        });
+      }
+    };
+
+    const timer = setInterval(poll, 5000);
+    return () => clearInterval(timer);
+  }, [pinSession, data, localMsgs]);
+
   async function fetchData() {
     setLoading(true);
     setError('');
