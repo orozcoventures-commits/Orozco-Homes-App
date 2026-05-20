@@ -157,6 +157,20 @@ const CONTRACTOR_TOOLS = [
       </svg>
     ),
   },
+  {
+    label: 'New Home Budget',
+    page: 'new-home-budget',
+    adminOnly: true,
+    badge: null,
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 9.5 L12 3 L21 9.5 V20 Q21 21 20 21 H4 Q3 21 3 20 Z" />
+        <line x1="9" y1="21" x2="9" y2="13" /><line x1="15" y1="21" x2="15" y2="13" />
+        <line x1="9" y1="13" x2="15" y2="13" />
+        <line x1="12" y1="6" x2="12" y2="9" /><line x1="10.5" y1="7.5" x2="13.5" y2="7.5" />
+      </svg>
+    ),
+  },
 ];
 
 export default function Sidebar({ isOpen, onClose }) {
