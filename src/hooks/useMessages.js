@@ -55,7 +55,9 @@ export function useMessages(projectId, userId, isAdmin) {
           });
         }
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        if (err) console.error('[realtime] channel error', err);
+      });
 
     return () => { supabase.removeChannel(channel); };
   }, [projectId]);
