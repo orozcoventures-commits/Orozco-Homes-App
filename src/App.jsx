@@ -17,6 +17,7 @@ import AdminCreateProject from './pages/AdminCreateProject';
 import ManageClients from './pages/ManageClients';
 import PinClientPortal from './pages/PinClientPortal';
 import NewHomeBudget from './pages/NewHomeBudget';
+import RemodelBudget from './pages/RemodelBudget';
 import './index.css';
 
 // Shown when VITE_SUPABASE_* env vars are missing in Netlify
@@ -144,8 +145,10 @@ function AppContent() {
           {page === 'create-project'   && <AdminCreateProject />}
           {page === 'manage-clients'   && <ManageClients />}
           {page === 'new-home-budget'  && <NewHomeBudget />}
+          {page === 'remodel-budget'   && <RemodelBudget />}
           {!['home','project','client-portal','photo-log','approvals','messages',
-              'weekly-updates','create-project','manage-clients','new-home-budget'].includes(page) && (
+              'weekly-updates','create-project','manage-clients','new-home-budget',
+              'remodel-budget'].includes(page) && (
             <div className="flex flex-col items-center justify-center py-32 px-6 text-center">
               <div
                 className="w-14 h-14 rounded-2xl flex items-center justify-center mb-5"

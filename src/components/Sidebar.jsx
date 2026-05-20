@@ -171,6 +171,20 @@ const CONTRACTOR_TOOLS = [
       </svg>
     ),
   },
+  {
+    label: 'Remodel Budget',
+    page: 'remodel-budget',
+    adminOnly: true,
+    badge: null,
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="2" y="3" width="20" height="14" rx="2" />
+        <path d="M8 21 L16 21" /><line x1="12" y1="17" x2="12" y2="21" />
+        <line x1="7" y1="8" x2="17" y2="8" /><line x1="7" y1="12" x2="13" y2="12" />
+        <line x1="15.5" y1="10.5" x2="17.5" y2="12.5" /><line x1="17.5" y1="10.5" x2="15.5" y2="12.5" />
+      </svg>
+    ),
+  },
 ];
 
 export default function Sidebar({ isOpen, onClose }) {
