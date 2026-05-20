@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { getAvatarColour, getInitials } from '../lib/utils';
 import { supabase } from '../lib/supabase';
@@ -59,7 +59,7 @@ function ConversationItem({ project, isActive, onClick }) {
 }
 
 // ── Chat message bubble ───────────────────────────────────────────────────────
-function MessageBubble({ msg, prevMsg, clientName, projectId, currentUserId }) {
+function MessageBubble({ msg, prevMsg, clientName, projectId, isNew }) {
   const isContractor = msg.sender_role === 'admin';
   const showDate = !prevMsg || formatDate(prevMsg.created_at) !== formatDate(msg.created_at);
 
@@ -72,7 +72,7 @@ function MessageBubble({ msg, prevMsg, clientName, projectId, currentUserId }) {
           <div className="flex-1 h-px" style={{ backgroundColor: '#E8E6E1' }} />
         </div>
       )}
-      <div className={`flex items-end gap-2 ${isContractor ? 'flex-row-reverse' : 'flex-row'}`}>
+      <div className={`flex items-end gap-2 ${isContractor ? 'flex-row-reverse' : 'flex-row'} ${isNew ? 'msg-new' : ''}`}>
         {!isContractor && <Avatar name={clientName} projectId={projectId} size="sm" />}
         <div
           className="max-w-[72%] px-4 py-2.5 rounded-2xl"
@@ -114,7 +114,7 @@ export default function MessageCenter() {
   const bottomRef = useRef(null);
 
   // The hook handles fetching + Realtime for the active project
-  const { messages, loading: loadingMessages, sendMessage } = useMessages(
+  const { messages, loading: loadingMessages, sendMessage, realtimeIds } = useMessages(
     activeId,
     user?.id,
     isAdmin
@@ -261,7 +261,7 @@ export default function MessageCenter() {
                       prevMsg={messages[i - 1] ?? null}
                       clientName={activeClientName}
                       projectId={activeId}
-                      currentUserId={user.id}
+                      isNew={realtimeIds.current.has(msg.id)}
                     />
                   ))}
                 </div>

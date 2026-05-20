@@ -1,27 +1,28 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 
-/**
- * Subscribes to messages for a given project_id.
- * - Fetches existing messages on mount / when projectId changes.
- * - Opens a Supabase Realtime channel so new messages appear instantly.
- * - Returns a sendMessage() function that inserts into the messages table.
- */
 export function useMessages(projectId, userId, isAdmin) {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState(null);
 
-  // Fetch existing messages whenever the active project changes
+  // IDs that arrived via the realtime channel (not the initial fetch).
+  // Stored in a ref so reads in the render cycle are always current without
+  // triggering re-renders when the set is mutated.
+  const realtimeIds = useRef(new Set());
+
   useEffect(() => {
     if (!projectId) {
       setMessages([]);
+      realtimeIds.current = new Set();
       return;
     }
 
     setLoading(true);
     setError(null);
+    realtimeIds.current = new Set();
 
+    // Initial fetch — sorted ascending so the chat reads top→bottom
     supabase
       .from('messages')
       .select('id, sender_id, sender_role, content, created_at')
@@ -33,7 +34,8 @@ export function useMessages(projectId, userId, isAdmin) {
         setLoading(false);
       });
 
-    // Realtime subscription — new INSERT events for this project arrive here
+    // Live channel — INSERT events for this project arrive here instantly.
+    // The project_id filter requires REPLICA IDENTITY FULL (migration 021).
     const channel = supabase
       .channel(`messages:project:${projectId}`)
       .on(
@@ -46,8 +48,9 @@ export function useMessages(projectId, userId, isAdmin) {
         },
         (payload) => {
           setMessages((prev) => {
-            // Deduplicate — optimistic insert may have already added this id
+            // Guard against duplicate: optimistic insert may already be present
             if (prev.some((m) => m.id === payload.new.id)) return prev;
+            realtimeIds.current.add(payload.new.id);
             return [...prev, payload.new];
           });
         }
@@ -57,7 +60,6 @@ export function useMessages(projectId, userId, isAdmin) {
     return () => { supabase.removeChannel(channel); };
   }, [projectId]);
 
-  // Insert a new message; Realtime will add it to the list automatically
   const sendMessage = useCallback(
     async (content) => {
       const text = (content ?? '').trim();
@@ -75,5 +77,5 @@ export function useMessages(projectId, userId, isAdmin) {
     [projectId, userId, isAdmin]
   );
 
-  return { messages, loading, error, sendMessage };
+  return { messages, loading, error, sendMessage, realtimeIds };
 }
