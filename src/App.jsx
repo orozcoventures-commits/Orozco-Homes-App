@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { ProjectProvider, useProject } from './context/ProjectContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { supabaseConfigError } from './lib/supabase';
@@ -110,12 +110,29 @@ function LoadingScreen() {
   );
 }
 
+// Pages each non-admin role is permitted to visit
+const DESIGNER_ALLOWED = new Set(['designer-workspace']);
+const CLIENT_ALLOWED   = new Set(['home', 'client-portal', 'photo-log', 'messages', 'approvals', 'designer-workspace']);
+
 function AppContent() {
-  const { state } = useProject();
-  const { isAuthenticated, loading, isPinMode } = useAuth();
+  const { state, dispatch } = useProject();
+  const { isAuthenticated, loading, isPinMode, isAdmin, isDesigner, isClient } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const page = state.activePage;
+  const rawPage = state.activePage;
+
+  // Compute the guarded page synchronously — prevents a forbidden component from ever mounting
+  const page = useMemo(() => {
+    if (!isAuthenticated || isAdmin) return rawPage;
+    if (isDesigner) return DESIGNER_ALLOWED.has(rawPage) ? rawPage : 'designer-workspace';
+    if (isClient)   return CLIENT_ALLOWED.has(rawPage)   ? rawPage : 'home';
+    return rawPage;
+  }, [rawPage, isAuthenticated, isAdmin, isDesigner, isClient]);
+
+  // Keep ProjectContext state in sync when guard overrides the page
+  useEffect(() => {
+    if (page !== rawPage) dispatch({ type: 'SET_PAGE', page });
+  }, [page, rawPage, dispatch]);
 
   if (loading) return <LoadingScreen />;
   if (isPinMode) return <PinClientPortal />;

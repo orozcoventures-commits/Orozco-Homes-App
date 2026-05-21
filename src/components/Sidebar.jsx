@@ -150,9 +150,8 @@ const CONTRACTOR_TOOLS = [
 
 export default function Sidebar({ isOpen, onClose }) {
   const { state, dispatch } = useProject();
-  const { user, profile, isAdmin, isAuthenticated, logout } = useAuth();
+  const { user, profile, isAdmin, isDesigner, isClient, isAuthenticated, logout } = useAuth();
   const activePage = state.activePage;
-  const isDesigner = profile?.role === 'designer';
 
   const [pendingApprovals, setPendingApprovals] = useState(0);
   const [unreadMessages,   setUnreadMessages]   = useState(0);
@@ -175,13 +174,18 @@ export default function Sidebar({ isOpen, onClose }) {
       .then(({ count }) => setUnreadMessages(count ?? 0));
   }, [isAuthenticated, user?.id]);
 
+  // Designer: only Designer Workspace
+  // Client:   Designer Workspace + Messages + Photo Log
+  // Admin:    everything
+  const DESIGNER_PAGES = new Set(['designer-workspace']);
+  const CLIENT_PAGES   = new Set(['designer-workspace', 'messages', 'photo-log']);
+
   function toolVisible(tool) {
-    if (tool.adminOnly)    return isAdmin;
-    if (tool.designerTool) return isAdmin || isDesigner;
-    if (tool.page === 'weekly-updates') return true;
-    if (!isAuthenticated)  return true;
-    if (isAdmin)           return true;
-    return tool.page === 'messages';
+    if (!isAuthenticated) return tool.page === 'weekly-updates'; // unauthenticated can see nothing useful
+    if (isAdmin)    return true;
+    if (isDesigner) return DESIGNER_PAGES.has(tool.page);
+    if (isClient)   return CLIENT_PAGES.has(tool.page);
+    return false;
   }
 
   function navigatePage(page) {
@@ -189,7 +193,8 @@ export default function Sidebar({ isOpen, onClose }) {
       localStorage.setItem('messages_last_viewed', new Date().toISOString());
       setUnreadMessages(0);
     }
-    dispatch({ type: 'CLEAR_DB_PROJECT' });
+    // Only admins need to clear the active project when switching pages
+    if (isAdmin) dispatch({ type: 'CLEAR_DB_PROJECT' });
     dispatch({ type: 'SET_PAGE', page });
     onClose();
   }
@@ -248,7 +253,7 @@ export default function Sidebar({ isOpen, onClose }) {
           className="px-3 mb-2 text-xs font-bold tracking-[0.14em] uppercase"
           style={{ color: 'rgba(255,255,255,0.4)' }}
         >
-          Contractor Tools
+          {isDesigner ? 'Design Studio' : isClient ? 'My Project' : 'Contractor Tools'}
         </p>
         <div className="space-y-0.5">
           {CONTRACTOR_TOOLS.filter((t) => toolVisible(t)).map((tool) => {
@@ -310,7 +315,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     : { backgroundColor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.7)' }
                 }
               >
-                {isAdmin ? 'Admin' : isDesigner ? 'Designer' : 'Client'}
+                {isAdmin ? 'Admin' : isDesigner ? 'Designer' : isClient ? 'Client' : 'Guest'}
               </span>
             </div>
             <button

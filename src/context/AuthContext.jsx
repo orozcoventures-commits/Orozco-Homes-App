@@ -124,11 +124,12 @@ export function AuthProvider({ children }) {
   const isAuthenticated = !!user && !loading;
   const isAdmin         = profile?.role === 'admin';
   const isDesigner      = profile?.role === 'designer';
+  const isClient        = isAuthenticated && !isAdmin && !isDesigner;
   const isPinMode       = !!pinSession;
 
   return (
     <AuthContext.Provider value={{
-      user, profile, loading, isAuthenticated, isAdmin, isDesigner,
+      user, profile, loading, isAuthenticated, isAdmin, isDesigner, isClient,
       login, signup, claimFirstAdmin, logout,
       pinSession, isPinMode, verifyPin, exitPinMode,
     }}>

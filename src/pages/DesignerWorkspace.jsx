@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { useDesignSpecs } from '../hooks/useDesignSpecs';
 import { useAuth } from '../context/AuthContext';
+import { useProject } from '../context/ProjectContext';
 
 const ROOM_CATEGORIES = [
   { key: 'all',      label: 'All Rooms' },
@@ -54,8 +55,9 @@ function StatusPill({ status }) {
   );
 }
 
-function SpecCard({ spec, onEdit, onDelete, isAdmin }) {
+function SpecCard({ spec, onEdit = () => {}, onDelete = () => {}, isAdmin, onApprove, onDecline, responding }) {
   const installed = Number(spec.installed_cost) || 0;
+  const hasClientActions = !!onApprove && !!onDecline;
   return (
     <div
       className="rounded-2xl p-4"
@@ -112,6 +114,32 @@ function SpecCard({ spec, onEdit, onDelete, isAdmin }) {
           </div>
         )}
       </div>
+
+      {/* Client Approve / Decline actions — only shown when callbacks are injected */}
+      {hasClientActions && spec.status === 'pending_review' && (
+        <div className="mt-3 pt-3 flex gap-2" style={{ borderTop: '1px solid #F3F2EE' }}>
+          <button
+            onClick={() => onApprove(spec.id)}
+            disabled={!!responding}
+            className="flex-1 rounded-xl text-sm font-bold transition-colors"
+            style={{ backgroundColor: '#065F46', color: '#fff', minHeight: '44px' }}
+            onMouseEnter={(e) => { if (!responding) e.currentTarget.style.backgroundColor = '#047857'; }}
+            onMouseLeave={(e) => { if (!responding) e.currentTarget.style.backgroundColor = '#065F46'; }}
+          >
+            {responding === spec.id + 'approved' ? 'Saving…' : '✓ Approve'}
+          </button>
+          <button
+            onClick={() => onDecline(spec.id)}
+            disabled={!!responding}
+            className="flex-1 rounded-xl text-sm font-bold transition-colors"
+            style={{ backgroundColor: '#FEF2F2', color: '#DC2626', border: '1px solid #FECACA', minHeight: '44px' }}
+            onMouseEnter={(e) => { if (!responding) e.currentTarget.style.backgroundColor = '#FEE2E2'; }}
+            onMouseLeave={(e) => { if (!responding) e.currentTarget.style.backgroundColor = '#FEF2F2'; }}
+          >
+            ✕ Decline
+          </button>
+        </div>
+      )}
 
       {spec.designer_notes && (
         <div className="mt-3 px-3 py-2 rounded-xl text-xs" style={{ backgroundColor: '#F9F8F6', color: '#6B7280', border: '1px solid #F0EEE9' }}>
@@ -337,9 +365,233 @@ function SpecModal({ initial, projects, onSave, onClose, saving }) {
   );
 }
 
+// ── Client view of Designer Workspace ────────────────────────────────────────
+function ClientDesignWorkspace() {
+  const { state } = useProject();
+  const [projectId,    setProjectId]    = useState(state.activeDbProject?.id ?? '');
+  const [activeRoom,   setActiveRoom]   = useState('all');
+  const [declining,    setDeclining]    = useState(null);
+  const [feedbackDraft,setFeedbackDraft]= useState({});
+  const [responding,   setResponding]   = useState(null);
+  const [toast,        setToast]        = useState('');
+
+  // Auto-load the client's project via RLS if none is already set in context
+  useEffect(() => {
+    if (projectId) return;
+    supabase
+      .from('projects')
+      .select('id')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .then(({ data }) => { if (data?.[0]) setProjectId(data[0].id); });
+  }, [projectId]);
+
+  const { specs: resolvedSpecs, loading: resolvedLoading, clientRespond: respond } = useDesignSpecs(projectId || null);
+
+  const filteredSpecs = useMemo(() => {
+    if (activeRoom === 'all') return resolvedSpecs;
+    return resolvedSpecs.filter((s) => s.room_category === activeRoom);
+  }, [resolvedSpecs, activeRoom]);
+
+  const decliningSpec   = declining ? resolvedSpecs.find((s) => s.id === declining) : null;
+  const pendingCount    = resolvedSpecs.filter((s) => s.status === 'pending_review').length;
+
+  function showToast(msg) { setToast(msg); setTimeout(() => setToast(''), 2500); }
+
+  async function handleApprove(specId) {
+    setResponding(specId + 'approved');
+    const result = await respond(specId, 'approved');
+    setResponding(null);
+    if (result.error) showToast('Error: ' + result.error);
+    else showToast('Selection approved!');
+  }
+
+  async function handleDeclineConfirm() {
+    if (!declining) return;
+    setResponding(declining + 'declined');
+    const result = await respond(declining, 'declined', feedbackDraft[declining] ?? '');
+    setResponding(null);
+    if (result.error) showToast('Error: ' + result.error);
+    else {
+      showToast('Selection declined.');
+      setDeclining(null);
+      setFeedbackDraft((p) => { const n = { ...p }; delete n[declining]; return n; });
+    }
+  }
+
+  if (!projectId && !resolvedLoading) {
+    return (
+      <div className="max-w-3xl mx-auto px-6 py-24 text-center">
+        <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5" style={{ backgroundColor: '#F5F4F0' }}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/>
+            <line x1="4.22" y1="4.22" x2="6.34" y2="6.34"/><line x1="17.66" y1="17.66" x2="19.78" y2="19.78"/>
+            <line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/>
+          </svg>
+        </div>
+        <p className="font-bold text-base mb-2" style={{ color: '#002147' }}>No project assigned yet</p>
+        <p className="text-sm" style={{ color: '#6B7280' }}>Your contractor will assign a project and add design selections for your review soon.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+
+      {/* Header */}
+      <div className="mb-8">
+        <p className="text-xs font-bold tracking-[0.18em] uppercase mb-1" style={{ color: '#D4AF37' }}>Your Design</p>
+        <h1 className="text-2xl font-extrabold" style={{ color: '#002147' }}>Design Workspace</h1>
+        <p className="text-sm mt-1" style={{ color: '#6B7280' }}>
+          {pendingCount > 0
+            ? <span style={{ color: '#92400E', fontWeight: 700 }}>{pendingCount} selection{pendingCount !== 1 ? 's' : ''} awaiting your decision</span>
+            : 'Browse and respond to your curated material selections.'}
+        </p>
+      </div>
+
+      {/* Room category tabs */}
+      <div className="flex gap-1.5 overflow-x-auto pb-2 mb-6" style={{ scrollbarWidth: 'none' }}>
+        {ROOM_CATEGORIES.map(({ key, label }) => {
+          const count    = key === 'all' ? resolvedSpecs.length : resolvedSpecs.filter((s) => s.room_category === key).length;
+          if (count === 0 && key !== 'all') return null;
+          const isActive = activeRoom === key;
+          return (
+            <button
+              key={key}
+              onClick={() => setActiveRoom(key)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition-colors"
+              style={{
+                backgroundColor: isActive ? '#002147' : '#fff',
+                color:           isActive ? '#D4AF37' : '#6B7280',
+                border:          isActive ? '1.5px solid #002147' : '1.5px solid #E8E6E1',
+                minHeight: '36px',
+              }}
+            >
+              {label}
+              {count > 0 && (
+                <span
+                  className="px-1.5 py-0.5 rounded-full font-bold"
+                  style={{
+                    backgroundColor: isActive ? 'rgba(212,175,55,0.25)' : '#F3F4F6',
+                    color: isActive ? '#D4AF37' : '#6B7280',
+                    fontSize: '0.6rem', minWidth: '16px', textAlign: 'center',
+                  }}
+                >
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Spec grid */}
+      {resolvedLoading ? (
+        <div className="flex items-center justify-center gap-3 py-16">
+          <svg className="animate-spin" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" strokeWidth="2.5" strokeLinecap="round">
+            <circle cx="12" cy="12" r="10" strokeOpacity="0.2" /><path d="M12 2a10 10 0 0 1 10 10" />
+          </svg>
+          <span className="text-sm" style={{ color: '#9CA3AF' }}>Loading your selections…</span>
+        </div>
+      ) : filteredSpecs.length === 0 ? (
+        <div className="rounded-2xl p-12 text-center" style={{ backgroundColor: '#fff', border: '1.5px dashed #E8E6E1' }}>
+          <p className="font-semibold text-sm mb-1" style={{ color: '#374151' }}>
+            {resolvedSpecs.length === 0 ? 'No design selections yet' : 'No items in this room'}
+          </p>
+          <p className="text-xs" style={{ color: '#9CA3AF' }}>
+            {resolvedSpecs.length === 0
+              ? 'Your designer will curate selections for your review soon.'
+              : 'Try a different room category above.'}
+          </p>
+        </div>
+      ) : (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredSpecs.map((spec) => (
+            <SpecCard
+              key={spec.id}
+              spec={spec}
+              isAdmin={false}
+              onApprove={handleApprove}
+              onDecline={(id) => setDeclining(id)}
+              responding={responding}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Decline feedback modal — bottom sheet on mobile */}
+      {decliningSpec && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
+          style={{ backgroundColor: 'rgba(0,0,0,0.55)' }}
+          onClick={(e) => { if (e.target === e.currentTarget) setDeclining(null); }}
+        >
+          <div
+            className="w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl p-6"
+            style={{ backgroundColor: '#fff', boxShadow: '0 -8px 48px rgba(0,0,0,0.18)' }}
+          >
+            <div className="w-10 h-1 rounded-full mx-auto mb-5 sm:hidden" style={{ backgroundColor: '#D1D5DB' }} />
+            <div className="flex items-start justify-between gap-3 mb-1">
+              <p className="font-bold text-base" style={{ color: '#002147' }}>Decline Selection</p>
+              <button
+                onClick={() => setDeclining(null)}
+                className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                style={{ backgroundColor: '#F5F4F0', color: '#6B7280' }}
+              >
+                <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <line x1="1" y1="1" x2="11" y2="11"/><line x1="11" y1="1" x2="1" y2="11"/>
+                </svg>
+              </button>
+            </div>
+            <p className="text-sm mb-4 font-semibold" style={{ color: '#374151' }}>{decliningSpec.product_name}</p>
+            <p className="text-sm font-semibold mb-1" style={{ color: '#374151' }}>Please let our design team know your feedback</p>
+            <p className="text-xs mb-3" style={{ color: '#9CA3AF' }}>e.g., color, budget, alternative material texture</p>
+            <textarea
+              rows={3}
+              value={feedbackDraft[declining] ?? ''}
+              onChange={(e) => setFeedbackDraft((p) => ({ ...p, [declining]: e.target.value }))}
+              placeholder="Your feedback helps us find a better option for you…"
+              className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none resize-none mb-4"
+              style={{ backgroundColor: '#F9FAFB', border: '1.5px solid #E5E7EB', color: '#374151' }}
+              autoFocus
+            />
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => setDeclining(null)}
+                className="rounded-xl text-sm font-bold"
+                style={{ backgroundColor: '#F5F4F0', color: '#374151', border: '1px solid #E8E6E1', minHeight: '48px' }}
+              >
+                Back
+              </button>
+              <button
+                onClick={handleDeclineConfirm}
+                disabled={responding === declining + 'declined'}
+                className="rounded-xl text-sm font-bold"
+                style={{ backgroundColor: '#DC2626', color: '#fff', minHeight: '48px' }}
+              >
+                {responding === declining + 'declined' ? 'Saving…' : 'Confirm Decline'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl text-sm font-semibold shadow-lg" style={{ backgroundColor: '#002147', color: '#D4AF37' }}>
+          {toast}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Designer / Admin view ─────────────────────────────────────────────────────
 export default function DesignerWorkspace() {
-  const { isAdmin, profile } = useAuth();
+  const { isAdmin, isClient, profile } = useAuth();
   const canEdit = isAdmin || profile?.role === 'designer';
+
+  // Clients get their own curated view with Approve / Decline actions
+  if (isClient) return <ClientDesignWorkspace />;
 
   const [projects,    setProjects]    = useState([]);
   const [projectId,   setProjectId]   = useState('');
