@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   REMODEL_CONFIGS,
   SPEC_LEVELS,
@@ -6,6 +6,7 @@ import {
   getProjectConfig,
   computeBaseLineValues,
 } from '../utils/remodelBudgetCalculator';
+import { supabase } from '../lib/supabase';
 
 // ── Project type groupings ────────────────────────────────────────────────────
 
@@ -204,6 +205,58 @@ function SummaryCard({ label, value, sub, highlight, color }) {
   );
 }
 
+// ── Design Specs section component ───────────────────────────────────────────
+function DesignSpecsSection({ approvedSpecs, total, isOpen, onToggle }) {
+  if (approvedSpecs.length === 0) return null;
+  return (
+    <div className="rounded-2xl overflow-hidden mb-3" style={{ border: '1.5px solid #6EE7B7' }}>
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center justify-between px-5 py-4 focus:outline-none"
+        style={{ backgroundColor: '#ECFDF5' }}
+      >
+        <div className="flex items-center gap-3">
+          <span className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-extrabold shrink-0" style={{ backgroundColor: '#065F46', color: '#fff' }}>DS</span>
+          <span className="text-sm font-bold text-left" style={{ color: '#065F46' }}>Design Selections (Approved)</span>
+          <span className="text-xs px-2 py-0.5 rounded-full font-bold" style={{ backgroundColor: '#D1FAE5', color: '#065F46' }}>{approvedSpecs.length} items</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-extrabold" style={{ color: '#065F46' }}>${total.toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#065F46" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+            style={{ transition: 'transform 0.2s', transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+            <polyline points="1 4 6 8 11 4" />
+          </svg>
+        </div>
+      </button>
+      {isOpen && (
+        <div style={{ backgroundColor: '#fff' }}>
+          {approvedSpecs.map((spec, i) => (
+            <div
+              key={spec.id}
+              className="flex items-center gap-3 px-4 py-2.5"
+              style={{ borderTop: i === 0 ? '1px solid #6EE7B7' : '1px solid #F3F4F6' }}
+            >
+              <span className="text-xs font-bold w-8 text-center py-0.5 rounded shrink-0" style={{ backgroundColor: '#ECFDF5', color: '#065F46' }}>DS</span>
+              <div className="flex-1 min-w-0">
+                <span className="text-sm truncate" style={{ color: '#374151' }}>{spec.product_name}</span>
+                {spec.supplier && <span className="text-xs ml-2" style={{ color: '#9CA3AF' }}>{spec.supplier}</span>}
+              </div>
+              <span className="text-xs shrink-0" style={{ color: '#9CA3AF' }}>{spec.quantity} {spec.unit_type}</span>
+              <span className="text-sm font-semibold shrink-0" style={{ color: '#065F46' }}>
+                ${(Number(spec.installed_cost) || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}
+              </span>
+            </div>
+          ))}
+          <div className="flex items-center justify-between px-4 py-3" style={{ borderTop: '1px solid #6EE7B7', backgroundColor: '#ECFDF5' }}>
+            <span className="text-xs font-bold uppercase tracking-wide" style={{ color: '#065F46' }}>Design Selections Total</span>
+            <span className="text-sm font-extrabold" style={{ color: '#065F46' }}>${total.toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function RemodelBudget() {
@@ -215,6 +268,35 @@ export default function RemodelBudget() {
   const [userVals,    setUserVals]    = useState({});
   const [overrideFlags, setOverrideFlags] = useState({});
   const [openDivs,    setOpenDivs]    = useState({});
+
+  // Design specs integration
+  const [dbProjects,      setDbProjects]      = useState([]);
+  const [selectedProjId,  setSelectedProjId]  = useState('');
+  const [approvedSpecs,   setApprovedSpecs]   = useState([]);
+  const [specsDivOpen,    setSpecsDivOpen]    = useState(true);
+
+  useEffect(() => {
+    supabase.from('projects').select('id, project_name').order('created_at', { ascending: false })
+      .then(({ data }) => setDbProjects(data ?? []));
+  }, []);
+
+  const loadApprovedSpecs = useCallback(async (pid) => {
+    if (!pid) { setApprovedSpecs([]); return; }
+    const { data } = await supabase
+      .from('design_specs')
+      .select('id, product_name, supplier, quantity, unit_type, installed_cost, room_category')
+      .eq('project_id', pid)
+      .eq('status', 'approved')
+      .order('room_category');
+    setApprovedSpecs(data ?? []);
+  }, []);
+
+  useEffect(() => { loadApprovedSpecs(selectedProjId); }, [selectedProjId, loadApprovedSpecs]);
+
+  const designSpecsTotal = useMemo(
+    () => approvedSpecs.reduce((s, sp) => s + (Number(sp.installed_cost) || 0), 0),
+    [approvedSpecs]
+  );
 
   const config = getProjectConfig(projectType);
 
@@ -261,9 +343,10 @@ export default function RemodelBudget() {
       }
     }
 
-    // Compute base sum (all non-pct, non-M lines)
+    // Base sum includes approved design specs installed cost
     const nonPctWbs = allNonPctWbs(config);
-    const baseSum = nonPctWbs.reduce((s, w) => s + (vals[w] ?? 0), 0);
+    const wbsSum  = nonPctWbs.reduce((s, w) => s + (vals[w] ?? 0), 0);
+    const baseSum = wbsSum + designSpecsTotal;
 
     // Pct lines
     vals['M.1'] = overrideFlags['M.1'] ? (userVals['M.1'] ?? 0) : baseSum * (pctRates.overheadPct / 100);
@@ -271,14 +354,14 @@ export default function RemodelBudget() {
     vals['M.3'] = overrideFlags['M.3'] ? (userVals['M.3'] ?? 0) : baseSum * (pctRates.contingencyPct / 100);
 
     return vals;
-  }, [config, projectType, inputs, specLevel, pctRates, userVals, overrideFlags]);
+  }, [config, projectType, inputs, specLevel, pctRates, userVals, overrideFlags, designSpecsTotal]);
 
   // ── Aggregate totals ──────────────────────────────────────────────────────
   const totals = useMemo(() => {
     if (!config) return {};
 
-    // Sum non-M lines
-    const directCosts = allNonPctWbs(config).reduce((s, w) => s + (lineVals[w] ?? 0), 0);
+    // Sum non-M lines + approved design specs
+    const directCosts = allNonPctWbs(config).reduce((s, w) => s + (lineVals[w] ?? 0), 0) + designSpecsTotal;
     const overhead    = lineVals['M.1'] ?? 0;
     const profit      = lineVals['M.2'] ?? 0;
     const contingency = lineVals['M.3'] ?? 0;
@@ -297,7 +380,7 @@ export default function RemodelBudget() {
     }
 
     return { directCosts, overhead, profit, contingency, totalClientPrice, contractorMargin, marginPct, costPerSqft, divSums };
-  }, [config, lineVals, inputs.sqft]);
+  }, [config, lineVals, inputs.sqft, designSpecsTotal]);
 
   // ── Event handlers ────────────────────────────────────────────────────────
   function handleLineChange(wbs, num) {
@@ -376,6 +459,30 @@ export default function RemodelBudget() {
         </div>
       </div>
 
+      {/* Design Specs project selector */}
+      <div className="rounded-2xl p-5 mb-5" style={{ backgroundColor: '#fff', border: '1.5px solid #E8E6E1', boxShadow: '0 2px 12px rgba(0,33,71,0.05)' }}>
+        <div className="flex flex-wrap items-end gap-4">
+          <div className="flex-1 min-w-48">
+            <p className="text-xs font-bold tracking-[0.14em] uppercase mb-1.5" style={{ color: '#065F46' }}>Link Design Specs</p>
+            <select
+              value={selectedProjId}
+              onChange={(e) => setSelectedProjId(e.target.value)}
+              className="w-full px-3 py-2.5 rounded-xl text-sm focus:outline-none"
+              style={{ backgroundColor: '#F9FAFB', border: '1.5px solid #E5E7EB', color: '#111827' }}
+            >
+              <option value="">— None (no design specs) —</option>
+              {dbProjects.map((p) => <option key={p.id} value={p.id}>{p.project_name}</option>)}
+            </select>
+          </div>
+          {approvedSpecs.length > 0 && (
+            <div className="px-4 py-2.5 rounded-xl" style={{ backgroundColor: '#ECFDF5', border: '1px solid #6EE7B7' }}>
+              <p className="text-xs font-semibold" style={{ color: '#065F46' }}>{approvedSpecs.length} approved spec{approvedSpecs.length !== 1 ? 's' : ''}</p>
+              <p className="text-base font-extrabold" style={{ color: '#065F46' }}>${designSpecsTotal.toLocaleString('en-US', { maximumFractionDigits: 0 })} added to costs</p>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Project parameters */}
       <div className="rounded-2xl p-6 mb-5"
         style={{ backgroundColor: '#fff', border: '1.5px solid #E8E6E1', boxShadow: '0 2px 12px rgba(0,33,71,0.05)' }}>
@@ -439,6 +546,16 @@ export default function RemodelBudget() {
           value={fmtPct(totals.marginPct)}
           sub="Of total client price"
           color={totals.marginPct >= 0.25 ? '#059669' : '#D97706'}
+        />
+      </div>
+
+      {/* Design Selections division */}
+      <div className="space-y-3 mb-3">
+        <DesignSpecsSection
+          approvedSpecs={approvedSpecs}
+          total={designSpecsTotal}
+          isOpen={specsDivOpen}
+          onToggle={() => setSpecsDivOpen((o) => !o)}
         />
       </div>
 

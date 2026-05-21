@@ -19,6 +19,7 @@ import PinClientPortal from './pages/PinClientPortal';
 import NewHomeBudget from './pages/NewHomeBudget';
 import RemodelBudget from './pages/RemodelBudget';
 import ScheduleCalendar from './pages/ScheduleCalendar';
+import DesignerWorkspace from './pages/DesignerWorkspace';
 import './index.css';
 
 // Shown when VITE_SUPABASE_* env vars are missing in Netlify
@@ -136,21 +137,22 @@ function AppContent() {
         )}
 
         <main className={`flex-1 ${isMessages ? 'flex flex-col' : ''}`}>
-          {page === 'home'             && <ProjectSelector />}
-          {page === 'project'          && <ProjectDetail />}
-          {page === 'client-portal'    && <ClientPortal />}
-          {page === 'photo-log'        && <PhotoLog />}
-          {page === 'approvals'        && <Approvals />}
-          {page === 'messages'         && <MessageCenter />}
-          {page === 'weekly-updates'   && <WeeklyUpdates />}
-          {page === 'create-project'   && <AdminCreateProject />}
-          {page === 'manage-clients'   && <ManageClients />}
-          {page === 'new-home-budget'  && <NewHomeBudget />}
-          {page === 'remodel-budget'   && <RemodelBudget />}
-          {page === 'schedule'         && <ScheduleCalendar />}
+          {page === 'home'               && <ProjectSelector />}
+          {page === 'project'            && <ProjectDetail />}
+          {page === 'client-portal'      && <ClientPortal />}
+          {page === 'photo-log'          && <PhotoLog />}
+          {page === 'approvals'          && <Approvals />}
+          {page === 'messages'           && <MessageCenter />}
+          {page === 'weekly-updates'     && <WeeklyUpdates />}
+          {page === 'create-project'     && <AdminCreateProject />}
+          {page === 'manage-clients'     && <ManageClients />}
+          {page === 'new-home-budget'    && <NewHomeBudget />}
+          {page === 'remodel-budget'     && <RemodelBudget />}
+          {page === 'schedule'           && <ScheduleCalendar />}
+          {page === 'designer-workspace' && <DesignerWorkspace />}
           {!['home','project','client-portal','photo-log','approvals','messages',
               'weekly-updates','create-project','manage-clients','new-home-budget',
-              'remodel-budget','schedule'].includes(page) && (
+              'remodel-budget','schedule','designer-workspace'].includes(page) && (
             <div className="flex flex-col items-center justify-center py-32 px-6 text-center">
               <div
                 className="w-14 h-14 rounded-2xl flex items-center justify-center mb-5"
