@@ -3,16 +3,9 @@ import { createContext, useContext, useReducer } from 'react';
 const ProjectContext = createContext(null);
 
 const initialState = {
-  activeProject:   null,    // PROJECT_TYPE (material catalog browsing)
+  activeProject:   null,    // PROJECT_TYPE (for material catalog view, kept for legacy ProjectDetail)
   activeDbProject: null,    // real Supabase projects row
   activePage:      'home',
-  selections:      {},
-  dimensions:      { floor_sqft: '', wall_sqft: '', linear_feet: '' },
-  wasteFactor:     15,      // percentage integer, 0–100
-  overheadPct:     18,      // percentage integer — OH markup (default 18%)
-  profitPct:       12,      // percentage integer — net profit (default 12%)
-  contractorView:  true,    // true = show internal breakdown; false = client preview
-  isLocked:        false,
 };
 
 function reducer(state, action) {
@@ -31,41 +24,8 @@ function reducer(state, action) {
       };
     case 'SET_PAGE':
       return { ...state, activePage: action.page };
-    case 'SET_MATERIAL_STATUS': {
-      if (state.isLocked) return state;
-      const { materialId, status } = action;
-      const current = state.selections[materialId];
-      if (current?.status === status) {
-        const next = { ...state.selections };
-        delete next[materialId];
-        return { ...state, selections: next };
-      }
-      return {
-        ...state,
-        selections: {
-          ...state.selections,
-          [materialId]: { status, price: action.price, name: action.name, category: action.category },
-        },
-      };
-    }
     case 'CLEAR_DB_PROJECT':
       return { ...state, activeDbProject: null };
-    case 'CLEAR_SELECTIONS':
-      return { ...state, selections: {}, isLocked: false };
-    case 'SET_DIMENSIONS':
-      return { ...state, dimensions: { ...state.dimensions, ...action.dimensions } };
-    case 'SET_WASTE_FACTOR':
-      return { ...state, wasteFactor: Math.min(100, Math.max(0, Number(action.value) || 0)) };
-    case 'SET_OVERHEAD':
-      return { ...state, overheadPct: Math.min(99, Math.max(0, Number(action.value) || 0)) };
-    case 'SET_PROFIT':
-      return { ...state, profitPct: Math.min(99, Math.max(0, Number(action.value) || 0)) };
-    case 'TOGGLE_CONTRACTOR_VIEW':
-      return { ...state, contractorView: !state.contractorView };
-    case 'LOCK_ESTIMATE':
-      return { ...state, isLocked: true };
-    case 'UNLOCK_ESTIMATE':
-      return { ...state, isLocked: false };
     default:
       return state;
   }

@@ -1,10 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useProject } from '../context/ProjectContext';
-import MaterialSection from '../components/MaterialSection';
-import BudgetTracker from '../components/BudgetTracker';
-import SelectionSummary from '../components/SelectionSummary';
-import { MATERIAL_CATEGORY_LABELS } from '../data/projectTypes';
 import { useAuth } from '../context/AuthContext';
+import { MATERIAL_CATEGORY_LABELS } from '../data/projectTypes';
 
 function ShareAccessCard({ project }) {
   const clientName = project.managed_client?.full_name ?? 'Your Client';
@@ -13,7 +10,7 @@ function ShareAccessCard({ project }) {
   const portalUrl = window.location.origin;
 
   const [pinRevealed, setPinRevealed] = useState(false);
-  const [toast, setToast]             = useState('');   // '' | 'copied' | 'email'
+  const [toast, setToast]             = useState('');
   const toastTimer                    = useRef(null);
 
   function showToast(msg) {
@@ -46,7 +43,6 @@ function ShareAccessCard({ project }) {
       className="rounded-2xl mb-6 overflow-hidden"
       style={{ backgroundColor: '#fff', border: '1.5px solid rgba(212,175,55,0.45)', boxShadow: '0 2px 12px rgba(0,33,71,0.06)' }}
     >
-      {/* Header */}
       <div className="flex items-center gap-2.5 px-4 py-3" style={{ backgroundColor: 'rgba(212,175,55,0.08)', borderBottom: '1px solid rgba(212,175,55,0.25)' }}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
           <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
@@ -56,7 +52,6 @@ function ShareAccessCard({ project }) {
       </div>
 
       <div className="px-4 py-3 flex flex-wrap items-center gap-3">
-        {/* PIN display */}
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <div
             className="flex items-center gap-2 px-3 py-2 rounded-xl"
@@ -79,9 +74,7 @@ function ShareAccessCard({ project }) {
           </button>
         </div>
 
-        {/* Action buttons */}
         <div className="flex items-center gap-2 shrink-0">
-          {/* Copy message */}
           <button
             onClick={handleCopy}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150 focus:outline-none"
@@ -101,7 +94,6 @@ function ShareAccessCard({ project }) {
             <span className="hidden sm:inline">{toast === 'copied' ? 'Copied!' : 'Copy Message'}</span>
           </button>
 
-          {/* Email invite */}
           <button
             onClick={handleEmail}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150 focus:outline-none"
@@ -123,7 +115,6 @@ function ShareAccessCard({ project }) {
         </div>
       </div>
 
-      {/* Message preview */}
       <div
         className="mx-4 mb-3 px-3 py-2 rounded-xl text-xs"
         style={{ backgroundColor: '#F9F8F6', border: '1px solid #F0EEE9', color: '#6B7280', fontStyle: 'italic' }}
@@ -137,15 +128,12 @@ function ShareAccessCard({ project }) {
 export default function ProjectDetail() {
   const { state, dispatch } = useProject();
   const { isAdmin } = useAuth();
-  const { activeProject, activeDbProject, selections } = state;
-  const [view, setView] = useState('materials');
+  const { activeProject, activeDbProject } = state;
 
   if (!activeProject) return null;
 
-  const selectionCount = Object.keys(selections).length;
-
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
       {/* Breadcrumb */}
       <button
@@ -176,39 +164,6 @@ export default function ProjectDetail() {
             </h2>
             <p className="text-sm" style={{ color: '#4A4A4A' }}>{activeProject.description}</p>
           </div>
-        </div>
-
-        {/* Materials / My List toggle */}
-        <div
-          className="flex rounded-xl overflow-hidden"
-          style={{ border: '1.5px solid #E8E6E1', backgroundColor: '#F9F8F6' }}
-        >
-          {['materials', 'summary'].map((v) => {
-            const active = view === v;
-            const label = v === 'materials' ? 'Materials' : 'My List';
-            return (
-              <button
-                key={v}
-                onClick={() => setView(v)}
-                className="relative px-5 py-2 text-sm font-semibold transition-all duration-150"
-                style={
-                  active
-                    ? { backgroundColor: '#002147', color: '#fff' }
-                    : { backgroundColor: 'transparent', color: '#4A4A4A' }
-                }
-              >
-                {label}
-                {v === 'summary' && selectionCount > 0 && (
-                  <span
-                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold"
-                    style={{ backgroundColor: '#D4AF37', color: '#002147' }}
-                  >
-                    {selectionCount}
-                  </span>
-                )}
-              </button>
-            );
-          })}
         </div>
       </div>
 
@@ -254,23 +209,109 @@ export default function ProjectDetail() {
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
           </svg>
-          Selecting materials for: <span className="font-bold ml-1" style={{ color: '#002147' }}>{activeDbProject.project_name}</span>
+          Linked client project: <span className="font-bold ml-1" style={{ color: '#002147' }}>{activeDbProject.project_name}</span>
         </div>
       )}
 
-      {/* Share Access card — PIN + copy/email for client onboarding */}
+      {/* Share Access card */}
       {isAdmin && activeDbProject && <ShareAccessCard project={activeDbProject} />}
 
       {/* Gold divider */}
       <div className="h-px mb-8" style={{ backgroundColor: 'rgba(212,175,55,0.3)' }} />
 
-      {view === 'materials' ? (
-        <MaterialSection categories={activeProject.materialCategories} />
-      ) : (
-        <SelectionSummary />
-      )}
-
-      <BudgetTracker />
+      {/* Quick-action cards */}
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {[
+          {
+            icon: (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+            ),
+            label: 'Client Portal',
+            description: 'View project status, phases & design approvals',
+            page: 'client-portal',
+          },
+          {
+            icon: (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+            ),
+            label: 'Messages',
+            description: 'Send and receive project messages',
+            page: 'messages',
+          },
+          {
+            icon: (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2"/>
+                <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
+                <line x1="3" y1="10" x2="21" y2="10"/>
+              </svg>
+            ),
+            label: 'Weekly Updates',
+            description: 'Post or view weekly progress reports',
+            page: 'weekly-updates',
+          },
+          {
+            icon: (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/><polyline points="9 15 11 17 15 13"/>
+              </svg>
+            ),
+            label: 'Approvals',
+            description: 'Review and action pending change orders',
+            page: 'approvals',
+          },
+          {
+            icon: (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                <circle cx="12" cy="13" r="4"/>
+              </svg>
+            ),
+            label: 'Photo Log',
+            description: 'Browse project progress photos',
+            page: 'photo-log',
+          },
+          {
+            icon: (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="6"/>
+                <line x1="12" y1="18" x2="12" y2="22"/><line x1="4.22" y1="4.22" x2="7.05" y2="7.05"/>
+                <line x1="16.95" y1="16.95" x2="19.78" y2="19.78"/>
+                <line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/>
+                <line x1="4.22" y1="19.78" x2="7.05" y2="16.95"/><line x1="16.95" y1="7.05" x2="19.78" y2="4.22"/>
+              </svg>
+            ),
+            label: 'Designer Workspace',
+            description: 'Curate material selections for this project',
+            page: 'designer-workspace',
+            adminOnly: true,
+          },
+        ].map((card) => {
+          if (card.adminOnly && !isAdmin) return null;
+          return (
+            <button
+              key={card.page}
+              onClick={() => dispatch({ type: 'SET_PAGE', page: card.page })}
+              className="rounded-2xl p-5 text-left transition-all duration-150 focus:outline-none"
+              style={{ backgroundColor: '#fff', border: '1.5px solid #E8E6E1', boxShadow: '0 1px 6px rgba(0,33,71,0.04)' }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#D4AF37'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,33,71,0.10)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#E8E6E1'; e.currentTarget.style.boxShadow = '0 1px 6px rgba(0,33,71,0.04)'; }}
+            >
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ backgroundColor: 'rgba(0,33,71,0.06)', color: '#002147' }}>
+                {card.icon}
+              </div>
+              <p className="font-bold text-sm mb-1" style={{ color: '#002147' }}>{card.label}</p>
+              <p className="text-xs leading-relaxed" style={{ color: '#9CA3AF' }}>{card.description}</p>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
