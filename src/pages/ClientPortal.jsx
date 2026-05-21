@@ -93,6 +93,7 @@ function DesignSelectionsSection({ projectId, isAdmin }) {
   const pending  = specs.filter((s) => s.status === 'pending_review');
   const approved = specs.filter((s) => s.status === 'approved');
   const declined = specs.filter((s) => s.status === 'declined');
+  const decliningSpec = declining ? specs.find((s) => s.id === declining) : null;
 
   if (loading) return null;
   if (specs.length === 0) return null;
@@ -100,83 +101,54 @@ function DesignSelectionsSection({ projectId, isAdmin }) {
   const approvedTotal = approved.reduce((s, sp) => s + (Number(sp.installed_cost) || 0), 0);
 
   return (
-    <div className="mt-8 rounded-2xl overflow-hidden" style={{ backgroundColor: '#fff', border: '1.5px solid #E8E6E1', boxShadow: '0 2px 12px rgba(0,33,71,0.06)' }}>
-      {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4" style={{ backgroundColor: 'rgba(0,33,71,0.03)', borderBottom: '1px solid #E8E6E1' }}>
-        <div>
-          <h3 className="font-bold text-base" style={{ color: '#002147' }}>Design Selections</h3>
-          <p className="text-xs mt-0.5" style={{ color: '#9CA3AF' }}>
-            {specs.length} item{specs.length !== 1 ? 's' : ''} · {pending.length} pending your review
-          </p>
-        </div>
-        {approved.length > 0 && (
-          <div className="text-right">
-            <p className="text-xs font-semibold" style={{ color: '#9CA3AF' }}>Approved Total</p>
-            <p className="text-base font-extrabold" style={{ color: '#065F46' }}>{fmtCurrency(approvedTotal)}</p>
-          </div>
-        )}
-      </div>
-
-      <div className="px-6 py-5 space-y-5">
-        {/* Pending review */}
-        {pending.length > 0 && (
+    <>
+      <div className="mt-8 rounded-2xl overflow-hidden" style={{ backgroundColor: '#fff', border: '1.5px solid #E8E6E1', boxShadow: '0 2px 12px rgba(0,33,71,0.06)' }}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4" style={{ backgroundColor: 'rgba(0,33,71,0.03)', borderBottom: '1px solid #E8E6E1' }}>
           <div>
-            <p className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color: '#92400E' }}>
-              Awaiting Your Decision ({pending.length})
+            <h3 className="font-bold text-base" style={{ color: '#002147' }}>Design Selections</h3>
+            <p className="text-xs mt-0.5" style={{ color: '#9CA3AF' }}>
+              {specs.length} item{specs.length !== 1 ? 's' : ''} · {pending.length} pending your review
             </p>
-            <div className="space-y-3">
-              {pending.map((spec) => (
-                <div key={spec.id} className="rounded-xl p-4" style={{ backgroundColor: '#FFFBEB', border: '1.5px solid #FCD34D' }}>
-                  <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
-                    <div>
-                      <p className="font-bold text-sm" style={{ color: '#002147' }}>{spec.product_name}</p>
-                      {spec.supplier && <p className="text-xs mt-0.5" style={{ color: '#9CA3AF' }}>{spec.supplier}</p>}
-                      <div className="flex flex-wrap gap-2 mt-1.5 text-xs" style={{ color: '#6B7280' }}>
-                        <span>{spec.quantity} {spec.unit_type} @ {fmtCurrency(spec.unit_price)}/{spec.unit_type}</span>
-                        {spec.phase_tag && <span className="px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE' }}>{spec.phase_tag}</span>}
-                      </div>
-                    </div>
-                    <p className="text-lg font-extrabold" style={{ color: '#002147' }}>{fmtCurrency(spec.installed_cost)}</p>
-                  </div>
-                  {spec.designer_notes && (
-                    <p className="text-xs mb-3 italic" style={{ color: '#78350F' }}>"{spec.designer_notes}"</p>
-                  )}
+          </div>
+          {approved.length > 0 && (
+            <div className="text-right">
+              <p className="text-xs font-semibold" style={{ color: '#9CA3AF' }}>Approved Total</p>
+              <p className="text-base font-extrabold" style={{ color: '#065F46' }}>{fmtCurrency(approvedTotal)}</p>
+            </div>
+          )}
+        </div>
 
-                  {declining === spec.id ? (
-                    <div className="space-y-2">
-                      <textarea
-                        rows={2}
-                        value={feedbackDraft[spec.id] ?? ''}
-                        onChange={(e) => setFeedbackDraft((p) => ({ ...p, [spec.id]: e.target.value }))}
-                        placeholder="Optional: let us know why you're declining this…"
-                        className="w-full px-3 py-2 rounded-lg text-xs focus:outline-none resize-none"
-                        style={{ backgroundColor: '#fff', border: '1.5px solid #FCD34D', color: '#374151' }}
-                      />
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => setDeclining(null)}
-                          className="flex-1 py-2 rounded-lg text-xs font-bold"
-                          style={{ backgroundColor: '#F5F4F0', color: '#374151' }}
-                        >
-                          Back
-                        </button>
-                        <button
-                          onClick={() => handleRespond(spec.id, 'declined', feedbackDraft[spec.id] ?? '')}
-                          disabled={responding === spec.id + 'declined'}
-                          className="flex-1 py-2 rounded-lg text-xs font-bold"
-                          style={{ backgroundColor: '#DC2626', color: '#fff' }}
-                        >
-                          {responding === spec.id + 'declined' ? 'Saving…' : 'Confirm Decline'}
-                        </button>
+        <div className="px-6 py-5 space-y-5">
+          {/* Pending review */}
+          {pending.length > 0 && (
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color: '#92400E' }}>
+                Awaiting Your Decision ({pending.length})
+              </p>
+              <div className="space-y-3">
+                {pending.map((spec) => (
+                  <div key={spec.id} className="rounded-xl p-4" style={{ backgroundColor: '#FFFBEB', border: '1.5px solid #FCD34D' }}>
+                    <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
+                      <div>
+                        <p className="font-bold text-sm" style={{ color: '#002147' }}>{spec.product_name}</p>
+                        {spec.supplier && <p className="text-xs mt-0.5" style={{ color: '#9CA3AF' }}>{spec.supplier}</p>}
+                        <div className="flex flex-wrap gap-2 mt-1.5 text-xs" style={{ color: '#6B7280' }}>
+                          <span>{spec.quantity} {spec.unit_type} @ {fmtCurrency(spec.unit_price)}/{spec.unit_type}</span>
+                          {spec.phase_tag && <span className="px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE' }}>{spec.phase_tag}</span>}
+                        </div>
                       </div>
+                      <p className="text-lg font-extrabold" style={{ color: '#002147' }}>{fmtCurrency(spec.installed_cost)}</p>
                     </div>
-                  ) : (
+                    {spec.designer_notes && (
+                      <p className="text-xs mb-3 italic" style={{ color: '#78350F' }}>"{spec.designer_notes}"</p>
+                    )}
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleRespond(spec.id, 'approved')}
                         disabled={!!responding}
-                        className="flex-1 py-2 rounded-lg text-xs font-bold transition-colors"
-                        style={{ backgroundColor: '#065F46', color: '#fff' }}
+                        className="flex-1 rounded-xl text-sm font-bold transition-colors"
+                        style={{ backgroundColor: '#065F46', color: '#fff', minHeight: '44px' }}
                         onMouseEnter={(e) => { if (!responding) e.currentTarget.style.backgroundColor = '#047857'; }}
                         onMouseLeave={(e) => { if (!responding) e.currentTarget.style.backgroundColor = '#065F46'; }}
                       >
@@ -185,67 +157,131 @@ function DesignSelectionsSection({ projectId, isAdmin }) {
                       <button
                         onClick={() => setDeclining(spec.id)}
                         disabled={!!responding}
-                        className="flex-1 py-2 rounded-lg text-xs font-bold transition-colors"
-                        style={{ backgroundColor: '#FEF2F2', color: '#DC2626', border: '1px solid #FECACA' }}
+                        className="flex-1 rounded-xl text-sm font-bold transition-colors"
+                        style={{ backgroundColor: '#FEF2F2', color: '#DC2626', border: '1px solid #FECACA', minHeight: '44px' }}
                         onMouseEnter={(e) => { if (!responding) e.currentTarget.style.backgroundColor = '#FEE2E2'; }}
                         onMouseLeave={(e) => { if (!responding) e.currentTarget.style.backgroundColor = '#FEF2F2'; }}
                       >
                         ✕ Decline
                       </button>
                     </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Approved */}
-        {approved.length > 0 && (
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color: '#065F46' }}>
-              Approved ({approved.length})
-            </p>
-            <div className="grid sm:grid-cols-2 gap-2">
-              {approved.map((spec) => (
-                <div key={spec.id} className="flex items-center justify-between px-3 py-2.5 rounded-xl" style={{ backgroundColor: '#ECFDF5', border: '1px solid #6EE7B7' }}>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate" style={{ color: '#065F46' }}>{spec.product_name}</p>
-                    {spec.supplier && <p className="text-xs truncate" style={{ color: '#6EE7B7' }}>{spec.supplier}</p>}
                   </div>
-                  <p className="text-sm font-bold shrink-0 ml-3" style={{ color: '#065F46' }}>{fmtCurrency(spec.installed_cost)}</p>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Declined */}
-        {declined.length > 0 && (
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color: '#991B1B' }}>
-              Declined ({declined.length})
+          {/* Approved */}
+          {approved.length > 0 && (
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color: '#065F46' }}>
+                Approved ({approved.length})
+              </p>
+              <div className="grid sm:grid-cols-2 gap-2">
+                {approved.map((spec) => (
+                  <div key={spec.id} className="flex items-center justify-between px-3 py-2.5 rounded-xl" style={{ backgroundColor: '#ECFDF5', border: '1px solid #6EE7B7' }}>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold truncate" style={{ color: '#065F46' }}>{spec.product_name}</p>
+                      {spec.supplier && <p className="text-xs truncate" style={{ color: '#6EE7B7' }}>{spec.supplier}</p>}
+                    </div>
+                    <p className="text-sm font-bold shrink-0 ml-3" style={{ color: '#065F46' }}>{fmtCurrency(spec.installed_cost)}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Declined */}
+          {declined.length > 0 && (
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color: '#991B1B' }}>
+                Declined ({declined.length})
+              </p>
+              <div className="space-y-2">
+                {declined.map((spec) => (
+                  <div key={spec.id} className="px-3 py-2.5 rounded-xl" style={{ backgroundColor: '#FEF2F2', border: '1px solid #FECACA' }}>
+                    <p className="text-sm font-semibold" style={{ color: '#991B1B' }}>{spec.product_name}</p>
+                    {spec.client_feedback && (
+                      <p className="text-xs mt-1" style={{ color: '#6B7280' }}>Your feedback: {spec.client_feedback}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Decline feedback modal — bottom sheet on mobile, centered on desktop */}
+      {decliningSpec && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
+          style={{ backgroundColor: 'rgba(0,0,0,0.55)' }}
+          onClick={(e) => { if (e.target === e.currentTarget) setDeclining(null); }}
+        >
+          <div
+            className="w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl p-6"
+            style={{ backgroundColor: '#fff', boxShadow: '0 -8px 48px rgba(0,0,0,0.18)' }}
+          >
+            {/* Drag handle (mobile visual cue) */}
+            <div className="w-10 h-1 rounded-full mx-auto mb-5 sm:hidden" style={{ backgroundColor: '#D1D5DB' }} />
+
+            <div className="flex items-start justify-between gap-3 mb-1">
+              <p className="font-bold text-base" style={{ color: '#002147' }}>Decline Selection</p>
+              <button
+                onClick={() => setDeclining(null)}
+                className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                style={{ backgroundColor: '#F5F4F0', color: '#6B7280' }}
+              >
+                <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <line x1="1" y1="1" x2="11" y2="11" /><line x1="11" y1="1" x2="1" y2="11" />
+                </svg>
+              </button>
+            </div>
+            <p className="text-sm mb-4 font-semibold" style={{ color: '#374151' }}>{decliningSpec.product_name}</p>
+
+            <p className="text-sm font-semibold mb-1" style={{ color: '#374151' }}>
+              Please let our design team know your feedback
             </p>
-            <div className="space-y-2">
-              {declined.map((spec) => (
-                <div key={spec.id} className="px-3 py-2.5 rounded-xl" style={{ backgroundColor: '#FEF2F2', border: '1px solid #FECACA' }}>
-                  <p className="text-sm font-semibold" style={{ color: '#991B1B' }}>{spec.product_name}</p>
-                  {spec.client_feedback && (
-                    <p className="text-xs mt-1" style={{ color: '#6B7280' }}>Feedback: {spec.client_feedback}</p>
-                  )}
-                </div>
-              ))}
+            <p className="text-xs mb-3" style={{ color: '#9CA3AF' }}>
+              e.g., color, budget, alternative material texture
+            </p>
+            <textarea
+              rows={3}
+              value={feedbackDraft[declining] ?? ''}
+              onChange={(e) => setFeedbackDraft((p) => ({ ...p, [declining]: e.target.value }))}
+              placeholder="Your feedback helps us find a better option for you…"
+              className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none resize-none mb-4"
+              style={{ backgroundColor: '#F9FAFB', border: '1.5px solid #E5E7EB', color: '#374151' }}
+              autoFocus
+            />
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => setDeclining(null)}
+                className="rounded-xl text-sm font-bold"
+                style={{ backgroundColor: '#F5F4F0', color: '#374151', border: '1px solid #E8E6E1', minHeight: '48px' }}
+              >
+                Back
+              </button>
+              <button
+                onClick={() => handleRespond(declining, 'declined', feedbackDraft[declining] ?? '')}
+                disabled={responding === declining + 'declined'}
+                className="rounded-xl text-sm font-bold"
+                style={{ backgroundColor: '#DC2626', color: '#fff', minHeight: '48px' }}
+              >
+                {responding === declining + 'declined' ? 'Saving…' : 'Confirm Decline'}
+              </button>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {toast && (
         <div className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl text-sm font-semibold shadow-lg" style={{ backgroundColor: '#002147', color: '#D4AF37' }}>
           {toast}
         </div>
       )}
-    </div>
+    </>
   );
 }
 

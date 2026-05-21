@@ -403,6 +403,139 @@ export default function RemodelBudget() {
 
   if (!config) return null;
 
+  // ── Export to print window ────────────────────────────────────────────────
+  function handleExport() {
+    const dateStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    const projectTypeName = TYPE_BUTTON_LABELS[projectType] ?? projectType;
+
+    let specsTableHTML = '';
+    if (approvedSpecs.length > 0) {
+      const rows = approvedSpecs.map((sp) => `
+        <tr>
+          <td>${sp.product_name}</td>
+          <td>${sp.supplier || '—'}</td>
+          <td class="amount">${sp.quantity} ${sp.unit_type}</td>
+          <td class="amount">$${(Number(sp.installed_cost) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        </tr>`).join('');
+      specsTableHTML = `
+        <h2>Design Selections (Approved)</h2>
+        <table>
+          <thead><tr><th>Product</th><th>Supplier</th><th class="amount">Qty / Unit</th><th class="amount">Installed Cost</th></tr></thead>
+          <tbody>${rows}</tbody>
+          <tfoot><tr><td colspan="3" class="amount-label">Design Selections Total</td><td class="amount">$${designSpecsTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr></tfoot>
+        </table>`;
+    }
+
+    let wbsRowsHTML = '';
+    for (const div of config.divisions) {
+      const divTotal = totals.divSums?.[div.key] ?? 0;
+      wbsRowsHTML += `<tr class="div-header"><td colspan="2">${div.label}</td><td class="amount">$${Math.round(divTotal).toLocaleString('en-US')}</td></tr>`;
+      for (const item of div.items) {
+        const val = lineVals[item.wbs] ?? 0;
+        if (val === 0) continue;
+        wbsRowsHTML += `<tr><td class="wbs-code">${item.wbs}</td><td>${item.label}</td><td class="amount">$${Math.round(val).toLocaleString('en-US')}</td></tr>`;
+      }
+    }
+
+    const paramRows = config.inputFields.map((f) =>
+      `<div class="param-item"><div class="param-label">${f.label}</div><div class="param-value">${inputs[f.key] ?? f.default} ${f.unit}</div></div>`
+    ).join('');
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Orozco Homes — Budget Estimate</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:11pt;color:#1A1A1A;padding:40px 48px;max-width:820px;margin:0 auto}
+    .header{display:flex;align-items:center;justify-content:space-between;padding-bottom:20px;border-bottom:2.5px solid #002147;margin-bottom:24px}
+    .brand-mark{width:44px;height:44px;border-radius:10px;background:#002147;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:14pt;color:#D4AF37;flex-shrink:0;letter-spacing:-1px}
+    .brand-info{margin-left:12px;flex:1}
+    .brand-name{font-size:18pt;font-weight:900;color:#002147;letter-spacing:-0.5px}
+    .brand-sub{font-size:8pt;color:#6B7280;text-transform:uppercase;letter-spacing:.12em;font-weight:600}
+    .doc-meta{text-align:right;font-size:8pt;color:#6B7280}
+    .doc-meta strong{display:block;font-size:10pt;color:#002147;margin-bottom:2px}
+    h2{font-size:10pt;font-weight:800;color:#002147;text-transform:uppercase;letter-spacing:.1em;margin:20px 0 8px;border-left:3px solid #D4AF37;padding-left:8px}
+    .params-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px 20px;margin-bottom:6px}
+    .param-item{font-size:9pt}
+    .param-label{color:#6B7280;font-weight:600;font-size:8pt;text-transform:uppercase;letter-spacing:.06em}
+    .param-value{color:#002147;font-weight:700;margin-top:1px}
+    table{width:100%;border-collapse:collapse;margin-bottom:8px;font-size:9.5pt}
+    th{text-align:left;font-size:8pt;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#6B7280;border-bottom:1.5px solid #E5E7EB;padding:5px 6px}
+    td{padding:5px 6px;border-bottom:1px solid #F3F4F6;vertical-align:top}
+    .amount{text-align:right;font-variant-numeric:tabular-nums}
+    .amount-label{text-align:right;font-weight:700;font-size:9pt;color:#002147}
+    tr.div-header td{background:#F5F4F0;font-weight:700;font-size:9pt;color:#002147;border-bottom:1px solid #E5E7EB}
+    .wbs-code{font-size:8pt;font-weight:700;color:#7C3AED;width:40px}
+    tfoot tr td{font-weight:700;border-top:1.5px solid #D1D5DB;border-bottom:none;background:#F9FAFB}
+    .totals-block{margin-top:20px;border:2px solid #002147;border-radius:8px;overflow:hidden}
+    .totals-row{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;font-size:10pt;border-bottom:1px solid #E5E7EB}
+    .totals-row:last-child{border-bottom:none}
+    .totals-row.sub{background:#F9FAFB}
+    .totals-row.grand{background:#002147;color:#D4AF37;font-weight:900;font-size:14pt}
+    .totals-row.grand .t-label{color:rgba(212,175,55,.75);font-size:10pt}
+    .t-label{font-weight:600;color:#374151;font-size:9pt}
+    .t-value{font-weight:700;font-variant-numeric:tabular-nums}
+    .sig-block{margin-top:32px;padding-top:20px;border-top:1.5px solid #E5E7EB}
+    .sig-title{font-size:10pt;font-weight:800;color:#002147;text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px}
+    .sig-intro{font-size:8.5pt;color:#374151;margin-bottom:18px;line-height:1.5}
+    .sig-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px 48px}
+    .sig-line{border-bottom:1.5px solid #374151;min-height:30px;margin-bottom:4px}
+    .sig-label{font-size:8pt;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.08em}
+    .footer-note{margin-top:24px;font-size:8pt;color:#9CA3AF;text-align:center;border-top:1px solid #F3F4F6;padding-top:12px}
+    @media print{body{padding:0}@page{margin:.65in;size:letter portrait}}
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div style="display:flex;align-items:center">
+      <div class="brand-mark">OH</div>
+      <div class="brand-info">
+        <div class="brand-name">Orozco Homes</div>
+        <div class="brand-sub">Design &amp; Construction · Virginia Beach, VA</div>
+      </div>
+    </div>
+    <div class="doc-meta"><strong>Budget Estimate</strong>${dateStr}</div>
+  </div>
+  <h2>Project Parameters</h2>
+  <div class="params-grid">
+    <div class="param-item"><div class="param-label">Project Type</div><div class="param-value">${projectTypeName}</div></div>
+    <div class="param-item"><div class="param-label">Spec Level</div><div class="param-value">${SPEC_LABELS[specLevel]}</div></div>
+    ${paramRows}
+  </div>
+  ${specsTableHTML}
+  <h2>Work Breakdown Structure</h2>
+  <table>
+    <thead><tr><th style="width:40px">WBS</th><th>Description</th><th class="amount">Amount</th></tr></thead>
+    <tbody>${wbsRowsHTML}</tbody>
+  </table>
+  <div class="totals-block">
+    <div class="totals-row sub"><span class="t-label">Direct Costs (Materials + Labor)</span><span class="t-value">$${Math.round(totals.directCosts).toLocaleString('en-US')}</span></div>
+    <div class="totals-row sub"><span class="t-label">Overhead (${pctRates.overheadPct}%)</span><span class="t-value">$${Math.round(totals.overhead).toLocaleString('en-US')}</span></div>
+    <div class="totals-row sub"><span class="t-label">Profit (${pctRates.profitPct}%)</span><span class="t-value">$${Math.round(totals.profit).toLocaleString('en-US')}</span></div>
+    <div class="totals-row sub"><span class="t-label">Contingency (${pctRates.contingencyPct}%)</span><span class="t-value">$${Math.round(totals.contingency).toLocaleString('en-US')}</span></div>
+    <div class="totals-row grand"><span class="t-label">TOTAL CLIENT PRICE</span><span class="t-value">$${Math.round(totals.totalClientPrice).toLocaleString('en-US')}</span></div>
+  </div>
+  <div class="sig-block">
+    <div class="sig-title">Client Authorization</div>
+    <p class="sig-intro">By signing below, the client acknowledges and approves the scope of work and pricing outlined in this estimate. This document constitutes a preliminary agreement pending execution of a formal contract.</p>
+    <div class="sig-grid">
+      <div><div class="sig-line"></div><div class="sig-label">Client Signature</div></div>
+      <div><div class="sig-line"></div><div class="sig-label">Date</div></div>
+      <div><div class="sig-line"></div><div class="sig-label">Client Printed Name</div></div>
+      <div><div class="sig-line"></div><div class="sig-label">Contractor Representative</div></div>
+    </div>
+  </div>
+  <div class="footer-note">Orozco Homes LLC · Virginia Beach, VA · orozcoventures@gmail.com · This estimate is valid for 30 days from the date above.</div>
+  <script>window.onload=function(){window.print()}</script>
+</body>
+</html>`;
+
+    const win = window.open('', '_blank');
+    if (win) { win.document.write(html); win.document.close(); }
+  }
+
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -416,15 +549,29 @@ export default function RemodelBudget() {
             Live WBS estimator — Virginia Beach / Hampton Roads, 2026. Every line item is editable.
           </p>
         </div>
-        {hasOverrides && (
+        <div className="flex items-center gap-2 shrink-0 mt-1">
+          {hasOverrides && (
+            <button
+              onClick={resetAll}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold"
+              style={{ backgroundColor: '#FFFBEB', color: '#D97706', border: '1px solid #FCD34D' }}
+            >
+              &#8635; Reset all overrides
+            </button>
+          )}
           <button
-            onClick={resetAll}
-            className="shrink-0 mt-1 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold"
-            style={{ backgroundColor: '#FFFBEB', color: '#D97706', border: '1px solid #FCD34D' }}
+            onClick={handleExport}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold"
+            style={{ backgroundColor: '#002147', color: '#D4AF37' }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#003166'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#002147'; }}
           >
-            &#8635; Reset all overrides
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="12" y2="18"/><line x1="15" y1="15" x2="12" y2="18"/>
+            </svg>
+            Export Contract
           </button>
-        )}
+        </div>
       </div>
 
       {/* Project type selector */}

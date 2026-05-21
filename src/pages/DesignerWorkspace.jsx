@@ -119,8 +119,16 @@ function SpecCard({ spec, onEdit, onDelete, isAdmin }) {
         </div>
       )}
       {spec.client_feedback && spec.status === 'declined' && (
-        <div className="mt-2 px-3 py-2 rounded-xl text-xs" style={{ backgroundColor: '#FEF2F2', color: '#991B1B', border: '1px solid #FECACA' }}>
-          <span className="font-semibold">Client: </span>{spec.client_feedback}
+        <div className="mt-3 rounded-xl overflow-hidden" style={{ border: '1.5px solid #FECACA' }}>
+          <div className="flex items-center gap-1.5 px-3 py-1.5" style={{ backgroundColor: '#DC2626' }}>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            </svg>
+            <p className="text-xs font-bold text-white uppercase tracking-wide">Client Feedback</p>
+          </div>
+          <div className="px-3 py-2.5" style={{ backgroundColor: '#FEF2F2' }}>
+            <p className="text-sm italic" style={{ color: '#991B1B' }}>"{spec.client_feedback}"</p>
+          </div>
         </div>
       )}
       {spec.phase_tag && (
@@ -164,8 +172,8 @@ function SpecModal({ initial, projects, onSave, onClose, saving }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.55)' }}>
-      <div className="w-full max-w-xl rounded-2xl overflow-hidden shadow-2xl" style={{ backgroundColor: '#fff', maxHeight: '90vh', overflowY: 'auto' }}>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4" style={{ backgroundColor: 'rgba(0,0,0,0.55)' }}>
+      <div className="w-full sm:max-w-xl rounded-t-3xl sm:rounded-2xl overflow-hidden shadow-2xl" style={{ backgroundColor: '#fff', maxHeight: '95vh', overflowY: 'auto' }}>
         <div className="flex items-center justify-between px-6 py-4" style={{ backgroundColor: '#002147' }}>
           <h2 className="font-bold text-base" style={{ color: '#D4AF37' }}>
             {initial ? 'Edit Spec' : 'Add Design Spec'}
