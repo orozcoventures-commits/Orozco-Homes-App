@@ -3,19 +3,12 @@ import { createContext, useContext, useReducer } from 'react';
 const ProjectContext = createContext(null);
 
 const initialState = {
-  activeProject:   null,    // PROJECT_TYPE (for material catalog view, kept for legacy ProjectDetail)
-  activeDbProject: null,    // real Supabase projects row
+  activeDbProject: null,  // real Supabase projects row
   activePage:      'home',
 };
 
 function reducer(state, action) {
   switch (action.type) {
-    case 'SET_PROJECT':
-      return {
-        ...state,
-        activeProject: action.project,
-        activePage: action.project ? 'project' : 'home',
-      };
     case 'SET_DB_PROJECT':
       return {
         ...state,

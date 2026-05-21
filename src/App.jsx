@@ -7,7 +7,6 @@ import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import Login from './pages/Login';
 import ProjectSelector from './pages/ProjectSelector';
-import ProjectDetail from './pages/ProjectDetail';
 import ClientPortal from './pages/ClientPortal';
 import PhotoLog from './pages/PhotoLog';
 import Approvals from './pages/Approvals';
@@ -138,7 +137,6 @@ function AppContent() {
 
         <main className={`flex-1 ${isMessages ? 'flex flex-col' : ''}`}>
           {page === 'home'               && <ProjectSelector />}
-          {page === 'project'            && <ProjectDetail />}
           {page === 'client-portal'      && <ClientPortal />}
           {page === 'photo-log'          && <PhotoLog />}
           {page === 'approvals'          && <Approvals />}
@@ -150,7 +148,7 @@ function AppContent() {
           {page === 'remodel-budget'     && <RemodelBudget />}
           {page === 'schedule'           && <ScheduleCalendar />}
           {page === 'designer-workspace' && <DesignerWorkspace />}
-          {!['home','project','client-portal','photo-log','approvals','messages',
+          {!['home','client-portal','photo-log','approvals','messages',
               'weekly-updates','create-project','manage-clients','new-home-budget',
               'remodel-budget','schedule','designer-workspace'].includes(page) && (
             <div className="flex flex-col items-center justify-center py-32 px-6 text-center">
