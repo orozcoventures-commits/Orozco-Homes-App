@@ -504,6 +504,12 @@ export default function RemodelBudget() {
     if (cfg) setOpenDivs(Object.fromEntries(cfg.divisions.map((d) => [d.key, true])));
   }
 
+  // ── Design specs total — must be declared before lineVals uses it ────────────
+  const designSpecsTotal = useMemo(
+    () => approvedSpecs.reduce((s, sp) => s + (Number(sp.installed_cost) || 0), 0),
+    [approvedSpecs]
+  );
+
   // ── Cascade engine (estimated line values) ──────────────────────────────────
   const lineVals = useMemo(() => {
     if (!config) return {};
@@ -523,12 +529,7 @@ export default function RemodelBudget() {
     vals['M.2'] = overrideFlags['M.2'] ? (userVals['M.2'] ?? 0) : baseSum * (pctRates.profitPct   / 100);
     vals['M.3'] = overrideFlags['M.3'] ? (userVals['M.3'] ?? 0) : baseSum * (pctRates.contingencyPct / 100);
     return vals;
-  }, [config, projectType, inputs, specLevel, pctRates, userVals, overrideFlags]);
-
-  const designSpecsTotal = useMemo(
-    () => approvedSpecs.reduce((s, sp) => s + (Number(sp.installed_cost) || 0), 0),
-    [approvedSpecs]
-  );
+  }, [config, projectType, inputs, specLevel, pctRates, userVals, overrideFlags, designSpecsTotal]);
 
   // ── Aggregate totals (budget + actual) ──────────────────────────────────────
   const totals = useMemo(() => {
