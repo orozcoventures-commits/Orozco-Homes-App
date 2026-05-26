@@ -139,26 +139,10 @@ function Toast({ message }) {
   );
 }
 
-function PinRow({ project, clientName, onCopy, onPinBackfilled }) {
+function PinRow({ project, clientName, onCopy }) {
   const [revealed, setRevealed] = useState(false);
-  // If the DB row was created without a PIN, generate one and persist it now
-  const [pin, setPin] = useState(project.project_pin ?? null);
+  const pin = project.project_pin;
   const portalUrl = window.location.origin;
-
-  useEffect(() => {
-    if (pin) return; // already has a PIN — nothing to do
-    const newPin = generateUniquePin();
-    supabase
-      .from('projects')
-      .update({ project_pin: newPin })
-      .eq('id', project.id)
-      .then(({ error }) => {
-        if (!error) {
-          setPin(newPin);
-          onPinBackfilled?.(project.id, newPin);
-        }
-      });
-  }, [pin, project.id, onPinBackfilled]);
 
   function handleShare() {
     if (!pin) return;
@@ -186,7 +170,7 @@ function PinRow({ project, clientName, onCopy, onPinBackfilled }) {
           </svg>
           <span className="text-xs font-bold tracking-[0.2em]"
             style={{ color: '#002147', fontFamily: 'monospace', minWidth: '2.2rem', letterSpacing: revealed ? '0.2em' : '0.12em' }}>
-            {pin ? (revealed ? pin : '••••') : '----'}
+            {revealed ? pin : '••••'}
           </span>
         </div>
 
@@ -218,7 +202,7 @@ function PinRow({ project, clientName, onCopy, onPinBackfilled }) {
   );
 }
 
-function ClientRow({ client, projects, onCopy, onPinBackfilled }) {
+function ClientRow({ client, projects, onCopy }) {
   const clientProjects = projects.filter((p) => p.managed_client_id === client.id);
 
   return (
@@ -244,7 +228,7 @@ function ClientRow({ client, projects, onCopy, onPinBackfilled }) {
         {clientProjects.length > 0 ? (
           <div className="pl-3 space-y-1.5" style={{ borderLeft: '2px solid rgba(212,175,55,0.35)' }}>
             {clientProjects.map((p) => (
-              <PinRow key={p.id} project={p} clientName={client.full_name} onCopy={onCopy} onPinBackfilled={onPinBackfilled} />
+              <PinRow key={p.id} project={p} clientName={client.full_name} onCopy={onCopy} />
             ))}
           </div>
         ) : (
@@ -286,8 +270,34 @@ export default function ManageClients() {
         .select('id, project_name, project_pin, managed_client_id')
         .order('project_name'),
     ]);
+
+    let projects = projectData ?? [];
+
+    // Backfill any legacy rows that have no PIN — generate, persist, and patch locally
+    const missing = projects.filter((p) => !p.project_pin);
+    if (missing.length > 0) {
+      const patches = await Promise.all(
+        missing.map(async (p) => {
+          const pin = generateUniquePin();
+          const { error } = await supabase
+            .from('projects')
+            .update({ project_pin: pin })
+            .eq('id', p.id);
+          return error ? null : { id: p.id, pin };
+        })
+      );
+      const pinMap = Object.fromEntries(
+        patches.filter(Boolean).map((u) => [u.id, u.pin])
+      );
+      if (Object.keys(pinMap).length > 0) {
+        projects = projects.map((p) =>
+          pinMap[p.id] ? { ...p, project_pin: pinMap[p.id] } : p
+        );
+      }
+    }
+
     setClients(clientData ?? []);
-    setProjects(projectData ?? []);
+    setProjects(projects);
     setLoading(false);
   }, []);
 
@@ -304,13 +314,6 @@ export default function ManageClients() {
   function handleAdded(newClient) {
     setClients((prev) => [newClient, ...prev]);
     setShowForm(false);
-  }
-
-  // Called by PinRow when it backfills a missing PIN into the DB — update local state instantly
-  function handlePinBackfilled(projectId, newPin) {
-    setProjects((prev) =>
-      prev.map((p) => p.id === projectId ? { ...p, project_pin: newPin } : p)
-    );
   }
 
   return (
@@ -402,7 +405,7 @@ export default function ManageClients() {
         ) : (
           <div>
             {clients.map((client) => (
-              <ClientRow key={client.id} client={client} projects={projects} onCopy={showToast} onPinBackfilled={handlePinBackfilled} />
+              <ClientRow key={client.id} client={client} projects={projects} onCopy={showToast} />
             ))}
           </div>
         )}
