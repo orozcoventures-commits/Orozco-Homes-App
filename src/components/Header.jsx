@@ -34,30 +34,12 @@ export default function Header({ onMenuToggle }) {
             style={{ color: '#002147', fontSize: '0.95rem', letterSpacing: '0.03em' }}
           >
             Orozco Homes
-            <span style={{ color: '#D4AF37' }} className="mx-1.5 font-light">|</span>
-            <span className="font-light" style={{ color: '#4A4A4A' }}>Material Selection Portal</span>
           </h1>
         </div>
       </div>
 
       {/* Spacer */}
       <div className="flex-1" />
-
-      {/* Get a Quote CTA */}
-      <a
-        href="#contact"
-        onClick={(e) => {
-          e.preventDefault();
-          const el = document.querySelector('#contact');
-          if (el) el.scrollIntoView({ behavior: 'smooth' });
-        }}
-        className="hidden sm:flex items-center px-4 py-1.5 rounded-lg text-xs font-bold tracking-wide transition-all duration-150 shrink-0"
-        style={{ backgroundColor: '#D4AF37', color: '#002147', letterSpacing: '0.04em' }}
-        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#C9A227'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#D4AF37'; }}
-      >
-        Get a Quote
-      </a>
     </header>
   );
 }
