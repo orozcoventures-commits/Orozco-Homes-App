@@ -3,6 +3,12 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useProject } from '../context/ProjectContext';
 
+// Returns a random 4-digit zero-padded string, e.g. '0512' or '3921'.
+// Treated strictly as a string so leading zeros are preserved.
+function generateUniquePin() {
+  return String(Math.floor(Math.random() * 10000)).padStart(4, '0');
+}
+
 const CATEGORY_OPTIONS = [
   { value: 'bathroom',          label: 'Bathrooms' },
   { value: 'kitchen',           label: 'Kitchens' },
@@ -114,6 +120,8 @@ export default function AdminCreateProject() {
     const categoryLabel = CATEGORY_OPTIONS.find((c) => c.value === category)?.label ?? category;
     const clientName    = clients.find((c) => c.id === clientId)?.full_name ?? 'Client';
 
+    const pin = generateUniquePin();
+
     const { data, error: insertError } = await supabase
       .from('projects')
       .insert({
@@ -121,6 +129,7 @@ export default function AdminCreateProject() {
         label:             categoryLabel,
         project_name:      projectTitle.trim(),
         category,
+        project_pin:       pin,
       })
       .select()
       .single();
@@ -132,7 +141,8 @@ export default function AdminCreateProject() {
       return;
     }
 
-    setSuccess({ clientName, projectTitle: projectTitle.trim(), id: data.id });
+    // Use the PIN returned by the DB in case a trigger overwrote it
+    setSuccess({ clientName, projectTitle: projectTitle.trim(), id: data.id, pin: data.project_pin ?? pin });
     setClientId('');
     setCategory('');
     setProjectTitle('');
@@ -163,10 +173,36 @@ export default function AdminCreateProject() {
             </svg>
           </div>
           <p className="text-lg font-bold mb-1" style={{ color: '#002147' }}>Project Created</p>
-          <p className="text-sm mb-6" style={{ color: '#6B7280' }}>
+          <p className="text-sm mb-5" style={{ color: '#6B7280' }}>
             <span className="font-semibold" style={{ color: '#002147' }}>{success.projectTitle}</span> has been linked to{' '}
             <span className="font-semibold" style={{ color: '#002147' }}>{success.clientName}</span>.
           </p>
+
+          {/* PIN badge — visible immediately so the admin can share it right away */}
+          {success.pin && (
+            <div className="flex items-center justify-between px-4 py-3 rounded-xl mb-6"
+              style={{ backgroundColor: 'rgba(212,175,55,0.1)', border: '1.5px solid rgba(212,175,55,0.45)' }}>
+              <div className="text-left">
+                <p className="text-xs font-bold uppercase tracking-widest mb-0.5" style={{ color: '#92400E' }}>Client PIN</p>
+                <p className="text-2xl font-extrabold tracking-[0.35em] font-mono" style={{ color: '#002147' }}>{success.pin}</p>
+              </div>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(success.pin);
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold"
+                style={{ backgroundColor: '#D4AF37', color: '#002147' }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#C9A227'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#D4AF37'; }}
+              >
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                </svg>
+                Copy PIN
+              </button>
+            </div>
+          )}
+
           <div className="flex flex-col gap-3">
             <button
               onClick={handleGoToUpdates}

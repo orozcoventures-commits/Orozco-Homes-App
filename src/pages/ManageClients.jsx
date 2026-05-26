@@ -2,6 +2,11 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 
+// Returns a random 4-digit zero-padded string, e.g. '0512' or '3921'.
+function generateUniquePin() {
+  return String(Math.floor(Math.random() * 10000)).padStart(4, '0');
+}
+
 function getInitials(name) {
   if (!name) return '?';
   return name.trim().split(/\s+/).map((w) => w[0]).join('').toUpperCase().slice(0, 2);
@@ -134,12 +139,30 @@ function Toast({ message }) {
   );
 }
 
-function PinRow({ project, clientName, onCopy }) {
+function PinRow({ project, clientName, onCopy, onPinBackfilled }) {
   const [revealed, setRevealed] = useState(false);
+  // If the DB row was created without a PIN, generate one and persist it now
+  const [pin, setPin] = useState(project.project_pin ?? null);
   const portalUrl = window.location.origin;
 
+  useEffect(() => {
+    if (pin) return; // already has a PIN — nothing to do
+    const newPin = generateUniquePin();
+    supabase
+      .from('projects')
+      .update({ project_pin: newPin })
+      .eq('id', project.id)
+      .then(({ error }) => {
+        if (!error) {
+          setPin(newPin);
+          onPinBackfilled?.(project.id, newPin);
+        }
+      });
+  }, [pin, project.id, onPinBackfilled]);
+
   function handleShare() {
-    const msg = `Hi ${clientName}! You can track your ${project.project_name} progress here: ${portalUrl}. Your 4-digit access code is: ${project.project_pin}.`;
+    if (!pin) return;
+    const msg = `Hi ${clientName}! You can track your ${project.project_name} progress here: ${portalUrl}. Your 4-digit access code is: ${pin}.`;
     navigator.clipboard.writeText(msg).then(() => onCopy('Copied to clipboard!'));
   }
 
@@ -163,7 +186,7 @@ function PinRow({ project, clientName, onCopy }) {
           </svg>
           <span className="text-xs font-bold tracking-[0.2em]"
             style={{ color: '#002147', fontFamily: 'monospace', minWidth: '2.2rem', letterSpacing: revealed ? '0.2em' : '0.12em' }}>
-            {revealed ? project.project_pin : '••••'}
+            {pin ? (revealed ? pin : '••••') : '----'}
           </span>
         </div>
 
@@ -195,12 +218,12 @@ function PinRow({ project, clientName, onCopy }) {
   );
 }
 
-function ClientRow({ client, projects, onCopy }) {
+function ClientRow({ client, projects, onCopy, onPinBackfilled }) {
   const clientProjects = projects.filter((p) => p.managed_client_id === client.id);
 
   return (
     <div style={{ borderBottom: '1px solid #F3F2EE' }}>
-      {/* Client identity — compact, no action buttons */}
+      {/* Client identity */}
       <div className="flex items-center gap-3 px-5 pt-4 pb-3">
         <div
           className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white shrink-0"
@@ -221,13 +244,13 @@ function ClientRow({ client, projects, onCopy }) {
         {clientProjects.length > 0 ? (
           <div className="pl-3 space-y-1.5" style={{ borderLeft: '2px solid rgba(212,175,55,0.35)' }}>
             {clientProjects.map((p) => (
-              <PinRow key={p.id} project={p} clientName={client.full_name} onCopy={onCopy} />
+              <PinRow key={p.id} project={p} clientName={client.full_name} onCopy={onCopy} onPinBackfilled={onPinBackfilled} />
             ))}
           </div>
         ) : (
           <div className="pl-3" style={{ borderLeft: '2px solid #F0EEE9' }}>
             <p className="text-xs py-1" style={{ color: '#C4C0B8' }}>
-              No projects yet — create a project to generate a PIN.
+              No projects yet — use <strong>Create New Project</strong> to add one.
             </p>
           </div>
         )}
@@ -281,6 +304,13 @@ export default function ManageClients() {
   function handleAdded(newClient) {
     setClients((prev) => [newClient, ...prev]);
     setShowForm(false);
+  }
+
+  // Called by PinRow when it backfills a missing PIN into the DB — update local state instantly
+  function handlePinBackfilled(projectId, newPin) {
+    setProjects((prev) =>
+      prev.map((p) => p.id === projectId ? { ...p, project_pin: newPin } : p)
+    );
   }
 
   return (
@@ -372,7 +402,7 @@ export default function ManageClients() {
         ) : (
           <div>
             {clients.map((client) => (
-              <ClientRow key={client.id} client={client} projects={projects} onCopy={showToast} />
+              <ClientRow key={client.id} client={client} projects={projects} onCopy={showToast} onPinBackfilled={handlePinBackfilled} />
             ))}
           </div>
         )}
