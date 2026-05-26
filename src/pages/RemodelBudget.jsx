@@ -317,10 +317,28 @@ function DesignSpecsSection({ approvedSpecs, total, isOpen, onToggle }) {
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function RemodelBudget() {
-  const { state: projectState, dispatch } = useProject();
-  const activeProject   = projectState.activeDbProject;
-  const currentProjectId   = activeProject?.id ?? null;
-  const currentProjectName = activeProject?.project_name ?? null;
+  const { state: projectState } = useProject();
+  // Used only to pre-populate the picker when admin arrives from a project view
+  const contextProjectId = projectState.activeDbProject?.id ?? null;
+
+  // ── Internal project picker ─────────────────────────────────────────────────
+  const [dbProjects,     setDbProjects]     = useState([]);
+  const [selectedProjId, setSelectedProjId] = useState('');
+
+  // currentProjectId drives all save/load; empty string = standalone mode (no DB save)
+  const currentProjectId   = selectedProjId || null;
+  const currentProjectName = dbProjects.find((p) => p.id === selectedProjId)?.project_name ?? null;
+
+  // Load project list once on mount
+  useEffect(() => {
+    supabase.from('projects').select('id, project_name').order('created_at', { ascending: false })
+      .then(({ data }) => setDbProjects(data ?? []));
+  }, []);
+
+  // Pre-populate picker when arriving from a project context (e.g. clicking a project then navigating here)
+  useEffect(() => {
+    if (contextProjectId && !selectedProjId) setSelectedProjId(contextProjectId);
+  }, [contextProjectId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Calculator state ────────────────────────────────────────────────────────
   const [projectType,    setProjectType]    = useState('bathroom-medium');
@@ -334,7 +352,7 @@ export default function RemodelBudget() {
   // ── Actuals state ───────────────────────────────────────────────────────────
   const [actualVals,     setActualVals]     = useState({});
 
-  // ── Design specs (auto-linked to active project) ────────────────────────────
+  // ── Design specs ────────────────────────────────────────────────────────────
   const [approvedSpecs,  setApprovedSpecs]  = useState([]);
   const [specsDivOpen,   setSpecsDivOpen]   = useState(true);
 
@@ -403,13 +421,12 @@ export default function RemodelBudget() {
     setTimeout(() => { syncingRef.current = false; }, 50);
   }, []);
 
-  // ── Wipe + reload when active project changes ───────────────────────────────
+  // ── Wipe + reload when selected project changes ────────────────────────────
   useEffect(() => {
-    // Cancel any pending saves from the previous project
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     syncingRef.current = true;
 
-    // Full state reset
+    // Full calculator reset on every project switch
     setProjectType('bathroom-medium');
     setInputs(defaultInputs('bathroom-medium'));
     setSpecLevel('mid');
@@ -422,14 +439,14 @@ export default function RemodelBudget() {
     setLastSaved(null);
     setSaving(false);
 
-    if (!currentProjectId) {
+    if (!selectedProjId) {
       syncingRef.current = false;
       return;
     }
 
-    loadBudget(currentProjectId);
-    loadApprovedSpecs(currentProjectId);
-  }, [currentProjectId, loadBudget, loadApprovedSpecs]);
+    loadBudget(selectedProjId);
+    loadApprovedSpecs(selectedProjId);
+  }, [selectedProjId, loadBudget, loadApprovedSpecs]);
 
   // ── Debounced auto-save for budget header ───────────────────────────────────
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -580,39 +597,6 @@ export default function RemodelBudget() {
   const hasActuals   = Object.values(actualVals).some((v) => (Number(v) || 0) > 0);
 
   if (!config) return null;
-
-  // ── No project selected ─────────────────────────────────────────────────────
-  if (!currentProjectId) {
-    return (
-      <div className="max-w-md mx-auto px-6 py-24 text-center">
-        <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5"
-          style={{ backgroundColor: '#F5F4F0' }}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF"
-            strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="2" y="3" width="20" height="14" rx="2"/>
-            <path d="M8 21L16 21"/><line x1="12" y1="17" x2="12" y2="21"/>
-            <line x1="7" y1="8" x2="17" y2="8"/><line x1="7" y1="12" x2="13" y2="12"/>
-          </svg>
-        </div>
-        <p className="text-xs font-bold tracking-[0.18em] uppercase mb-1" style={{ color: '#D4AF37' }}>
-          Contractor Tool
-        </p>
-        <h2 className="text-2xl font-bold mb-2" style={{ color: '#002147' }}>Remodel Budget Calculator</h2>
-        <p className="text-sm mb-6" style={{ color: '#6B7280' }}>
-          Select a client project to load or start a budget estimate. Each project's estimate is saved automatically.
-        </p>
-        <button
-          onClick={() => dispatch({ type: 'SET_PAGE', page: 'home' })}
-          className="px-6 py-3 rounded-xl text-sm font-bold"
-          style={{ backgroundColor: '#002147', color: '#D4AF37' }}
-          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#003166'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#002147'; }}
-        >
-          Select a Project
-        </button>
-      </div>
-    );
-  }
 
   // ── Export to print window ──────────────────────────────────────────────────
   function handleExport() {
@@ -771,31 +755,37 @@ export default function RemodelBudget() {
 
       {/* Header */}
       <div className="flex items-start justify-between mb-6 gap-4">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="text-xs font-bold tracking-[0.18em] uppercase mb-0.5" style={{ color: '#D4AF37' }}>
             Contractor Tool
           </p>
-          <h1 className="text-2xl font-extrabold truncate" style={{ color: '#002147' }}>
+          <h1 className="text-2xl font-extrabold" style={{ color: '#002147' }}>
             Remodel Budget Calculator
           </h1>
-          {/* Active project banner */}
-          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-            <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full"
-              style={{ backgroundColor: 'rgba(0,33,71,0.08)', color: '#002147' }}>
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-              {currentProjectName}
-            </span>
-            {saving && (
-              <span className="text-xs" style={{ color: '#9CA3AF' }}>Saving…</span>
-            )}
+          <p className="text-sm mt-1" style={{ color: '#6B7280' }}>
+            Live WBS estimator — Virginia Beach / Hampton Roads, 2026.
+          </p>
+
+          {/* Project picker */}
+          <div className="flex flex-wrap items-center gap-3 mt-3">
+            <div className="flex items-center gap-2 flex-1 min-w-48 max-w-xs">
+              <select
+                value={selectedProjId}
+                onChange={(e) => setSelectedProjId(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl text-sm focus:outline-none"
+                style={{ backgroundColor: '#F9FAFB', border: '1.5px solid #E5E7EB', color: '#111827' }}
+              >
+                <option value="">— No project (unsaved estimate) —</option>
+                {dbProjects.map((p) => <option key={p.id} value={p.id}>{p.project_name}</option>)}
+              </select>
+            </div>
+            {saving && <span className="text-xs" style={{ color: '#9CA3AF' }}>Saving…</span>}
             {!saving && lastSaved && (
               <span className="text-xs" style={{ color: '#9CA3AF' }}>
                 Saved {lastSaved.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
               </span>
             )}
-            {budgetLoading && (
-              <span className="text-xs" style={{ color: '#9CA3AF' }}>Loading estimate…</span>
-            )}
+            {budgetLoading && <span className="text-xs" style={{ color: '#9CA3AF' }}>Loading…</span>}
           </div>
         </div>
 
