@@ -19,6 +19,7 @@ import NewHomeBudget from './pages/NewHomeBudget';
 import RemodelBudget from './pages/RemodelBudget';
 import ScheduleCalendar from './pages/ScheduleCalendar';
 import DesignerWorkspace from './pages/DesignerWorkspace';
+import ReadMe from './pages/ReadMe';
 import './index.css';
 
 // Shown when VITE_SUPABASE_* env vars are missing in Netlify
@@ -111,8 +112,8 @@ function LoadingScreen() {
 }
 
 // Pages each non-admin role is permitted to visit
-const DESIGNER_ALLOWED = new Set(['designer-workspace']);
-const CLIENT_ALLOWED   = new Set(['home', 'client-portal', 'photo-log', 'messages', 'approvals', 'designer-workspace']);
+const DESIGNER_ALLOWED = new Set(['designer-workspace', 'readme']);
+const CLIENT_ALLOWED   = new Set(['home', 'client-portal', 'photo-log', 'messages', 'approvals', 'designer-workspace', 'readme']);
 
 function AppContent() {
   const { state, dispatch } = useProject();
@@ -165,9 +166,10 @@ function AppContent() {
           {page === 'remodel-budget'     && <RemodelBudget />}
           {page === 'schedule'           && <ScheduleCalendar />}
           {page === 'designer-workspace' && <DesignerWorkspace />}
+          {page === 'readme'             && <ReadMe />}
           {!['home','client-portal','photo-log','approvals','messages',
               'weekly-updates','create-project','manage-clients','new-home-budget',
-              'remodel-budget','schedule','designer-workspace'].includes(page) && (
+              'remodel-budget','schedule','designer-workspace','readme'].includes(page) && (
             <div className="flex flex-col items-center justify-center py-32 px-6 text-center">
               <div
                 className="w-14 h-14 rounded-2xl flex items-center justify-center mb-5"

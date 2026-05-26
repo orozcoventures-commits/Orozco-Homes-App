@@ -146,6 +146,18 @@ const CONTRACTOR_TOOLS = [
       </svg>
     ),
   },
+  {
+    label: 'User Guide',
+    page: 'readme',
+    badge: null,
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+        <line x1="9" y1="7" x2="15" y2="7" /><line x1="9" y1="11" x2="15" y2="11" /><line x1="9" y1="15" x2="12" y2="15" />
+      </svg>
+    ),
+  },
 ];
 
 export default function Sidebar({ isOpen, onClose }) {
@@ -177,11 +189,12 @@ export default function Sidebar({ isOpen, onClose }) {
   // Designer: only Designer Workspace
   // Client:   Designer Workspace + Messages + Photo Log
   // Admin:    everything
-  const DESIGNER_PAGES = new Set(['designer-workspace']);
-  const CLIENT_PAGES   = new Set(['designer-workspace', 'messages', 'photo-log']);
+  const DESIGNER_PAGES = new Set(['designer-workspace', 'readme']);
+  const CLIENT_PAGES   = new Set(['designer-workspace', 'messages', 'photo-log', 'readme']);
 
   function toolVisible(tool) {
-    if (!isAuthenticated) return tool.page === 'weekly-updates'; // unauthenticated can see nothing useful
+    if (!isAuthenticated) return false;
+    if (tool.page === 'readme') return true;
     if (isAdmin)    return true;
     if (isDesigner) return DESIGNER_PAGES.has(tool.page);
     if (isClient)   return CLIENT_PAGES.has(tool.page);
@@ -262,29 +275,33 @@ export default function Sidebar({ isOpen, onClose }) {
                            : tool.page === 'messages'  ? unreadMessages
                            : 0;
             return (
-              <button
-                key={tool.page}
-                onClick={() => navigatePage(tool.page)}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150 focus:outline-none"
-                style={{
-                  color:           isActive ? '#D4AF37' : 'rgba(255,255,255,0.72)',
-                  backgroundColor: isActive ? 'rgba(212,175,55,0.18)' : 'transparent',
-                  borderLeft:      isActive ? '2px solid #D4AF37' : '2px solid transparent',
-                }}
-                onMouseEnter={(e) => { if (!isActive) { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#fff'; } }}
-                onMouseLeave={(e) => { if (!isActive) { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.72)'; } }}
-              >
-                <span style={{ color: isActive ? '#D4AF37' : 'rgba(255,255,255,0.55)' }}>{tool.icon}</span>
-                <span className="flex-1 text-left">{tool.label}</span>
-                {count > 0 && (
-                  <span
-                    className="text-xs font-bold px-1.5 py-0.5 rounded-full shrink-0"
-                    style={{ backgroundColor: '#EF4444', color: '#fff', fontSize: '0.6rem', minWidth: '18px', textAlign: 'center' }}
-                  >
-                    {count}
-                  </span>
+              <div key={tool.page}>
+                {tool.page === 'readme' && (
+                  <div className="my-2 mx-1" style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }} />
                 )}
-              </button>
+                <button
+                  onClick={() => navigatePage(tool.page)}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150 focus:outline-none"
+                  style={{
+                    color:           isActive ? '#D4AF37' : 'rgba(255,255,255,0.72)',
+                    backgroundColor: isActive ? 'rgba(212,175,55,0.18)' : 'transparent',
+                    borderLeft:      isActive ? '2px solid #D4AF37' : '2px solid transparent',
+                  }}
+                  onMouseEnter={(e) => { if (!isActive) { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#fff'; } }}
+                  onMouseLeave={(e) => { if (!isActive) { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.72)'; } }}
+                >
+                  <span style={{ color: isActive ? '#D4AF37' : 'rgba(255,255,255,0.55)' }}>{tool.icon}</span>
+                  <span className="flex-1 text-left">{tool.label}</span>
+                  {count > 0 && (
+                    <span
+                      className="text-xs font-bold px-1.5 py-0.5 rounded-full shrink-0"
+                      style={{ backgroundColor: '#EF4444', color: '#fff', fontSize: '0.6rem', minWidth: '18px', textAlign: 'center' }}
+                    >
+                      {count}
+                    </span>
+                  )}
+                </button>
+              </div>
             );
           })}
         </div>
