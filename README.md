@@ -98,3 +98,11 @@ npm run preview
 - All prices shown are **per-unit estimates** (per sq ft, each, per linear ft). Final project costs depend on quantities, labor, and site conditions.
 - A full detailed estimate is provided by Orozco Homes during the client consultation.
 - SKU numbers are reference codes for ordering discussions.
+
+## Entrepreneurship Club site
+
+`entrepreneurship-club/` is a standalone, static marketing site for the Entrepreneurship Club (unrelated to the remodel app above), built as a second Vite entry point in this same repo. It's a single-page site (Home, About, Success Stories, Membership, Community Values, Meetings, Resources) with an EN/ES language toggle.
+
+- Runs locally at [http://localhost:5173/entrepreneurship-club/](http://localhost:5173/entrepreneurship-club/) alongside the main app (`npm run dev`).
+- Builds to `dist/entrepreneurship-club/` and deploys as part of the same Netlify site.
+- The membership-request and success-story forms write to the `ec_membership_requests` and `ec_success_stories` tables (see `supabase/migrations/021_entrepreneurship_club.sql`) using the same `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` env vars as the rest of the app. Both tables are insert-only for anonymous visitors (RLS); only an `admin` profile can read or moderate submissions. Run the migration in the Supabase SQL Editor before the forms will work.

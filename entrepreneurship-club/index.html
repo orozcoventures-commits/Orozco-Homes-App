@@ -1,0 +1,1096 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Entrepreneurship Club — A Global Community of Founders</title>
+<meta name="description" content="A free, monthly global community where founders and aspiring entrepreneurs share ideas, pitch to experienced operators, and get honest feedback. Membership is by request.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Entrepreneurship Club — A Global Community of Founders">
+<meta property="og:description" content="A free, monthly global community where founders and aspiring entrepreneurs share ideas, pitch to experienced operators, and get honest feedback.">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Entrepreneurship Club — A Global Community of Founders">
+<meta name="twitter:description" content="A free, monthly global community where founders and aspiring entrepreneurs share ideas, pitch to experienced operators, and get honest feedback.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2034%2034%22%3E%3Ccircle%20cx%3D%2217%22%20cy%3D%2217%22%20r%3D%2217%22%20fill%3D%22%23101B33%22/%3E%3Ccircle%20cx%3D%2217%22%20cy%3D%2217%22%20r%3D%2214.5%22%20stroke%3D%22%23D9B876%22%20stroke-width%3D%220.75%22%20fill%3D%22none%22/%3E%3Ccircle%20cx%3D%2217%22%20cy%3D%2217%22%20r%3D%2212%22%20stroke%3D%22%23D9B876%22%20stroke-width%3D%220.75%22%20fill%3D%22none%22/%3E%3Ctext%20x%3D%2217%22%20y%3D%2218.5%22%20text-anchor%3D%22middle%22%20dominant-baseline%3D%22middle%22%20font-family%3D%22Georgia%2C%20serif%22%20font-weight%3D%22600%22%20font-size%3D%2213%22%20letter-spacing%3D%22-1%22%20fill%3D%22%23D9B876%22%3EEC%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com/">
+<link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy: #101B33;
+    --navy-2: #1B2C4F;
+    --navy-3: #223768;
+    --ink: #0B1220;
+    --paper: #F5F5F1;
+    --paper-2: #ECEBE4;
+    --card: #FFFFFF;
+    --gold: #B8863B;
+    --gold-light: #D9B876;
+    --line: #DEDCD2;
+    --text: #1B2230;
+    --text-muted: #5A6172;
+    --text-on-navy: #E9EAEE;
+    --text-on-navy-muted: #A7AFC4;
+    --radius: 4px;
+    --maxw: 1180px;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    font-family:'Inter', sans-serif;
+    color:var(--text);
+    background:var(--paper);
+    line-height:1.55;
+  }
+  h1,h2,h3,h4{
+    font-family:'Fraunces', serif;
+    font-weight:600;
+    color:var(--ink);
+    margin:0 0 .5em 0;
+    line-height:1.15;
+  }
+  p{margin:0 0 1em 0;}
+  a{color:inherit;}
+  img{max-width:100%;display:block;}
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:0 32px;}
+  ul{margin:0; padding:0;}
+  li{list-style:none;}
+
+  /* ---------- NAV ---------- */
+  header.site-nav{
+    position:sticky; top:0; z-index:50;
+    background:rgba(16,27,51,0.96);
+    backdrop-filter: blur(6px);
+    border-bottom:1px solid rgba(255,255,255,0.08);
+  }
+  .nav-inner{
+    max-width:var(--maxw); margin:0 auto; padding:0 32px;
+    display:flex; align-items:center; justify-content:space-between;
+    height:68px;
+  }
+  .nav-right{display:flex; align-items:center; gap:14px;}
+  .logo{
+    font-family:'Fraunces', serif;
+    font-size:19px; font-weight:600;
+    color:#fff; letter-spacing:.2px;
+    display:flex; align-items:center; gap:10px;
+    cursor:pointer; background:none; border:none;
+  }
+  .logo-mark{
+    width:34px; height:34px;
+    display:flex; align-items:center; justify-content:center;
+    color:var(--gold-light); flex-shrink:0;
+  }
+  .logo-mark svg{display:block;}
+  nav.primary{display:flex; gap:6px; align-items:center;}
+  nav.primary button.navlink{
+    background:none; border:none; cursor:pointer;
+    color:var(--text-on-navy-muted);
+    font-family:'Inter',sans-serif; font-size:14.5px; font-weight:500;
+    padding:10px 14px; border-radius:var(--radius);
+    transition:color .15s ease;
+  }
+  nav.primary button.navlink:hover{color:#fff;}
+  nav.primary button.navlink.active{color:#fff;}
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:8px;
+    padding:11px 22px; border-radius:var(--radius);
+    font-family:'Inter',sans-serif; font-size:14.5px; font-weight:600;
+    cursor:pointer; border:1px solid transparent;
+    text-decoration:none; white-space:nowrap;
+  }
+  .btn-gold{background:var(--gold); color:#1B140A;}
+  .btn-gold:hover{background:var(--gold-light);}
+  .btn-outline-light{border-color:rgba(255,255,255,0.35); color:#fff;}
+  .btn-outline-light:hover{border-color:#fff; background:rgba(255,255,255,0.06);}
+  .btn-navy{background:var(--navy); color:#fff;}
+  .btn-navy:hover{background:var(--navy-3);}
+  .btn-outline-navy{border-color:var(--navy); color:var(--navy);}
+  .btn-outline-navy:hover{background:var(--navy); color:#fff;}
+  .nav-toggle{display:none; background:none; border:none; color:#fff; cursor:pointer;}
+  .lang-toggle{
+    display:flex; align-items:center;
+    border:1px solid rgba(255,255,255,0.22); border-radius:999px; padding:3px;
+    flex-shrink:0;
+  }
+  .lang-btn{
+    background:none; border:none; cursor:pointer; padding:5px 12px; border-radius:999px;
+    font-family:'Inter',sans-serif; font-size:12.5px; font-weight:600; letter-spacing:.3px;
+    color:var(--text-on-navy-muted);
+  }
+  .lang-btn.active{background:var(--gold-light); color:#1B140A;}
+
+  /* ---------- PAGES ---------- */
+  .page{display:none;}
+  .page.active{display:block;}
+  section{padding:88px 0;}
+  section.tight{padding:64px 0;}
+
+  /* ---------- HERO ---------- */
+  .hero{
+    background: linear-gradient(150deg, var(--navy) 0%, var(--navy-2) 55%, var(--navy) 100%);
+    padding:100px 0 90px;
+  }
+  .hero-grid{
+    display:grid; grid-template-columns: 1.35fr 1fr; gap:56px; align-items:start;
+  }
+  .hero h1{
+    color:#fff; font-size:46px; font-weight:600; letter-spacing:-.3px;
+    max-width:12.5em;
+  }
+  .hero p.lede{
+    color:var(--text-on-navy-muted); font-size:18px; max-width:38em; margin-bottom:32px;
+  }
+  .hero-ctas{display:flex; gap:14px; flex-wrap:wrap;}
+  .hero-card{
+    background:rgba(255,255,255,0.04);
+    border:1px solid rgba(255,255,255,0.14);
+    border-radius:6px; padding:26px 26px 24px;
+  }
+  .hero-card + .hero-card{margin-top:16px;}
+  .hero-card .label{
+    color:var(--gold-light); font-size:13px; font-weight:600; margin-bottom:10px;
+  }
+  .hero-card .detail-row{
+    display:flex; justify-content:space-between; color:#fff; font-size:14.5px;
+    padding:7px 0; border-top:1px solid rgba(255,255,255,0.08);
+  }
+  .hero-card .detail-row:first-of-type{border-top:none;}
+  .hero-card .detail-row span:first-child{color:var(--text-on-navy-muted);}
+  .stat-big{font-family:'Fraunces',serif; font-size:44px; color:#fff; font-weight:600; line-height:1;}
+  .stat-caption{color:var(--text-on-navy-muted); font-size:13.5px; margin-top:8px;}
+  .stat-source{color:#6E7692; font-size:12px; margin-top:10px;}
+
+  /* ---------- PILLARS / GRID CARDS ---------- */
+  .section-head{max-width:640px; margin-bottom:48px;}
+  .section-head h2{font-size:32px;}
+  .section-head p{color:var(--text-muted); font-size:16.5px;}
+  .pillars{display:grid; grid-template-columns:repeat(3,1fr); gap:28px;}
+  .pillar-card{
+    background:var(--card); border:1px solid var(--line); border-radius:6px; padding:32px 28px;
+  }
+  .pillar-icon{
+    width:44px; height:44px; border-radius:50%; background:var(--paper-2);
+    display:flex; align-items:center; justify-content:center; margin-bottom:20px; color:var(--navy);
+  }
+  .pillar-card h3{font-size:19px; margin-bottom:10px;}
+  .pillar-card p{color:var(--text-muted); font-size:15px; margin:0;}
+
+  /* ---------- STAT STRIP ---------- */
+  .stat-strip{background:var(--paper-2); border-top:1px solid var(--line); border-bottom:1px solid var(--line);}
+  .stat-strip .wrap{display:grid; grid-template-columns:repeat(4,1fr); gap:24px;}
+  .stat-item .num{font-family:'Fraunces',serif; font-size:36px; color:var(--navy); font-weight:600;}
+  .stat-item .desc{font-size:14px; color:var(--text-muted); margin-top:6px; max-width:20em;}
+  .stat-footnote{font-size:12.5px; color:#8A8F9C; margin-top:28px;}
+
+  /* ---------- CTA BANNER ---------- */
+  .cta-banner{background:var(--navy);}
+  .cta-banner .wrap{display:flex; align-items:center; justify-content:space-between; gap:24px; flex-wrap:wrap;}
+  .cta-banner h2{color:#fff; font-size:26px; margin:0; max-width:20em;}
+  .cta-banner p{color:var(--text-on-navy-muted); margin:8px 0 0; font-size:15px;}
+
+  /* ---------- ABOUT PAGE ---------- */
+  .page-header{background:var(--navy); padding:64px 0 56px;}
+  .page-header h1{color:#fff; font-size:36px; margin-bottom:10px;}
+  .page-header p{color:var(--text-on-navy-muted); font-size:16.5px; max-width:44em; margin:0;}
+
+  .founder-grid{display:grid; grid-template-columns: 240px 1fr; gap:48px; align-items:start;}
+  .founder-portrait{
+    width:100%; aspect-ratio:1; border-radius:6px;
+    background: linear-gradient(160deg, var(--navy) 0%, var(--navy-3) 100%);
+    display:flex; align-items:center; justify-content:center;
+    color:var(--gold-light); font-family:'Fraunces',serif; font-size:56px; font-weight:600;
+    overflow:hidden;
+  }
+  .founder-portrait img{width:100%; height:100%; object-fit:cover; display:block;}
+  .founder-title{color:var(--gold); font-size:13.5px; font-weight:600; margin-top:18px; text-align:center;}
+  .founder-bio h2{font-size:28px;}
+  .founder-bio p{color:var(--text); font-size:16px;}
+  .credential-list{margin-top:24px; border-top:1px solid var(--line);}
+  .credential-list li{
+    display:flex; gap:16px; padding:16px 0; border-bottom:1px solid var(--line);
+  }
+  .credential-list .cred-icon{color:var(--navy); flex-shrink:0; margin-top:2px;}
+  .credential-list .cred-title{font-weight:600; font-size:15px; color:var(--ink);}
+  .credential-list .cred-sub{font-size:14px; color:var(--text-muted); margin-top:2px;}
+
+  .mission-quote{
+    margin-top:64px; border-left:3px solid var(--gold); padding:4px 0 4px 28px;
+  }
+  .mission-quote p{font-family:'Fraunces',serif; font-size:22px; color:var(--ink); font-weight:500; line-height:1.5;}
+  .mission-quote span{font-size:14px; color:var(--text-muted);}
+
+  /* ---------- MEMBERSHIP ---------- */
+  .two-col{display:grid; grid-template-columns:1fr 1fr; gap:56px; align-items:start;}
+  .req-list li{
+    display:flex; gap:14px; padding:14px 0; border-bottom:1px solid var(--line);
+  }
+  .req-list li:first-child{padding-top:0;}
+  .req-check{
+    width:20px; height:20px; border-radius:4px; background:var(--paper-2); color:var(--navy);
+    display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:2px;
+  }
+  .req-text{font-size:15px; color:var(--text);}
+  .req-text strong{color:var(--ink);}
+
+  .steps{counter-reset:step;}
+  .step{display:flex; gap:20px; padding:22px 0; border-bottom:1px solid var(--line);}
+  .step:last-child{border-bottom:none;}
+  .step-num{
+    counter-increment:step; flex-shrink:0;
+    width:36px; height:36px; border-radius:50%; border:1px solid var(--navy);
+    color:var(--navy); font-family:'Fraunces',serif; font-weight:600; font-size:15px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .step-num::before{content:counter(step);}
+  .step h4{font-size:16.5px; margin-bottom:4px;}
+  .step p{font-size:14.5px; color:var(--text-muted); margin:0;}
+
+  /* ---------- FORM ---------- */
+  .apply-panel{background:var(--card); border:1px solid var(--line); border-radius:6px; padding:36px;}
+  .apply-panel h3{font-size:20px; margin-bottom:6px;}
+  .apply-panel .apply-sub{font-size:14.5px; color:var(--text-muted); margin-bottom:24px;}
+  .field{margin-bottom:18px;}
+  .field label{display:block; font-size:13.5px; font-weight:600; color:var(--ink); margin-bottom:6px;}
+  .field input, .field select, .field textarea{
+    width:100%; padding:11px 13px; border:1px solid var(--line); border-radius:var(--radius);
+    font-family:'Inter',sans-serif; font-size:14.5px; background:var(--paper); color:var(--text);
+  }
+  .field textarea{resize:vertical; min-height:90px;}
+  .field-check{display:flex; align-items:flex-start; gap:10px; font-size:13.5px; color:var(--text-muted);}
+  .field-check input{width:auto; margin-top:3px;}
+  .form-note{font-size:12.5px; color:#8A8F9C; margin-top:14px;}
+  .confirm-msg{
+    display:none; background:#F0F5EE; border:1px solid #C9DCC1; border-radius:var(--radius);
+    padding:18px 20px; font-size:14.5px; color:#33502C;
+  }
+  .error-msg{
+    display:none; background:#FBEEEC; border:1px solid #E9C3BC; border-radius:var(--radius);
+    padding:14px 18px; font-size:14px; color:#7A2E20; margin-top:14px;
+  }
+  button[disabled]{opacity:.6; cursor:not-allowed;}
+
+  /* ---------- VALUES / POLICY ---------- */
+  .values-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:22px;}
+  .value-card{background:var(--card); border:1px solid var(--line); border-radius:6px; padding:26px;}
+  .value-card .v-head{display:flex; align-items:center; gap:12px; margin-bottom:10px;}
+  .value-card .v-icon{color:var(--gold); flex-shrink:0;}
+  .value-card h4{font-size:16.5px; margin:0;}
+  .value-card p{font-size:14.5px; color:var(--text-muted); margin:0;}
+  .policy-note{
+    margin-top:36px; background:var(--paper-2); border-radius:6px; padding:24px 26px; font-size:14.5px; color:var(--text);
+  }
+
+  /* ---------- SUCCESS STORIES ---------- */
+  .story-types{margin-top:24px;}
+  .story-types li{display:flex; gap:14px; padding:13px 0; border-bottom:1px solid var(--line);}
+  .story-types li:first-child{padding-top:0;}
+  .story-types .st-icon{color:var(--navy); flex-shrink:0; margin-top:2px;}
+  .story-types .st-text{font-size:15px; color:var(--text);}
+  .story-types .st-text strong{color:var(--ink);}
+  .story-empty{
+    margin-top:64px; border:1px dashed var(--line); border-radius:6px; padding:48px 40px; text-align:center;
+  }
+  .story-empty h3{font-size:20px; margin-bottom:8px;}
+  .story-empty p{color:var(--text-muted); font-size:15px; max-width:38em; margin:0 auto 22px;}
+  .story-slots{display:grid; grid-template-columns:repeat(3,1fr); gap:20px; margin-top:56px;}
+  .story-slot{
+    border:1px dashed var(--line); border-radius:6px; padding:26px; background:var(--paper-2);
+  }
+  .story-slot .slot-tag{font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom:14px;}
+  .story-slot .slot-line{height:10px; background:var(--line); border-radius:3px; margin-bottom:10px;}
+  .story-slot .slot-line.short{width:60%;}
+
+  /* ---------- MEETINGS ---------- */
+  .meeting-panel{
+    display:grid; grid-template-columns:1fr 1fr; gap:0;
+    border:1px solid var(--line); border-radius:6px; overflow:hidden;
+  }
+  .meeting-left{background:var(--navy); color:#fff; padding:40px;}
+  .meeting-left .label{color:var(--gold-light); font-size:13px; font-weight:600; margin-bottom:14px;}
+  .meeting-left h3{color:#fff; font-size:26px;}
+  .meeting-left p{color:var(--text-on-navy-muted); font-size:15px;}
+  .meeting-right{padding:40px; background:var(--card);}
+  .meeting-right .m-row{display:flex; justify-content:space-between; padding:14px 0; border-bottom:1px solid var(--line); font-size:15px;}
+  .meeting-right .m-row:first-child{padding-top:0;}
+  .meeting-right .m-row span:first-child{color:var(--text-muted);}
+  .meeting-right .m-row span:last-child{font-weight:600; color:var(--ink);}
+
+  .format-list{margin-top:56px;}
+  .format-list li{display:flex; gap:16px; padding:16px 0; border-bottom:1px solid var(--line);}
+  .format-list .f-icon{color:var(--navy); flex-shrink:0; margin-top:2px;}
+  .format-list h4{font-size:15.5px; margin:0 0 3px;}
+  .format-list p{font-size:14px; color:var(--text-muted); margin:0;}
+
+  /* ---------- RESOURCES ---------- */
+  .res-cat{margin-bottom:52px;}
+  .res-cat h3{font-size:20px; border-bottom:1px solid var(--line); padding-bottom:14px; margin-bottom:22px;}
+  .res-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:20px;}
+  .res-card{
+    display:block; text-decoration:none; background:var(--card); border:1px solid var(--line);
+    border-radius:6px; padding:22px; transition:border-color .15s ease;
+  }
+  .res-card:hover{border-color:var(--gold);}
+  .res-card .r-type{font-size:12px; font-weight:600; color:var(--gold); margin-bottom:8px;}
+  .res-card h4{font-size:15.5px; color:var(--ink); margin:0 0 6px;}
+  .res-card p{font-size:13.5px; color:var(--text-muted); margin:0;}
+  .res-card .r-link{font-size:13px; color:var(--navy); margin-top:12px; display:flex; align-items:center; gap:6px;}
+
+  /* ---------- FOOTER ---------- */
+  footer{background:var(--ink); padding:52px 0 36px; color:var(--text-on-navy-muted);}
+  .footer-grid{display:grid; grid-template-columns:1.6fr repeat(3, 1fr); gap:32px; padding-bottom:32px; border-bottom:1px solid rgba(255,255,255,0.08);}
+  .footer-grid h5{color:#fff; font-size:13.5px; font-weight:600; margin-bottom:14px;}
+  .footer-grid li{margin-bottom:9px;}
+  .footer-grid button, .footer-grid a{background:none; border:none; color:var(--text-on-navy-muted); font-size:14px; cursor:pointer; padding:0; text-decoration:none; text-align:left; font-family:inherit;}
+  .footer-grid button:hover, .footer-grid a:hover{color:#fff;}
+  .footer-bottom{display:flex; justify-content:space-between; padding-top:24px; font-size:12.5px; flex-wrap:wrap; gap:8px;}
+
+  @media (max-width: 880px){
+    nav.primary{
+      position:fixed; top:68px; left:0; right:0; background:var(--navy);
+      flex-direction:column; align-items:stretch; padding:8px 20px 20px;
+      display:none; border-bottom:1px solid rgba(255,255,255,0.08);
+    }
+    nav.primary.open{display:flex;}
+    nav.primary button.navlink{text-align:left; padding:12px 6px;}
+    .nav-toggle{display:block;}
+    .hero-grid, .two-col, .founder-grid, .meeting-panel{grid-template-columns:1fr;}
+    .pillars, .stat-strip .wrap, .values-grid, .res-grid, .story-slots{grid-template-columns:1fr;}
+    .hero h1{font-size:34px;}
+    .footer-grid{grid-template-columns:1fr 1fr;}
+  }
+</style>
+</head>
+<body>
+
+<header class="site-nav">
+  <div class="nav-inner">
+    <button class="logo" data-target="home">
+      <span class="logo-mark">
+        <svg width="34" height="34" viewBox="0 0 34 34" fill="none">
+          <circle cx="17" cy="17" r="16" stroke="currentColor" stroke-width="0.75"></circle>
+          <circle cx="17" cy="17" r="13.25" stroke="currentColor" stroke-width="0.75"></circle>
+          <text x="17" y="18.5" text-anchor="middle" dominant-baseline="middle" font-family="&#39;Fraunces&#39;, serif" font-weight="600" font-size="14.5" letter-spacing="-1" fill="currentColor">EC</text>
+        </svg>
+      </span>
+      Entrepreneurship Club
+    </button>
+    <div class="nav-right">
+      <div class="lang-toggle" id="langToggle">
+        <button class="lang-btn active" data-lang="en">EN</button>
+        <button class="lang-btn" data-lang="es">ES</button>
+      </div>
+      <button class="nav-toggle" id="navToggle" aria-label="Toggle menu">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg>
+      </button>
+      <nav class="primary" id="primaryNav">
+        <button class="navlink active" data-target="home"><span class="i18n" data-en="Home" data-es="Inicio">Home</span></button>
+        <button class="navlink" data-target="about"><span class="i18n" data-en="About Us" data-es="Sobre Nosotros">About Us</span></button>
+        <button class="navlink" data-target="stories"><span class="i18n" data-en="Success Stories" data-es="Casos de Éxito">Success Stories</span></button>
+        <button class="navlink" data-target="membership"><span class="i18n" data-en="Membership" data-es="Membresía">Membership</span></button>
+        <button class="navlink" data-target="values"><span class="i18n" data-en="Community Values" data-es="Valores de la Comunidad">Community Values</span></button>
+        <button class="navlink" data-target="meetings"><span class="i18n" data-en="Meetings" data-es="Reuniones">Meetings</span></button>
+        <button class="navlink" data-target="resources"><span class="i18n" data-en="Resources" data-es="Recursos">Resources</span></button>
+        <button class="btn btn-gold" data-target="membership" style="margin-left:10px;"><span class="i18n" data-en="Request to Join" data-es="Solicitar Unirse">Request to Join</span></button>
+      </nav>
+    </div>
+  </div>
+</header>
+
+<!-- ============ HOME ============ -->
+<main>
+<section id="home" class="page active">
+
+  <div class="hero">
+    <div class="wrap hero-grid">
+      <div>
+        <h1><span class="i18n" data-en="A global room where founders build, pitch, and grow together." data-es="Un espacio global donde los fundadores construyen, presentan y crecen juntos.">A global room where founders build, pitch, and grow together.</span></h1>
+        <p class="lede"><span class="i18n" data-en="The Entrepreneurship Club connects founders, operators, and aspiring entrepreneurs across the world to trade ideas, sharpen strategy, and pitch directly to people who&#39;ve built businesses before them." data-es="El Entrepreneurship Club conecta a fundadores, operadores y aspirantes a emprendedores de todo el mundo para intercambiar ideas, perfeccionar estrategias y presentar sus proyectos directamente a personas que ya han construido negocios.">The Entrepreneurship Club connects founders, operators, and aspiring entrepreneurs across the world to trade ideas, sharpen strategy, and pitch directly to people who've built businesses before them.</span></p>
+        <div class="hero-ctas">
+          <button class="btn btn-gold" data-target="membership"><span class="i18n" data-en="Request to Join" data-es="Solicitar Unirse">Request to Join</span></button>
+          <button class="btn btn-outline-light" data-target="meetings"><span class="i18n" data-en="See how meetings work" data-es="Vea cómo funcionan las reuniones">See how meetings work</span></button>
+        </div>
+      </div>
+      <div>
+        <div class="hero-card">
+          <div class="label"><span class="i18n" data-en="Next session" data-es="Próxima sesión">Next session</span></div>
+          <div class="detail-row"><span><span class="i18n" data-en="Frequency" data-es="Frecuencia">Frequency</span></span><span><span class="i18n" data-en="Monthly" data-es="Mensual">Monthly</span></span></div>
+          <div class="detail-row"><span><span class="i18n" data-en="Platform" data-es="Plataforma">Platform</span></span><span>Google Meet</span></div>
+          <div class="detail-row"><span><span class="i18n" data-en="Time" data-es="Hora">Time</span></span><span><span class="i18n" data-en="12:00 PM Eastern" data-es="12:00 p.m., hora del Este">12:00 PM Eastern</span></span></div>
+        </div>
+        <div class="hero-card">
+          <div class="stat-big">20%</div>
+          <div class="stat-caption"><span class="i18n" data-en="of adults worldwide are actively starting or running a business." data-es="de los adultos en todo el mundo están iniciando o dirigiendo activamente un negocio.">of adults worldwide are actively starting or running a business.</span></div>
+          <div class="stat-source"><span class="i18n" data-en="Source: Global Entrepreneurship Monitor, 2024/2025 Global Report" data-es="Fuente: Global Entrepreneurship Monitor, Informe Global 2024/2025">Source: Global Entrepreneurship Monitor, 2024/2025 Global Report</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <section>
+    <div class="wrap">
+      <div class="section-head" style="max-width:720px;">
+        <h2><span class="i18n" data-en="What the club is built to do" data-es="Para qué está hecho el club">What the club is built to do</span></h2>
+        <p style="font-size:17.5px;"><span class="i18n" data-en="Every founder starts in the same place: an idea, a little conviction, and no room to test either one. That&#39;s the gap this club closes. Three things happen here, every single month, for founders at any stage, in any country." data-es="Todo fundador comienza en el mismo lugar: una idea, algo de convicción y ningún espacio para poner a prueba ninguna de las dos. Esa es la brecha que este club cierra. Aquí suceden tres cosas, cada mes, para fundadores de cualquier etapa, en cualquier país.">Every founder starts in the same place: an idea, a little conviction, and no room to test either one. That's the gap this club closes. Three things happen here, every single month, for founders at any stage, in any country.</span></p>
+      </div>
+      <div class="pillars">
+        <div class="pillar-card">
+          <div class="pillar-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M17 8c0 2.76-2.24 5-5 5s-5-2.24-5-5 2.24-5 5-5 5 2.24 5 5Z" stroke="currentColor" stroke-width="1.6"></path><path d="M3 21c0-3.87 3.13-7 7-7h4c3.87 0 7 3.13 7 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg>
+          </div>
+          <h3><span class="i18n" data-en="Say the idea out loud" data-es="Di la idea en voz alta">Say the idea out loud</span></h3>
+          <p><span class="i18n" data-en="An idea kept in your head only ever gets smaller. Bring the one you haven&#39;t told anyone yet into a room built for exactly that, trade notes with founders solving your same problem on the other side of the world, and walk out with a sharper version of what you walked in with." data-es="Una idea que se queda solo en tu cabeza nunca deja de encogerse. Trae esa idea que aún no le has contado a nadie a un espacio creado exactamente para eso, intercambia impresiones con fundadores que resuelven tu mismo problema al otro lado del mundo, y sal con una versión más afilada de la que trajiste.">An idea kept in your head only ever gets smaller. Bring the one you haven't told anyone yet into a room built for exactly that, trade notes with founders solving your same problem on the other side of the world, and walk out with a sharper version of what you walked in with.</span></p>
+        </div>
+        <div class="pillar-card">
+          <div class="pillar-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path><path d="M21 12v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg>
+          </div>
+          <h3><span class="i18n" data-en="Pitch to people who&#39;ve actually built something" data-es="Presenta tu idea a personas que realmente han construido algo">Pitch to people who've actually built something</span></h3>
+          <p><span class="i18n" data-en="Stand up and pitch to founders and operators who&#39;ve raised money, made payroll, and made the mistakes you&#39;re about to make. You leave with feedback specific enough to act on Monday morning — not polite nods." data-es="Ponte de pie y presenta tu idea a fundadores y operadores que han levantado capital, pagado nóminas y cometido los errores que tú estás a punto de cometer. Sales con comentarios lo suficientemente específicos como para actuar el lunes por la mañana, no solo con gestos de cortesía.">Stand up and pitch to founders and operators who've raised money, made payroll, and made the mistakes you're about to make. You leave with feedback specific enough to act on Monday morning — not polite nods.</span></p>
+        </div>
+        <div class="pillar-card">
+          <div class="pillar-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 19V9M12 19V5M20 19v-7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg>
+          </div>
+          <h3><span class="i18n" data-en="Back your instincts with global data" data-es="Respalda tu instinto con datos globales">Back your instincts with global data</span></h3>
+          <p><span class="i18n" data-en="Every session is grounded in research from the Global Entrepreneurship Monitor, so the conversation isn&#39;t guesswork or gut feel — it&#39;s informed by what&#39;s actually happening to founders across more than 50 countries right now." data-es="Cada sesión se basa en la investigación del Global Entrepreneurship Monitor, así que la conversación no es una suposición ni una corazonada: está informada por lo que realmente está pasando a los fundadores en más de 50 países en este momento.">Every session is grounded in research from the Global Entrepreneurship Monitor, so the conversation isn't guesswork or gut feel — it's informed by what's actually happening to founders across more than 50 countries right now.</span></p>
+        </div>
+      </div>
+      <p style="margin-top:36px; font-size:15.5px; color:var(--text-muted); max-width:640px;"><span class="i18n" data-en="No membership fees, no pitch decks required to attend, no gatekeeping by industry or how far along you are. Just one room, once a month, where the idea you&#39;re sitting on finally gets tested." data-es="Sin cuotas de membresía, sin necesidad de una presentación formal para asistir, sin barreras por industria o por qué tan avanzado estés. Solo un espacio, una vez al mes, donde esa idea que tienes guardada finalmente se pone a prueba.">No membership fees, no pitch decks required to attend, no gatekeeping by industry or how far along you are. Just one room, once a month, where the idea you're sitting on finally gets tested.</span></p>
+    </div>
+  </section>
+
+  <section class="stat-strip tight">
+    <div class="wrap">
+      <div class="stat-item">
+        <div class="num">49%</div>
+        <div class="desc"><span class="i18n" data-en="of people who see a good business opportunity say they wouldn&#39;t act on it, out of fear of failure." data-es="de las personas que ven una buena oportunidad de negocio dicen que no actuarían por miedo al fracaso.">of people who see a good business opportunity say they wouldn't act on it, out of fear of failure.</span></div>
+      </div>
+      <div class="stat-item">
+        <div class="num">67%+</div>
+        <div class="desc"><span class="i18n" data-en="of U.S. entrepreneurs cite limited job options as a motivation for starting a business." data-es="de los emprendedores en EE. UU. mencionan las opciones limitadas de empleo como motivo para iniciar un negocio.">of U.S. entrepreneurs cite limited job options as a motivation for starting a business.</span></div>
+      </div>
+      <div class="stat-item">
+        <div class="num">6.6%</div>
+        <div class="desc"><span class="i18n" data-en="of U.S. adults run an established, mature business — below the average across high-income economies." data-es="de los adultos en EE. UU. dirigen un negocio establecido y maduro, por debajo del promedio de las economías de altos ingresos.">of U.S. adults run an established, mature business — below the average across high-income economies.</span></div>
+      </div>
+      <div class="stat-item">
+        <div class="num">35%</div>
+        <div class="desc"><span class="i18n" data-en="of entrepreneurs worldwide now align their venture with a sustainability or social-impact goal." data-es="de los emprendedores en todo el mundo alinean hoy su proyecto con un objetivo de sostenibilidad o impacto social.">of entrepreneurs worldwide now align their venture with a sustainability or social-impact goal.</span></div>
+      </div>
+    </div>
+    <div class="wrap"><p class="stat-footnote"><span class="i18n" data-en="Figures drawn from the Global Entrepreneurship Monitor 2024/2025 Global Report and the GEM United States 2024–2025 Report. This is exactly the gap the club exists to close: connection, mentorship, and a place to test an idea before fear of failure closes the door on it." data-es="Cifras tomadas del Informe Global 2024/2025 del Global Entrepreneurship Monitor y del Informe de Estados Unidos 2024–2025 de GEM. Esta es exactamente la brecha que este club existe para cerrar: conexión, mentoría y un lugar para poner a prueba una idea antes de que el miedo al fracaso le cierre la puerta.">Figures drawn from the Global Entrepreneurship Monitor 2024/2025 Global Report and the GEM United States 2024–2025 Report. This is exactly the gap the club exists to close: connection, mentorship, and a place to test an idea before fear of failure closes the door on it.</span></p></div>
+  </section>
+
+  <section class="cta-banner tight">
+    <div class="wrap">
+      <div>
+        <h2><span class="i18n" data-en="Bring your idea to people who&#39;ve built one before." data-es="Lleva tu idea ante personas que ya han construido una.">Bring your idea to people who've built one before.</span></h2>
+        <p><span class="i18n" data-en="Membership is by request. Review the requirements and apply in a few minutes." data-es="La membresía es por solicitud. Revisa los requisitos y postúlate en pocos minutos.">Membership is by request. Review the requirements and apply in a few minutes.</span></p>
+      </div>
+      <button class="btn btn-gold" data-target="membership"><span class="i18n" data-en="Request to Join" data-es="Solicitar Unirse">Request to Join</span></button>
+    </div>
+  </section>
+
+</section>
+
+<!-- ============ ABOUT ============ -->
+<section id="about" class="page">
+  <div class="page-header">
+    <div class="wrap">
+      <h1><span class="i18n" data-en="About Us" data-es="Sobre Nosotros">About Us</span></h1>
+      <p><span class="i18n" data-en="The founder&#39;s background, and why the club exists." data-es="La trayectoria del fundador y la razón de ser del club.">The founder's background, and why the club exists.</span></p>
+    </div>
+  </div>
+  <section>
+    <div class="wrap">
+      <div class="founder-grid">
+        <div>
+          <div class="founder-portrait"><img src="./assets/founder-roger-orozco.jpg" alt="Roger Orozco, Founder of the Entrepreneurship Club" width="512" height="512" loading="lazy"></div>
+          <div class="founder-title"><span class="i18n" data-en="Founder, Entrepreneurship Club" data-es="Fundador, Entrepreneurship Club">Founder, Entrepreneurship Club</span></div>
+        </div>
+        <div class="founder-bio">
+          <h2>Roger Orozco</h2>
+          <p><span class="i18n" data-en="Roger Orozco is the founder of the Entrepreneurship Club, bringing over 25 years of experience across business, construction, real estate, and project leadership to the community. He built the club to give entrepreneurs — first-time founders and seasoned operators alike — a consistent, global space to share ideas, ask for honest feedback, and support one another&#39;s growth." data-es="Roger Orozco es el fundador del Entrepreneurship Club y aporta a la comunidad más de 25 años de experiencia en negocios, construcción, bienes raíces y liderazgo de proyectos. Creó el club para brindar a los emprendedores —tanto fundadores primerizos como operadores experimentados— un espacio global y constante para compartir ideas, pedir comentarios honestos y apoyarse mutuamente en su crecimiento.">Roger Orozco is the founder of the Entrepreneurship Club, bringing over 25 years of experience across business, construction, real estate, and project leadership to the community. He built the club to give entrepreneurs — first-time founders and seasoned operators alike — a consistent, global space to share ideas, ask for honest feedback, and support one another's growth.</span></p>
+          <p><span class="i18n" data-en="Roger earned his bachelor&#39;s degree in Finance and International Business from Old Dominion University and later completed his MBA at Regent University, with a concentration in Entrepreneurship. That combination of finance, global business, and entrepreneurial study shapes how the club approaches feedback: practical, numbers-aware, and focused on what actually moves a business forward." data-es="Roger obtuvo su licenciatura en Finanzas y Negocios Internacionales en Old Dominion University y más tarde completó su MBA en Regent University, con especialización en Emprendimiento. Esa combinación de finanzas, negocios globales y estudios de emprendimiento define cómo el club aborda los comentarios: de forma práctica, consciente de los números y enfocada en lo que realmente impulsa un negocio.">Roger earned his bachelor's degree in Finance and International Business from Old Dominion University and later completed his MBA at Regent University, with a concentration in Entrepreneurship. That combination of finance, global business, and entrepreneurial study shapes how the club approaches feedback: practical, numbers-aware, and focused on what actually moves a business forward.</span></p>
+          <p><span class="i18n" data-en="Beyond the club, Roger has served as a board director for a number of institutions. He currently serves on the Board of Directors for the Better Business Bureau (BBB) serving Virginia and for Coastal Mortgage Company, where he has helped shape strategy, vision, and leadership at the board level. He also serves as Executive of Asset Management for Bishard Homes, a real estate company, where he sets strategic direction for the commercial and residential asset management portfolio and sits on the company&#39;s executive team. He is additionally the founder of both Just One Opportunity and Orozco Venture Corporation." data-es="Más allá del club, Roger ha sido miembro de la junta directiva de varias instituciones. Actualmente forma parte de la Junta Directiva del Better Business Bureau (BBB) que sirve a Virginia y de Coastal Mortgage Company, donde ha ayudado a definir la estrategia, la visión y el liderazgo a nivel de junta. También se desempeña como Ejecutivo de Administración de Activos en Bishard Homes, una empresa de bienes raíces, donde establece la dirección estratégica de la cartera de administración de activos comerciales y residenciales y forma parte del equipo ejecutivo de la empresa. Además, es fundador de Just One Opportunity y de Orozco Venture Corporation.">Beyond the club, Roger has served as a board director for a number of institutions. He currently serves on the Board of Directors for the Better Business Bureau (BBB) serving Virginia and for Coastal Mortgage Company, where he has helped shape strategy, vision, and leadership at the board level. He also serves as Executive of Asset Management for Bishard Homes, a real estate company, where he sets strategic direction for the commercial and residential asset management portfolio and sits on the company's executive team. He is additionally the founder of both Just One Opportunity and Orozco Venture Corporation.</span></p>
+
+          <h3 style="font-size:15px; text-transform:none; color:var(--ink); margin:32px 0 4px;"><span class="i18n" data-en="Education &amp; certifications" data-es="Educación y certificaciones">Education &amp; certifications</span></h3>
+          <ul class="credential-list">
+            <li>
+              <span class="cred-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M22 10 12 5 2 10l10 5 10-5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"></path><path d="M6 12v5c0 1.1 2.69 2 6 2s6-.9 6-2v-5" stroke="currentColor" stroke-width="1.6"></path></svg></span>
+              <div>
+                <div class="cred-title"><span class="i18n" data-en="B.S., Finance &amp; International Business" data-es="Licenciatura en Finanzas y Negocios Internacionales">B.S., Finance &amp; International Business</span></div>
+                <div class="cred-sub">Old Dominion University</div>
+              </div>
+            </li>
+            <li>
+              <span class="cred-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M22 10 12 5 2 10l10 5 10-5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"></path><path d="M6 12v5c0 1.1 2.69 2 6 2s6-.9 6-2v-5" stroke="currentColor" stroke-width="1.6"></path></svg></span>
+              <div>
+                <div class="cred-title"><span class="i18n" data-en="MBA, concentration in Entrepreneurship" data-es="MBA, especialización en Emprendimiento">MBA, concentration in Entrepreneurship</span></div>
+                <div class="cred-sub">Regent University</div>
+              </div>
+            </li>
+            <li>
+              <span class="cred-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.6"></rect><path d="M7 9h10M7 13h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg></span>
+              <div>
+                <div class="cred-title"><span class="i18n" data-en="Class A Contractor&#39;s License, RBC" data-es="Licencia de Contratista Clase A, RBC">Class A Contractor's License, RBC</span></div>
+                <div class="cred-sub"><span class="i18n" data-en="25+ years applying business and finance principles in the field" data-es="Más de 25 años aplicando principios de negocios y finanzas en el campo">25+ years applying business and finance principles in the field</span></div>
+              </div>
+            </li>
+            <li>
+              <span class="cred-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="9" r="5" stroke="currentColor" stroke-width="1.6"></circle><path d="M8 14 6 21l6-3 6 3-2-7" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"></path></svg></span>
+              <div>
+                <div class="cred-title"><span class="i18n" data-en="Certified Project Management Professional (PMP)" data-es="Profesional Certificado en Gestión de Proyectos (PMP)">Certified Project Management Professional (PMP)</span></div>
+                <div class="cred-sub">Project Management Institute</div>
+              </div>
+            </li>
+            <li>
+              <span class="cred-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M17 8c0 2.76-2.24 5-5 5s-5-2.24-5-5 2.24-5 5-5 5 2.24 5 5Z" stroke="currentColor" stroke-width="1.6"></path><path d="M3 21c0-3.87 3.13-7 7-7h4c3.87 0 7 3.13 7 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg></span>
+              <div>
+                <div class="cred-title"><span class="i18n" data-en="Member, Project Management Institute (PMI)" data-es="Miembro del Project Management Institute (PMI)">Member, Project Management Institute (PMI)</span></div>
+              </div>
+            </li>
+          </ul>
+
+          <h3 style="font-size:15px; text-transform:none; color:var(--ink); margin:32px 0 4px;"><span class="i18n" data-en="Board &amp; leadership roles" data-es="Roles de junta directiva y liderazgo">Board &amp; leadership roles</span></h3>
+          <ul class="credential-list">
+            <li>
+              <span class="cred-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 21c-4.5-2.5-8-6-8-10.5A5.5 5.5 0 0 1 12 6a5.5 5.5 0 0 1 8 4.5C20 15 16.5 18.5 12 21Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"></path></svg></span>
+              <div>
+                <div class="cred-title"><span class="i18n" data-en="Board of Directors, Better Business Bureau (BBB) serving Virginia" data-es="Junta Directiva, Better Business Bureau (BBB) que sirve a Virginia">Board of Directors, Better Business Bureau (BBB) serving Virginia</span></div>
+                <div class="cred-sub"><span class="i18n" data-en="The BBB is a nonprofit organization, founded in 1912, focused on advancing trust in the marketplace. It accredits businesses that meet its standards, publishes business ratings and reviews, and helps resolve disputes between consumers and businesses." data-es="El BBB es una organización sin fines de lucro, fundada en 1912, enfocada en promover la confianza en el mercado. Acredita a las empresas que cumplen con sus estándares, publica calificaciones y reseñas de negocios, y ayuda a resolver disputas entre consumidores y empresas.">The BBB is a nonprofit organization, founded in 1912, focused on advancing trust in the marketplace. It accredits businesses that meet its standards, publishes business ratings and reviews, and helps resolve disputes between consumers and businesses.</span></div>
+              </div>
+            </li>
+            <li>
+              <span class="cred-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 21c-4.5-2.5-8-6-8-10.5A5.5 5.5 0 0 1 12 6a5.5 5.5 0 0 1 8 4.5C20 15 16.5 18.5 12 21Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"></path></svg></span>
+              <div>
+                <div class="cred-title"><span class="i18n" data-en="Board of Directors, Coastal Mortgage Company" data-es="Junta Directiva, Coastal Mortgage Company">Board of Directors, Coastal Mortgage Company</span></div>
+                <div class="cred-sub"><span class="i18n" data-en="Helps guide strategy, vision, and leadership at the board level" data-es="Ayuda a guiar la estrategia, la visión y el liderazgo a nivel de junta">Helps guide strategy, vision, and leadership at the board level</span></div>
+              </div>
+            </li>
+            <li>
+              <span class="cred-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"></path></svg></span>
+              <div>
+                <div class="cred-title"><span class="i18n" data-en="Executive of Asset Management, Bishard Homes" data-es="Ejecutivo de Administración de Activos, Bishard Homes">Executive of Asset Management, Bishard Homes</span></div>
+                <div class="cred-sub"><span class="i18n" data-en="Sets strategic direction for the company&#39;s commercial and residential asset management portfolio and serves on the Bishard executive team." data-es="Define la dirección estratégica de la cartera de administración de activos comerciales y residenciales de la empresa, y forma parte del equipo ejecutivo de Bishard.">Sets strategic direction for the company's commercial and residential asset management portfolio and serves on the Bishard executive team.</span></div>
+              </div>
+            </li>
+            <li>
+              <span class="cred-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M17 8c0 2.76-2.24 5-5 5s-5-2.24-5-5 2.24-5 5-5 5 2.24 5 5Z" stroke="currentColor" stroke-width="1.6"></path><path d="M3 21c0-3.87 3.13-7 7-7h4c3.87 0 7 3.13 7 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg></span>
+              <div>
+                <div class="cred-title"><span class="i18n" data-en="Founder, Just One Opportunity" data-es="Fundador, Just One Opportunity">Founder, Just One Opportunity</span></div>
+              </div>
+            </li>
+            <li>
+              <span class="cred-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M17 8c0 2.76-2.24 5-5 5s-5-2.24-5-5 2.24-5 5-5 5 2.24 5 5Z" stroke="currentColor" stroke-width="1.6"></path><path d="M3 21c0-3.87 3.13-7 7-7h4c3.87 0 7 3.13 7 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg></span>
+              <div>
+                <div class="cred-title"><span class="i18n" data-en="Founder, Orozco Venture Corporation" data-es="Fundador, Orozco Venture Corporation">Founder, Orozco Venture Corporation</span></div>
+              </div>
+            </li>
+          </ul>
+
+          <div class="mission-quote">
+            <p><span class="i18n" data-en="&quot;Most people don&#39;t fail because their idea was bad. They fail because they never had a room to test it in. This club is that room.&quot;" data-es="&quot;La mayoría de las personas no fracasa porque su idea fuera mala. Fracasan porque nunca tuvieron un espacio donde ponerla a prueba. Este club es ese espacio.&quot;">"Most people don't fail because their idea was bad. They fail because they never had a room to test it in. This club is that room."</span></p>
+            <span><span class="i18n" data-en="— Roger Orozco, Founder" data-es="— Roger Orozco, Fundador">— Roger Orozco, Founder</span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</section>
+
+<!-- ============ SUCCESS STORIES ============ -->
+<section id="stories" class="page">
+  <div class="page-header">
+    <div class="wrap">
+      <h1><span class="i18n" data-en="Success Stories" data-es="Casos de Éxito">Success Stories</span></h1>
+      <p><span class="i18n" data-en="Real milestones from the founders in this club, as they happen." data-es="Logros reales de los fundadores de este club, a medida que suceden.">Real milestones from the founders in this club, as they happen.</span></p>
+    </div>
+  </div>
+
+  <section>
+    <div class="wrap">
+      <div class="two-col">
+        <div>
+          <h2 style="font-size:24px;"><span class="i18n" data-en="What we celebrate here" data-es="Qué celebramos aquí">What we celebrate here</span></h2>
+          <p style="color:var(--text-muted);"><span class="i18n" data-en="A success story isn&#39;t only &quot;I sold the company.&quot; It&#39;s any real step forward a member can point to and say the club played a part in it. This page exists to make those moments visible — for the person who earned them, and for the next member who needs proof it&#39;s possible." data-es="Un caso de éxito no es solo &quot;vendí la empresa&quot;. Es cualquier avance real que un miembro pueda señalar y decir que el club tuvo algo que ver. Esta página existe para hacer visibles esos momentos, tanto para quien los logró como para el próximo miembro que necesita la prueba de que es posible.">A success story isn't only "I sold the company." It's any real step forward a member can point to and say the club played a part in it. This page exists to make those moments visible — for the person who earned them, and for the next member who needs proof it's possible.</span></p>
+          <ul class="story-types">
+            <li>
+              <span class="st-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path><path d="M21 12v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg></span>
+              <span class="st-text"><span class="i18n" data-en="&lt;strong&gt;A launch&lt;/strong&gt; — the idea you pitched in the group finally went live." data-es="&lt;strong&gt;Un lanzamiento&lt;/strong&gt; — la idea que presentaste en el grupo finalmente se lanzó."><strong>A launch</strong> — the idea you pitched in the group finally went live.</span></span>
+            </li>
+            <li>
+              <span class="st-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 19V9M12 19V5M20 19v-7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg></span>
+              <span class="st-text"><span class="i18n" data-en="&lt;strong&gt;A first sale or a growth milestone&lt;/strong&gt; — revenue, a new hire, or a number that moved." data-es="&lt;strong&gt;Una primera venta o un logro de crecimiento&lt;/strong&gt; — ingresos, una nueva contratación o una cifra que avanzó."><strong>A first sale or a growth milestone</strong> — revenue, a new hire, or a number that moved.</span></span>
+            </li>
+            <li>
+              <span class="st-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="1.6"></circle><path d="M2 21c0-3.87 3.13-7 7-7s7 3.13 7 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path><circle cx="17" cy="7" r="3" stroke="currentColor" stroke-width="1.6"></circle></svg></span>
+              <span class="st-text"><span class="i18n" data-en="&lt;strong&gt;A connection made in the room&lt;/strong&gt; — a co-founder, an investor, a mentor, a first customer." data-es="&lt;strong&gt;Una conexión hecha en el grupo&lt;/strong&gt; — un cofundador, un inversionista, un mentor, un primer cliente."><strong>A connection made in the room</strong> — a co-founder, an investor, a mentor, a first customer.</span></span>
+            </li>
+            <li>
+              <span class="st-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M17 8c0 2.76-2.24 5-5 5s-5-2.24-5-5 2.24-5 5-5 5 2.24 5 5Z" stroke="currentColor" stroke-width="1.6"></path><path d="M3 21c0-3.87 3.13-7 7-7h4c3.87 0 7 3.13 7 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg></span>
+              <span class="st-text"><span class="i18n" data-en="&lt;strong&gt;A hard pivot&lt;/strong&gt; — feedback from the group changed the direction of the business, for the better." data-es="&lt;strong&gt;Un giro difícil&lt;/strong&gt; — los comentarios del grupo cambiaron el rumbo del negocio, para mejor."><strong>A hard pivot</strong> — feedback from the group changed the direction of the business, for the better.</span></span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="apply-panel">
+          <h3><span class="i18n" data-en="Share your story" data-es="Comparte tu historia">Share your story</span></h3>
+          <p class="apply-sub"><span class="i18n" data-en="If the club played a part in a milestone, we&#39;d like to feature it here — with your permission." data-es="Si el club tuvo algo que ver en un logro, nos gustaría destacarlo aquí, con tu permiso.">If the club played a part in a milestone, we'd like to feature it here — with your permission.</span></p>
+          <form id="storyForm">
+            <div class="field">
+              <label for="storyName"><span class="i18n" data-en="Full name" data-es="Nombre completo">Full name</span></label>
+              <input type="text" id="storyName" required="">
+            </div>
+            <div class="field">
+              <label for="storyVenture"><span class="i18n" data-en="Business or venture name" data-es="Nombre del negocio o proyecto">Business or venture name</span></label>
+              <input type="text" id="storyVenture" required="">
+            </div>
+            <div class="field">
+              <label for="storyType"><span class="i18n" data-en="What kind of milestone is this?" data-es="¿Qué tipo de logro es este?">What kind of milestone is this?</span></label>
+              <select id="storyType" required="">
+                <option value="" class="i18n-opt" data-en="Select one" data-es="Selecciona una opción">Select one</option>
+                <option class="i18n-opt" data-en="Launch" data-es="Lanzamiento">Launch</option>
+                <option class="i18n-opt" data-en="Funding or revenue milestone" data-es="Logro de financiamiento o ingresos">Funding or revenue milestone</option>
+                <option class="i18n-opt" data-en="Connection made through the club" data-es="Conexión hecha a través del club">Connection made through the club</option>
+                <option class="i18n-opt" data-en="Pivot shaped by group feedback" data-es="Giro impulsado por los comentarios del grupo">Pivot shaped by group feedback</option>
+                <option class="i18n-opt" data-en="Other" data-es="Otro">Other</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="storyText"><span class="i18n" data-en="Tell us what happened" data-es="Cuéntanos qué pasó">Tell us what happened</span></label>
+              <textarea id="storyText" required=""></textarea>
+            </div>
+            <div class="field field-check">
+              <input type="checkbox" id="storyPermission" required="">
+              <label for="storyPermission" style="margin:0; font-weight:400;"><span class="i18n" data-en="I give the Entrepreneurship Club permission to feature this story, with my name, on this page." data-es="Autorizo al Entrepreneurship Club a destacar esta historia, con mi nombre, en esta página.">I give the Entrepreneurship Club permission to feature this story, with my name, on this page.</span></label>
+            </div>
+            <button type="submit" class="btn btn-navy" style="width:100%;"><span class="i18n" data-en="Submit story" data-es="Enviar historia">Submit story</span></button>
+          </form>
+          <div class="confirm-msg" id="storyConfirmMsg"><span class="i18n" data-en="Thank you — your story has been recorded. We&#39;ll follow up before anything is featured publicly." data-es="Gracias: tu historia ha sido registrada. Nos pondremos en contacto antes de publicar nada.">Thank you — your story has been recorded. We'll follow up before anything is featured publicly.</span></div>
+          <div class="error-msg" id="storyFormError"><span class="i18n" data-en="Something went wrong submitting your story. Please try again in a moment, or email us directly." data-es="Ocurrió un error al enviar tu historia. Inténtalo de nuevo en unos minutos, o escríbenos directamente por correo.">Something went wrong submitting your story. Please try again in a moment, or email us directly.</span></div>
+        </div>
+      </div>
+
+      <div class="story-empty">
+        <h3><span class="i18n" data-en="This page grows one milestone at a time." data-es="Esta página crece un logro a la vez.">This page grows one milestone at a time.</span></h3>
+        <p><span class="i18n" data-en="The club is early, so there&#39;s nothing to show off just yet — that&#39;s the honest truth. As members reach the moments listed above, their stories will replace the placeholders below." data-es="El club está en sus inicios, así que todavía no hay nada que mostrar: esa es la verdad. A medida que los miembros alcancen los momentos mencionados arriba, sus historias reemplazarán los espacios reservados a continuación.">The club is early, so there's nothing to show off just yet — that's the honest truth. As members reach the moments listed above, their stories will replace the placeholders below.</span></p>
+      </div>
+
+      <div class="story-slots">
+        <div class="story-slot">
+          <div class="slot-tag"><span class="i18n" data-en="Awaiting a story" data-es="Esperando una historia">Awaiting a story</span></div>
+          <div class="slot-line"></div>
+          <div class="slot-line"></div>
+          <div class="slot-line short"></div>
+        </div>
+        <div class="story-slot">
+          <div class="slot-tag"><span class="i18n" data-en="Awaiting a story" data-es="Esperando una historia">Awaiting a story</span></div>
+          <div class="slot-line"></div>
+          <div class="slot-line"></div>
+          <div class="slot-line short"></div>
+        </div>
+        <div class="story-slot">
+          <div class="slot-tag"><span class="i18n" data-en="Awaiting a story" data-es="Esperando una historia">Awaiting a story</span></div>
+          <div class="slot-line"></div>
+          <div class="slot-line"></div>
+          <div class="slot-line short"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</section>
+
+<!-- ============ MEMBERSHIP ============ -->
+<section id="membership" class="page">
+  <div class="page-header">
+    <div class="wrap">
+      <h1><span class="i18n" data-en="Membership" data-es="Membresía">Membership</span></h1>
+      <p><span class="i18n" data-en="What&#39;s required to join, and how the request process works." data-es="Qué se necesita para unirse y cómo funciona el proceso de solicitud.">What's required to join, and how the request process works.</span></p>
+    </div>
+  </div>
+
+  <section>
+    <div class="wrap">
+      <div class="two-col">
+        <div>
+          <h2 style="font-size:24px;"><span class="i18n" data-en="Requirements to join" data-es="Requisitos para unirse">Requirements to join</span></h2>
+          <p style="color:var(--text-muted); margin-bottom:24px;"><span class="i18n" data-en="The club works because everyone in the room takes it seriously. Before you request to join, make sure you can commit to the following:" data-es="El club funciona porque todos en la sala se lo toman en serio. Antes de solicitar tu ingreso, asegúrate de poder comprometerte con lo siguiente:">The club works because everyone in the room takes it seriously. Before you request to join, make sure you can commit to the following:</span></p>
+          <ul class="req-list">
+            <li>
+              <span class="req-check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M20 6 9 17l-5-5" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path></svg></span>
+              <span class="req-text"><span class="i18n" data-en="Be &lt;strong&gt;18 years or older&lt;/strong&gt; and have a genuine interest in entrepreneurship, whether you&#39;re a founder, an operator, or still shaping an idea." data-es="Tener &lt;strong&gt;18 años o más&lt;/strong&gt; y un interés genuino en el emprendimiento, ya seas fundador, operador o aún estés dando forma a una idea.">Be <strong>18 years or older</strong> and have a genuine interest in entrepreneurship, whether you're a founder, an operator, or still shaping an idea.</span></span>
+            </li>
+            <li>
+              <span class="req-check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M20 6 9 17l-5-5" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path></svg></span>
+              <span class="req-text"><span class="i18n" data-en="Complete the &lt;strong&gt;membership request form&lt;/strong&gt; with accurate information about yourself and your venture or interest." data-es="Completar el &lt;strong&gt;formulario de solicitud de membresía&lt;/strong&gt; con información precisa sobre ti y tu proyecto o interés.">Complete the <strong>membership request form</strong> with accurate information about yourself and your venture or interest.</span></span>
+            </li>
+            <li>
+              <span class="req-check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M20 6 9 17l-5-5" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path></svg></span>
+              <span class="req-text"><span class="i18n" data-en="Agree to the club&#39;s &lt;strong&gt;Community Respect Policy&lt;/strong&gt; and follow it in every session." data-es="Aceptar la &lt;strong&gt;Política de Respeto Comunitario&lt;/strong&gt; del club y cumplirla en cada sesión.">Agree to the club's <strong>Community Respect Policy</strong> and follow it in every session.</span></span>
+            </li>
+            <li>
+              <span class="req-check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M20 6 9 17l-5-5" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path></svg></span>
+              <span class="req-text"><span class="i18n" data-en="Make a reasonable effort to &lt;strong&gt;attend the monthly session&lt;/strong&gt;, or give notice when you can&#39;t." data-es="Hacer un esfuerzo razonable por &lt;strong&gt;asistir a la sesión mensual&lt;/strong&gt;, o avisar cuando no puedas.">Make a reasonable effort to <strong>attend the monthly session</strong>, or give notice when you can't.</span></span>
+            </li>
+            <li>
+              <span class="req-check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M20 6 9 17l-5-5" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path></svg></span>
+              <span class="req-text"><span class="i18n" data-en="Come ready to both &lt;strong&gt;give and receive feedback&lt;/strong&gt; — the group only works as a two-way exchange." data-es="Venir dispuesto tanto a &lt;strong&gt;dar como a recibir comentarios&lt;/strong&gt;: el grupo solo funciona como un intercambio en ambos sentidos.">Come ready to both <strong>give and receive feedback</strong> — the group only works as a two-way exchange.</span></span>
+            </li>
+            <li>
+              <span class="req-check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M20 6 9 17l-5-5" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path></svg></span>
+              <span class="req-text"><span class="i18n" data-en="Treat the club as a &lt;strong&gt;community, not a sales channel&lt;/strong&gt; — no unsolicited pitching of products or services to other members." data-es="Tratar al club como una &lt;strong&gt;comunidad, no como un canal de ventas&lt;/strong&gt;: no se permite ofrecer productos o servicios sin solicitud a otros miembros.">Treat the club as a <strong>community, not a sales channel</strong> — no unsolicited pitching of products or services to other members.</span></span>
+            </li>
+          </ul>
+        </div>
+
+        <div>
+          <h2 style="font-size:24px;"><span class="i18n" data-en="How the request process works" data-es="Cómo funciona el proceso de solicitud">How the request process works</span></h2>
+          <div class="steps">
+            <div class="step">
+              <div class="step-num"></div>
+              <div>
+                <h4><span class="i18n" data-en="Review the requirements" data-es="Revisa los requisitos">Review the requirements</span></h4>
+                <p><span class="i18n" data-en="Make sure you can commit to the expectations above and to the Community Respect Policy." data-es="Asegúrate de poder cumplir con las expectativas anteriores y con la Política de Respeto Comunitario.">Make sure you can commit to the expectations above and to the Community Respect Policy.</span></p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="step-num"></div>
+              <div>
+                <h4><span class="i18n" data-en="Submit a request" data-es="Envía una solicitud">Submit a request</span></h4>
+                <p><span class="i18n" data-en="Fill out the short form below with a bit about you, your venture or interest, and where you&#39;re joining from." data-es="Completa el breve formulario a continuación con información sobre ti, tu proyecto o interés, y desde dónde te unes.">Fill out the short form below with a bit about you, your venture or interest, and where you're joining from.</span></p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="step-num"></div>
+              <div>
+                <h4><span class="i18n" data-en="Confirmation" data-es="Confirmación">Confirmation</span></h4>
+                <p><span class="i18n" data-en="Requests are reviewed on a rolling basis. You&#39;ll hear back with next steps and the link for the upcoming session." data-es="Las solicitudes se revisan de forma continua. Te responderemos con los próximos pasos y el enlace para la próxima sesión.">Requests are reviewed on a rolling basis. You'll hear back with next steps and the link for the upcoming session.</span></p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="step-num"></div>
+              <div>
+                <h4><span class="i18n" data-en="Join your first session" data-es="Únete a tu primera sesión">Join your first session</span></h4>
+                <p><span class="i18n" data-en="Show up to the next monthly Google Meet, introduce yourself, and you&#39;re in." data-es="Asiste a la próxima reunión mensual de Google Meet, preséntate, y ya eres parte del club.">Show up to the next monthly Google Meet, introduce yourself, and you're in.</span></p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:64px; max-width:640px;">
+        <div class="apply-panel">
+          <h3><span class="i18n" data-en="Request to join" data-es="Solicitar unirse">Request to join</span></h3>
+          <p class="apply-sub"><span class="i18n" data-en="Takes about two minutes. We&#39;ll follow up by email with next steps." data-es="Toma unos dos minutos. Te contactaremos por correo electrónico con los próximos pasos.">Takes about two minutes. We'll follow up by email with next steps.</span></p>
+          <form id="joinForm">
+            <div class="field">
+              <label for="fullName"><span class="i18n" data-en="Full name" data-es="Nombre completo">Full name</span></label>
+              <input type="text" id="fullName" required="">
+            </div>
+            <div class="field">
+              <label for="email"><span class="i18n" data-en="Email address" data-es="Correo electrónico">Email address</span></label>
+              <input type="email" id="email" required="">
+            </div>
+            <div class="field">
+              <label for="location"><span class="i18n" data-en="City / country" data-es="Ciudad / país">City / country</span></label>
+              <input type="text" id="location" required="">
+            </div>
+            <div class="field">
+              <label for="stage"><span class="i18n" data-en="Where are you in your entrepreneurial journey?" data-es="¿En qué etapa de tu camino emprendedor te encuentras?">Where are you in your entrepreneurial journey?</span></label>
+              <select id="stage" required="">
+                <option value="" class="i18n-opt" data-en="Select one" data-es="Selecciona una opción">Select one</option>
+                <option class="i18n-opt" data-en="Just an idea, not started yet" data-es="Solo una idea, aún no he comenzado">Just an idea, not started yet</option>
+                <option class="i18n-opt" data-en="Early-stage / pre-revenue" data-es="Etapa inicial / sin ingresos aún">Early-stage / pre-revenue</option>
+                <option class="i18n-opt" data-en="Running an established business" data-es="Dirijo un negocio establecido">Running an established business</option>
+                <option class="i18n-opt" data-en="Mentor / investor / advisor" data-es="Mentor / inversionista / asesor">Mentor / investor / advisor</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="ventureAbout"><span class="i18n" data-en="Tell us briefly about your venture or interest" data-es="Cuéntanos brevemente sobre tu proyecto o interés">Tell us briefly about your venture or interest</span></label>
+              <textarea id="ventureAbout" required=""></textarea>
+            </div>
+            <div class="field field-check">
+              <input type="checkbox" id="agree" required="">
+              <label for="agree" style="margin:0; font-weight:400;"><span class="i18n" data-en="I agree to follow the Community Respect Policy and the membership requirements listed above." data-es="Acepto cumplir con la Política de Respeto Comunitario y los requisitos de membresía indicados anteriormente.">I agree to follow the Community Respect Policy and the membership requirements listed above.</span></label>
+            </div>
+            <button type="submit" class="btn btn-navy" style="width:100%;"><span class="i18n" data-en="Submit request" data-es="Enviar solicitud">Submit request</span></button>
+            <p class="form-note"><span class="i18n" data-en="Requests are typically reviewed within a few business days." data-es="Las solicitudes generalmente se revisan en un plazo de pocos días hábiles.">Requests are typically reviewed within a few business days.</span></p>
+          </form>
+          <div class="confirm-msg" id="confirmMsg"><span class="i18n" data-en="Thank you — your request has been recorded. You&#39;ll hear back with next steps and the link for the upcoming session." data-es="Gracias: tu solicitud ha sido registrada. Te responderemos con los próximos pasos y el enlace para la próxima sesión.">Thank you — your request has been recorded. You'll hear back with next steps and the link for the upcoming session.</span></div>
+          <div class="error-msg" id="joinFormError"><span class="i18n" data-en="Something went wrong submitting your request. Please try again in a moment, or email us directly." data-es="Ocurrió un error al enviar tu solicitud. Inténtalo de nuevo en unos minutos, o escríbenos directamente por correo.">Something went wrong submitting your request. Please try again in a moment, or email us directly.</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</section>
+
+<!-- ============ VALUES ============ -->
+<section id="values" class="page">
+  <div class="page-header">
+    <div class="wrap">
+      <h1><span class="i18n" data-en="Community Values" data-es="Valores de la Comunidad">Community Values</span></h1>
+      <p><span class="i18n" data-en="The Respect Policy every member agrees to when they join." data-es="La Política de Respeto que todo miembro acepta al unirse.">The Respect Policy every member agrees to when they join.</span></p>
+    </div>
+  </div>
+
+  <section>
+    <div class="wrap">
+      <div class="section-head" style="max-width:760px;">
+        <p style="font-size:16.5px; color:var(--text);"><span class="i18n" data-en="This club works because people feel safe enough to share a half-formed idea and hear the truth about it. Every member — founder, first-timer, mentor — is expected to hold these standards in every session and every conversation that grows out of it." data-es="Este club funciona porque las personas se sienten lo suficientemente seguras como para compartir una idea a medio formar y escuchar la verdad sobre ella. Se espera que todo miembro —fundador, principiante, mentor— mantenga estos estándares en cada sesión y en cada conversación que surja de ella.">This club works because people feel safe enough to share a half-formed idea and hear the truth about it. Every member — founder, first-timer, mentor — is expected to hold these standards in every session and every conversation that grows out of it.</span></p>
+      </div>
+
+      <div class="values-grid">
+        <div class="value-card">
+          <div class="v-head">
+            <span class="v-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 21c-4.5-2.5-8-6-8-10.5A5.5 5.5 0 0 1 12 6a5.5 5.5 0 0 1 8 4.5C20 15 16.5 18.5 12 21Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"></path></svg></span>
+            <h4><span class="i18n" data-en="Respect every background" data-es="Respeta cada trayectoria">Respect every background</span></h4>
+          </div>
+          <p><span class="i18n" data-en="Members come from different industries, countries, and stages of business. Treat every idea and every person with the same respect, regardless of experience level." data-es="Los miembros provienen de diferentes industrias, países y etapas de negocio. Trata cada idea y a cada persona con el mismo respeto, sin importar su nivel de experiencia.">Members come from different industries, countries, and stages of business. Treat every idea and every person with the same respect, regardless of experience level.</span></p>
+        </div>
+        <div class="value-card">
+          <div class="v-head">
+            <span class="v-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path><path d="M21 12v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg></span>
+            <h4><span class="i18n" data-en="Critique the idea, not the person" data-es="Critica la idea, no a la persona">Critique the idea, not the person</span></h4>
+          </div>
+          <p><span class="i18n" data-en="Feedback should be honest and specific. Attack weaknesses in a business plan, never the character or ability of the person presenting it." data-es="Los comentarios deben ser honestos y específicos. Señala las debilidades de un plan de negocio, nunca el carácter o la capacidad de quien lo presenta.">Feedback should be honest and specific. Attack weaknesses in a business plan, never the character or ability of the person presenting it.</span></p>
+        </div>
+        <div class="value-card">
+          <div class="v-head">
+            <span class="v-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2 3 7v6c0 5 4 8.5 9 9 5-.5 9-4 9-9V7l-9-5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"></path></svg></span>
+            <h4><span class="i18n" data-en="Keep it confidential" data-es="Mantén la confidencialidad">Keep it confidential</span></h4>
+          </div>
+          <p><span class="i18n" data-en="What&#39;s shared in a session — ideas, numbers, personal circumstances — stays within the club unless the member gives explicit permission to share it elsewhere." data-es="Lo que se comparte en una sesión —ideas, cifras, circunstancias personales— permanece dentro del club, a menos que el miembro dé permiso explícito para compartirlo en otro lugar.">What's shared in a session — ideas, numbers, personal circumstances — stays within the club unless the member gives explicit permission to share it elsewhere.</span></p>
+        </div>
+        <div class="value-card">
+          <div class="v-head">
+            <span class="v-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"></circle><path d="M12 8v4l3 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg></span>
+            <h4><span class="i18n" data-en="Share the floor" data-es="Comparte el espacio">Share the floor</span></h4>
+          </div>
+          <p><span class="i18n" data-en="One monthly session isn&#39;t much time. Keep pitches and comments focused so every member who wants feedback gets a fair chance to be heard." data-es="Una sesión mensual no es mucho tiempo. Mantén las presentaciones y comentarios enfocados para que cada miembro que busca retroalimentación tenga una oportunidad justa de ser escuchado.">One monthly session isn't much time. Keep pitches and comments focused so every member who wants feedback gets a fair chance to be heard.</span></p>
+        </div>
+        <div class="value-card">
+          <div class="v-head">
+            <span class="v-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg></span>
+            <h4><span class="i18n" data-en="No harassment or discrimination" data-es="Cero acoso o discriminación">No harassment or discrimination</span></h4>
+          </div>
+          <p><span class="i18n" data-en="Harassment, discriminatory remarks, or predatory behavior toward any member is not tolerated, in sessions or in any follow-up contact between members." data-es="No se tolera el acoso, los comentarios discriminatorios ni el comportamiento abusivo hacia ningún miembro, ni durante las sesiones ni en ningún contacto posterior entre miembros.">Harassment, discriminatory remarks, or predatory behavior toward any member is not tolerated, in sessions or in any follow-up contact between members.</span></p>
+        </div>
+        <div class="value-card">
+          <div class="v-head">
+            <span class="v-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 4v16h16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path><path d="M8 15l4-5 3 3 4-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg></span>
+            <h4><span class="i18n" data-en="No unsolicited selling" data-es="Sin ventas no solicitadas">No unsolicited selling</span></h4>
+          </div>
+          <p><span class="i18n" data-en="This is a community, not a lead list. Don&#39;t use the group or member contact information to pitch products or services without being asked." data-es="Esto es una comunidad, no una lista de prospectos. No uses el grupo ni la información de contacto de los miembros para ofrecer productos o servicios sin que te lo pidan.">This is a community, not a lead list. Don't use the group or member contact information to pitch products or services without being asked.</span></p>
+        </div>
+      </div>
+
+      <div class="policy-note"><span class="i18n" data-en="&lt;strong&gt;How this is enforced:&lt;/strong&gt; a member who violates this policy will first receive a direct conversation about the behavior. A repeated or serious violation — including harassment, discrimination, or breach of confidentiality — results in removal from the club." data-es="&lt;strong&gt;Cómo se aplica esto:&lt;/strong&gt; un miembro que infrinja esta política primero tendrá una conversación directa sobre el comportamiento. Una infracción repetida o grave —incluyendo acoso, discriminación o violación de la confidencialidad— resulta en la expulsión del club."><strong>How this is enforced:</strong> a member who violates this policy will first receive a direct conversation about the behavior. A repeated or serious violation — including harassment, discrimination, or breach of confidentiality — results in removal from the club.</span></div>
+    </div>
+  </section>
+</section>
+
+<!-- ============ MEETINGS ============ -->
+<section id="meetings" class="page">
+  <div class="page-header">
+    <div class="wrap">
+      <h1><span class="i18n" data-en="Meetings" data-es="Reuniones">Meetings</span></h1>
+      <p><span class="i18n" data-en="How and when the group gets together." data-es="Cómo y cuándo se reúne el grupo.">How and when the group gets together.</span></p>
+    </div>
+  </div>
+
+  <section>
+    <div class="wrap">
+      <div class="meeting-panel">
+        <div class="meeting-left">
+          <div class="label"><span class="i18n" data-en="Current format" data-es="Formato actual">Current format</span></div>
+          <h3><span class="i18n" data-en="One session a month, open to the whole club." data-es="Una sesión al mes, abierta a todo el club.">One session a month, open to the whole club.</span></h3>
+          <p><span class="i18n" data-en="The club currently meets virtually so members anywhere in the world can take part. As the group grows, additional regional or in-person meetups may be added." data-es="Actualmente el club se reúne de forma virtual para que miembros de cualquier parte del mundo puedan participar. A medida que el grupo crezca, podrían añadirse encuentros regionales o presenciales adicionales.">The club currently meets virtually so members anywhere in the world can take part. As the group grows, additional regional or in-person meetups may be added.</span></p>
+        </div>
+        <div class="meeting-right">
+          <div class="m-row"><span><span class="i18n" data-en="Frequency" data-es="Frecuencia">Frequency</span></span><span><span class="i18n" data-en="Once a month" data-es="Una vez al mes">Once a month</span></span></div>
+          <div class="m-row"><span><span class="i18n" data-en="Platform" data-es="Plataforma">Platform</span></span><span>Google Meet</span></div>
+          <div class="m-row"><span><span class="i18n" data-en="Time" data-es="Hora">Time</span></span><span><span class="i18n" data-en="12:00 PM Eastern Time" data-es="12:00 p.m., hora del Este">12:00 PM Eastern Time</span></span></div>
+          <div class="m-row"><span><span class="i18n" data-en="Access" data-es="Acceso">Access</span></span><span><span class="i18n" data-en="Members only" data-es="Solo miembros">Members only</span></span></div>
+          <div class="m-row"><span><span class="i18n" data-en="Cost" data-es="Costo">Cost</span></span><span><span class="i18n" data-en="No charge" data-es="Sin costo">No charge</span></span></div>
+        </div>
+      </div>
+
+      <ul class="format-list">
+        <li>
+          <span class="f-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M17 8c0 2.76-2.24 5-5 5s-5-2.24-5-5 2.24-5 5-5 5 2.24 5 5Z" stroke="currentColor" stroke-width="1.6"></path><path d="M3 21c0-3.87 3.13-7 7-7h4c3.87 0 7 3.13 7 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg></span>
+          <div>
+            <h4><span class="i18n" data-en="Open sharing round" data-es="Ronda abierta de intercambio">Open sharing round</span></h4>
+            <p><span class="i18n" data-en="Members share what they&#39;re working on, what&#39;s going well, and where they&#39;re stuck. Anyone can offer a quick perspective." data-es="Los miembros comparten en qué están trabajando, qué va bien y dónde están atascados. Cualquiera puede ofrecer una perspectiva breve.">Members share what they're working on, what's going well, and where they're stuck. Anyone can offer a quick perspective.</span></p>
+          </div>
+        </li>
+        <li>
+          <span class="f-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path><path d="M21 12v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg></span>
+          <div>
+            <h4><span class="i18n" data-en="Pitch and feedback segment" data-es="Segmento de presentación y retroalimentación">Pitch and feedback segment</span></h4>
+            <p><span class="i18n" data-en="One or more aspiring entrepreneurs pitch an idea to the group and receive direct, structured feedback from experienced members." data-es="Uno o más aspirantes a emprendedores presentan una idea al grupo y reciben retroalimentación directa y estructurada de miembros con experiencia.">One or more aspiring entrepreneurs pitch an idea to the group and receive direct, structured feedback from experienced members.</span></p>
+          </div>
+        </li>
+        <li>
+          <span class="f-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 19V9M12 19V5M20 19v-7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg></span>
+          <div>
+            <h4><span class="i18n" data-en="Insight of the month" data-es="Dato del mes">Insight of the month</span></h4>
+            <p><span class="i18n" data-en="A short look at a current data point or trend from entrepreneurship research, to keep the discussion grounded in what&#39;s actually happening globally." data-es="Un breve vistazo a un dato o tendencia actual de la investigación sobre emprendimiento, para mantener la conversación basada en lo que realmente ocurre a nivel global.">A short look at a current data point or trend from entrepreneurship research, to keep the discussion grounded in what's actually happening globally.</span></p>
+          </div>
+        </li>
+        <li>
+          <span class="f-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="1.6"></circle><path d="M2 21c0-3.87 3.13-7 7-7s7 3.13 7 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path><circle cx="17" cy="7" r="3" stroke="currentColor" stroke-width="1.6"></circle></svg></span>
+          <div>
+            <h4><span class="i18n" data-en="Open networking" data-es="Networking abierto">Open networking</span></h4>
+            <p><span class="i18n" data-en="The last stretch of every session is unstructured — a chance to connect one-on-one with other members before the call ends." data-es="El último tramo de cada sesión es libre: una oportunidad para conectar de forma individual con otros miembros antes de que termine la llamada.">The last stretch of every session is unstructured — a chance to connect one-on-one with other members before the call ends.</span></p>
+          </div>
+        </li>
+      </ul>
+
+      <div style="margin-top:48px;">
+        <button class="btn btn-navy" data-target="membership"><span class="i18n" data-en="Request to join a session" data-es="Solicita unirte a una sesión">Request to join a session</span></button>
+      </div>
+    </div>
+  </section>
+</section>
+
+<!-- ============ RESOURCES ============ -->
+<section id="resources" class="page">
+  <div class="page-header">
+    <div class="wrap">
+      <h1><span class="i18n" data-en="Resources" data-es="Recursos">Resources</span></h1>
+      <p><span class="i18n" data-en="Research, tools, and organizations worth a member&#39;s time." data-es="Investigaciones, herramientas y organizaciones que vale la pena que un miembro conozca.">Research, tools, and organizations worth a member's time.</span></p>
+    </div>
+  </div>
+
+  <section>
+    <div class="wrap">
+
+      <div class="res-cat">
+        <h3><span class="i18n" data-en="Research on entrepreneurship" data-es="Investigación sobre emprendimiento">Research on entrepreneurship</span></h3>
+        <div class="res-grid">
+          <a class="res-card" href="https://www.gemconsortium.org/" target="_blank" rel="noopener">
+            <div class="r-type"><span class="i18n" data-en="Website" data-es="Sitio web">Website</span></div>
+            <h4>Global Entrepreneurship Monitor</h4>
+            <p><span class="i18n" data-en="The world&#39;s largest ongoing study of entrepreneurial activity, covering more than 50 economies each year." data-es="El estudio continuo más grande del mundo sobre actividad emprendedora, que abarca más de 50 economías cada año.">The world's largest ongoing study of entrepreneurial activity, covering more than 50 economies each year.</span></p>
+            <div class="r-link">gemconsortium.org →</div>
+          </a>
+          <a class="res-card" href="https://www.gemconsortium.org/report" target="_blank" rel="noopener">
+            <div class="r-type"><span class="i18n" data-en="Whitepaper" data-es="Informe técnico">Whitepaper</span></div>
+            <h4>GEM 2024/2025 Global Report</h4>
+            <p><span class="i18n" data-en="&quot;Entrepreneurship Reality Check&quot; — the latest global findings on start-up activity, fear of failure, and AI adoption." data-es="&quot;Entrepreneurship Reality Check&quot;: los últimos hallazgos globales sobre actividad de startups, miedo al fracaso y adopción de IA.">"Entrepreneurship Reality Check" — the latest global findings on start-up activity, fear of failure, and AI adoption.</span></p>
+            <div class="r-link">gemconsortium.org/report →</div>
+          </a>
+          <a class="res-card" href="https://www.kauffman.org/" target="_blank" rel="noopener">
+            <div class="r-type"><span class="i18n" data-en="Website" data-es="Sitio web">Website</span></div>
+            <h4>Kauffman Foundation</h4>
+            <p><span class="i18n" data-en="Research and programs focused on education and entrepreneurship, including startup activity indexes." data-es="Investigación y programas centrados en educación y emprendimiento, incluyendo índices de actividad de startups.">Research and programs focused on education and entrepreneurship, including startup activity indexes.</span></p>
+            <div class="r-link">kauffman.org →</div>
+          </a>
+        </div>
+      </div>
+
+      <div class="res-cat">
+        <h3><span class="i18n" data-en="Mentorship and support" data-es="Mentoría y apoyo">Mentorship and support</span></h3>
+        <div class="res-grid">
+          <a class="res-card" href="https://www.score.org/" target="_blank" rel="noopener">
+            <div class="r-type"><span class="i18n" data-en="Website" data-es="Sitio web">Website</span></div>
+            <h4>SCORE</h4>
+            <p><span class="i18n" data-en="Free mentorship from experienced business volunteers, backed by the U.S. Small Business Administration." data-es="Mentoría gratuita de voluntarios de negocios con experiencia, respaldada por la Administración de Pequeñas Empresas de EE. UU.">Free mentorship from experienced business volunteers, backed by the U.S. Small Business Administration.</span></p>
+            <div class="r-link">score.org →</div>
+          </a>
+          <a class="res-card" href="https://www.sba.gov/" target="_blank" rel="noopener">
+            <div class="r-type"><span class="i18n" data-en="Website" data-es="Sitio web">Website</span></div>
+            <h4>U.S. Small Business Administration</h4>
+            <p><span class="i18n" data-en="Funding programs, licensing guidance, and planning tools for founders starting or growing a business." data-es="Programas de financiamiento, orientación sobre licencias y herramientas de planificación para fundadores que inician o hacen crecer un negocio.">Funding programs, licensing guidance, and planning tools for founders starting or growing a business.</span></p>
+            <div class="r-link">sba.gov →</div>
+          </a>
+          <a class="res-card" href="https://www.startupschool.org/" target="_blank" rel="noopener">
+            <div class="r-type"><span class="i18n" data-en="Website" data-es="Sitio web">Website</span></div>
+            <h4>Y Combinator Startup School</h4>
+            <p><span class="i18n" data-en="A free online program covering the fundamentals of building and launching an early-stage company." data-es="Un programa en línea gratuito que cubre los fundamentos para construir y lanzar una empresa en etapa inicial.">A free online program covering the fundamentals of building and launching an early-stage company.</span></p>
+            <div class="r-link">startupschool.org →</div>
+          </a>
+        </div>
+      </div>
+
+      <div class="res-cat">
+        <h3><span class="i18n" data-en="Reading and ongoing learning" data-es="Lecturas y aprendizaje continuo">Reading and ongoing learning</span></h3>
+        <div class="res-grid">
+          <a class="res-card" href="https://hbr.org/topic/subject/entrepreneurship" target="_blank" rel="noopener">
+            <div class="r-type"><span class="i18n" data-en="Publication" data-es="Publicación">Publication</span></div>
+            <h4>Harvard Business Review — Entrepreneurship</h4>
+            <p><span class="i18n" data-en="Ongoing articles and case studies on venture strategy, fundraising, and leadership." data-es="Artículos y casos de estudio continuos sobre estrategia de negocios, recaudación de fondos y liderazgo.">Ongoing articles and case studies on venture strategy, fundraising, and leadership.</span></p>
+            <div class="r-link">hbr.org →</div>
+          </a>
+          <a class="res-card" href="https://www.gemconsortium.org/report" target="_blank" rel="noopener">
+            <div class="r-type"><span class="i18n" data-en="Whitepaper" data-es="Informe técnico">Whitepaper</span></div>
+            <h4>GEM Women's Entrepreneurship Report</h4>
+            <p><span class="i18n" data-en="Global research on the specific challenges and momentum behind women-led ventures." data-es="Investigación global sobre los desafíos específicos y el impulso detrás de los emprendimientos liderados por mujeres.">Global research on the specific challenges and momentum behind women-led ventures.</span></p>
+            <div class="r-link">gemconsortium.org →</div>
+          </a>
+          <a class="res-card" href="https://www.pmi.org/" target="_blank" rel="noopener">
+            <div class="r-type"><span class="i18n" data-en="Website" data-es="Sitio web">Website</span></div>
+            <h4>Project Management Institute</h4>
+            <p><span class="i18n" data-en="Frameworks and certification paths for running a growing business with real project discipline." data-es="Marcos de trabajo y rutas de certificación para dirigir un negocio en crecimiento con verdadera disciplina de proyectos.">Frameworks and certification paths for running a growing business with real project discipline.</span></p>
+            <div class="r-link">pmi.org →</div>
+          </a>
+        </div>
+      </div>
+
+    </div>
+  </section>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="footer-grid">
+      <div>
+        <div class="logo" style="cursor:default;"><span class="logo-mark">
+          <svg width="34" height="34" viewBox="0 0 34 34" fill="none">
+            <circle cx="17" cy="17" r="16" stroke="currentColor" stroke-width="0.75"></circle>
+            <circle cx="17" cy="17" r="13.25" stroke="currentColor" stroke-width="0.75"></circle>
+            <text x="17" y="18.5" text-anchor="middle" dominant-baseline="middle" font-family="&#39;Fraunces&#39;, serif" font-weight="600" font-size="14.5" letter-spacing="-1" fill="currentColor">EC</text>
+          </svg>
+        </span>Entrepreneurship Club</div>
+        <p style="margin-top:14px; font-size:14px; max-width:26em;"><span class="i18n" data-en="A global community for founders to share ideas, pitch concepts, and support one another — one monthly session at a time." data-es="Una comunidad global para que los fundadores compartan ideas, presenten conceptos y se apoyen mutuamente: una sesión mensual a la vez.">A global community for founders to share ideas, pitch concepts, and support one another — one monthly session at a time.</span></p>
+      </div>
+      <div>
+        <h5><span class="i18n" data-en="Explore" data-es="Explorar">Explore</span></h5>
+        <ul>
+          <li><button data-target="about"><span class="i18n" data-en="About Us" data-es="Sobre Nosotros">About Us</span></button></li>
+          <li><button data-target="stories"><span class="i18n" data-en="Success Stories" data-es="Casos de Éxito">Success Stories</span></button></li>
+          <li><button data-target="membership"><span class="i18n" data-en="Membership" data-es="Membresía">Membership</span></button></li>
+          <li><button data-target="values"><span class="i18n" data-en="Community Values" data-es="Valores de la Comunidad">Community Values</span></button></li>
+        </ul>
+      </div>
+      <div>
+        <h5><span class="i18n" data-en="Join" data-es="Únete">Join</span></h5>
+        <ul>
+          <li><button data-target="meetings"><span class="i18n" data-en="Meeting schedule" data-es="Horario de reuniones">Meeting schedule</span></button></li>
+          <li><button data-target="membership"><span class="i18n" data-en="Request to join" data-es="Solicitar unirse">Request to join</span></button></li>
+        </ul>
+      </div>
+      <div>
+        <h5><span class="i18n" data-en="Learn" data-es="Aprender">Learn</span></h5>
+        <ul>
+          <li><button data-target="resources"><span class="i18n" data-en="Resources" data-es="Recursos">Resources</span></button></li>
+          <li><a href="https://www.gemconsortium.org/" target="_blank" rel="noopener"><span class="i18n" data-en="GEM Reports" data-es="Informes de GEM">GEM Reports</span></a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span><span class="i18n" data-en="© 2026 Entrepreneurship Club. Founded by Roger Orozco." data-es="© 2026 Entrepreneurship Club. Fundado por Roger Orozco.">© 2026 Entrepreneurship Club. Founded by Roger Orozco.</span></span>
+      <span><span class="i18n" data-en="Built for founders, everywhere." data-es="Creado para fundadores, en todas partes.">Built for founders, everywhere.</span></span>
+    </div>
+  </div>
+</footer>
+
+<script type="module" src="./main.js"></script>
+
+
+
+</body></html>
