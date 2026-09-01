@@ -101,8 +101,6 @@ npm run preview
 
 ## Entrepreneurship Club site
 
-`entrepreneurship-club/` is a standalone, static marketing site for the Entrepreneurship Club (unrelated to the remodel app above), built as a second Vite entry point in this same repo. It's a single-page site (Home, About, Success Stories, Membership, Community Values, Meetings, Resources) with an EN/ES language toggle.
+`entrepreneurship-club/` is a completely separate, standalone static site for the Entrepreneurship Club — unrelated to the remodel app above, sharing only this GitHub repo. It has its own `package.json`, `vite.config.js`, and `netlify.toml`, and deploys as its **own independent Netlify site** (own domain, own deploy history) with **Base directory** set to `entrepreneurship-club` in that site's build settings.
 
-- Runs locally at [http://localhost:5173/entrepreneurship-club/](http://localhost:5173/entrepreneurship-club/) alongside the main app (`npm run dev`).
-- Builds to `dist/entrepreneurship-club/` and deploys as part of the same Netlify site.
-- The membership-request and success-story forms write to the `ec_membership_requests` and `ec_success_stories` tables (see `supabase/migrations/021_entrepreneurship_club.sql`) using the same `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` env vars as the rest of the app. Both tables are insert-only for anonymous visitors (RLS); only an `admin` profile can read or moderate submissions. Run the migration in the Supabase SQL Editor before the forms will work.
+See `entrepreneurship-club/README.md` for local dev and Netlify setup instructions. The membership-request and success-story forms write to the `ec_membership_requests` and `ec_success_stories` tables (see `supabase/migrations/021_entrepreneurship_club.sql`); both are insert-only for anonymous visitors (RLS), with reads/moderation restricted to an `admin` profile. Run that migration in the Supabase SQL Editor before the forms will work.
