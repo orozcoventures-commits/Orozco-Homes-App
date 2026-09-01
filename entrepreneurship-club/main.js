@@ -1,4 +1,4 @@
-import { supabase, supabaseConfigError } from '../src/lib/supabase.js';
+import { supabase, supabaseConfigError } from './lib/supabase.js';
 
 // ---------- Page navigation ----------
 const pages = document.querySelectorAll('.page');
