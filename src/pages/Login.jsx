@@ -552,10 +552,10 @@ export default function Login() {
           </div>
 
           <h2 className="text-2xl font-bold mb-1" style={{ color: '#002147' }}>
-            {tab === 'signin' ? 'Welcome back' : 'Create account'}
+            {tab === 'signin' ? 'Welcome back' : tab === 'pin' ? 'Client Portal' : 'Create account'}
           </h2>
           <p className="text-sm mb-6" style={{ color: '#6B7280' }}>
-            {tab === 'signin' ? 'Sign in to your project portal' : 'Set up your Orozco Homes account'}
+            {tab === 'signin' ? 'Sign in to your contractor account' : tab === 'pin' ? 'Enter your project PIN to view your home' : 'Set up your Orozco Homes account'}
           </p>
 
           {/* Tab switcher */}
