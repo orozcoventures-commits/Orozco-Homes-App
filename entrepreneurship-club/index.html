@@ -270,6 +270,25 @@
   }
   button[disabled]{opacity:.6; cursor:not-allowed;}
 
+  /* ---------- ACADEMY PAYWALL ---------- */
+  .gate-panel{
+    background:var(--card); border:1px solid var(--line); border-radius:6px; padding:36px; text-align:center;
+  }
+  .gate-panel h3{font-size:20px; margin-bottom:8px;}
+  .gate-badge{
+    display:inline-block; background:var(--paper-2); color:var(--navy); font-size:12px; font-weight:600;
+    letter-spacing:.4px; text-transform:uppercase; padding:5px 12px; border-radius:999px; margin-bottom:16px;
+  }
+  .gate-sub{color:var(--text-muted); font-size:14.5px; margin-bottom:24px;}
+  .gate-panel .field{text-align:left;}
+  .gate-price{margin-bottom:20px;}
+  .gate-price-amount{font-family:'Fraunces',serif; font-size:40px; font-weight:600; color:var(--ink);}
+  .gate-price-period{font-size:14px; color:var(--text-muted); margin-left:4px;}
+  .gate-account{font-size:13px; color:var(--text-muted); margin-top:18px;}
+  .link-btn{background:none; border:none; padding:0; color:var(--navy); font-size:13px; text-decoration:underline; cursor:pointer; font-family:inherit;}
+  .gate-loading{color:var(--text-muted); font-size:14.5px; margin:0;}
+  .gate-panel .confirm-msg, .gate-panel .error-msg{margin-top:18px; text-align:left;}
+
   /* ---------- VALUES / POLICY ---------- */
   .values-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:22px;}
   .value-card{background:var(--card); border:1px solid var(--line); border-radius:6px; padding:26px;}
@@ -996,6 +1015,47 @@
     </div>
   </div>
 
+  <!-- ============ PAYWALL ============ -->
+  <section class="tight" id="academyGate">
+    <div class="wrap" style="max-width:520px;">
+
+      <div class="gate-panel" id="gateChecking">
+        <p class="gate-loading"><span class="i18n" data-en="Checking your access…" data-es="Verificando tu acceso…">Checking your access…</span></p>
+      </div>
+
+      <div class="gate-panel" id="gateSignedOut" hidden>
+        <div class="gate-badge"><span class="i18n" data-en="Members only" data-es="Solo miembros">Members only</span></div>
+        <h3><span class="i18n" data-en="Sign in to Genesis Academy" data-es="Inicia sesión en Genesis Academy">Sign in to Genesis Academy</span></h3>
+        <p class="gate-sub"><span class="i18n" data-en="Enter your email and we&#39;ll send you a one-click sign-in link — no password needed." data-es="Ingresa tu correo y te enviaremos un enlace de acceso con un clic, sin necesidad de contraseña.">Enter your email and we'll send you a one-click sign-in link — no password needed.</span></p>
+        <form id="gateSignInForm">
+          <div class="field">
+            <label for="gateEmail"><span class="i18n" data-en="Email address" data-es="Correo electrónico">Email address</span></label>
+            <input type="email" id="gateEmail" required="">
+          </div>
+          <button type="submit" class="btn btn-navy" style="width:100%;"><span class="i18n" data-en="Email me a sign-in link" data-es="Enviarme un enlace de acceso">Email me a sign-in link</span></button>
+        </form>
+        <div class="confirm-msg" id="gateSignInSent"><span class="i18n" data-en="Check your inbox — click the link we sent to sign in." data-es="Revisa tu bandeja de entrada: haz clic en el enlace que te enviamos para iniciar sesión.">Check your inbox — click the link we sent to sign in.</span></div>
+        <div class="error-msg" id="gateSignInError"><span class="i18n" data-en="Something went wrong sending your sign-in link. Please try again in a moment." data-es="Ocurrió un error al enviar tu enlace de acceso. Inténtalo de nuevo en unos minutos.">Something went wrong sending your sign-in link. Please try again in a moment.</span></div>
+      </div>
+
+      <div class="gate-panel" id="gateSignedIn" hidden>
+        <div class="gate-badge"><span class="i18n" data-en="Members only" data-es="Solo miembros">Members only</span></div>
+        <h3><span class="i18n" data-en="Subscribe to Genesis Academy" data-es="Suscríbete a Genesis Academy">Subscribe to Genesis Academy</span></h3>
+        <p class="gate-sub"><span class="i18n" data-en="Full access to every video masterclass, the Study Vault, and the Entrepreneur&#39;s Toolkit." data-es="Acceso completo a cada masterclass en video, la Bóveda de Estudio y el Kit del Emprendedor.">Full access to every video masterclass, the Study Vault, and the Entrepreneur's Toolkit.</span></p>
+        <div class="gate-price"><span class="gate-price-amount">$19</span><span class="gate-price-period"><span class="i18n" data-en="/ month" data-es="/ mes">/ month</span></span></div>
+        <button type="button" class="btn btn-gold" id="gateSubscribeBtn" style="width:100%;"><span class="i18n" data-en="Subscribe — $19/month" data-es="Suscribirme — $19/mes">Subscribe — $19/month</span></button>
+        <p class="gate-account"><span class="i18n" data-en="Signed in as" data-es="Sesión iniciada como">Signed in as</span> <strong id="gateEmailDisplay"></strong> · <button type="button" class="link-btn" id="gateSignOutBtn"><span class="i18n" data-en="Sign out" data-es="Cerrar sesión">Sign out</span></button></p>
+        <div class="error-msg" id="gateSubscribeError"><span class="i18n" data-en="Something went wrong starting checkout. Please try again in a moment." data-es="Ocurrió un error al iniciar el pago. Inténtalo de nuevo en unos minutos.">Something went wrong starting checkout. Please try again in a moment.</span></div>
+      </div>
+
+      <div class="gate-panel" id="gateActivating" hidden>
+        <p class="gate-loading"><span class="i18n" data-en="Payment received — activating your access…" data-es="Pago recibido: activando tu acceso…">Payment received — activating your access…</span></p>
+      </div>
+
+    </div>
+  </section>
+
+  <div id="academyContent" hidden>
   <!-- Zone 1: Video Masterclasses -->
   <section>
     <div class="wrap">
@@ -1142,6 +1202,7 @@
 
     </div>
   </section>
+  </div>
 </section>
 
 </main>

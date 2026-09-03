@@ -50,3 +50,80 @@ The two forms on this site write **only** to `ec_membership_requests` and
 (Row Level Security); only a profile with `role = 'admin'` can read or
 moderate submissions. Nothing on this site queries or touches any
 material-selection, project, or client table from the Orozco Homes app.
+
+## Genesis Academy paywall
+
+The Genesis Academy page (`#academy`) is gated behind a **$19/month Stripe
+subscription**. Signed-out visitors see a sign-in form (Supabase Auth email
+magic link — no password); signed-in visitors without an active
+subscription see a "Subscribe — $19/month" button; only an active
+subscriber sees the actual Video Masterclasses / Study Vault / Entrepreneur's
+Toolkit content. All of this is already built and wired up — **it just needs
+a Stripe account** to actually work. Until then, the sign-in form area shows
+correctly but nobody can complete a subscription.
+
+### One-time setup, once you have a Stripe account
+
+1. **Create the product/price in Stripe**: Dashboard → Product catalog →
+   Add product. Name it (e.g. "Genesis Academy Membership"), set it to
+   **Recurring**, **$19.00**, **Monthly**. Save, then copy the **Price ID**
+   (starts with `price_...`) from the product page — not the Product ID.
+2. **Get your API keys**: Dashboard → Developers → API keys. Copy the
+   **Secret key** (starts with `sk_live_...` or `sk_test_...` while testing).
+   You will *not* need the publishable key anywhere in this project —
+   checkout happens entirely server-side via a Supabase Edge Function that
+   redirects to a Stripe-hosted Checkout page.
+3. **Deploy the two Edge Functions** (from the repo root, with the
+   [Supabase CLI](https://supabase.com/docs/guides/cli) installed and linked
+   to whichever Supabase project this site's `VITE_SUPABASE_URL` points at):
+   ```bash
+   supabase functions deploy academy-checkout
+   supabase functions deploy academy-stripe-webhook
+   ```
+4. **Set the Edge Function secrets** (Supabase Dashboard → Edge Functions →
+   each function → Secrets, or via CLI):
+   ```bash
+   supabase secrets set STRIPE_SECRET_KEY=sk_live_...
+   supabase secrets set STRIPE_PRICE_ID=price_...
+   supabase secrets set ACADEMY_URL=https://<your-academy-site>.netlify.app
+   ```
+   (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` are
+   already present automatically in every Supabase project's Edge Functions —
+   no need to set those yourself.)
+5. **Register the webhook in Stripe**: Dashboard → Developers → Webhooks →
+   Add endpoint. URL is your deployed `academy-stripe-webhook` function's URL
+   (Supabase shows this after `deploy`, looks like
+   `https://<project-ref>.functions.supabase.co/academy-stripe-webhook`).
+   Select these events: `checkout.session.completed`,
+   `customer.subscription.updated`, `customer.subscription.created`,
+   `customer.subscription.deleted`. After creating it, open the endpoint and
+   copy its **Signing secret** (`whsec_...`):
+   ```bash
+   supabase secrets set STRIPE_WEBHOOK_SECRET=whsec_...
+   ```
+6. **Run the migration**: `supabase/migrations/022_academy_subscriptions.sql`
+   (repo root) in that Supabase project's SQL Editor — creates the
+   `ec_subscribers` table the webhook writes to and the gate reads from.
+7. **Enable email auth** in that Supabase project if it isn't already:
+   Dashboard → Authentication → Providers → Email should be on by default.
+   No extra config needed for magic links.
+
+Once all of the above is done, reload the Academy page: sign in with an
+email, click Subscribe, complete Stripe's test/real checkout, and the page
+should unlock within a couple of seconds (it polls briefly while the
+webhook lands).
+
+### How it works
+
+- `entrepreneurship-club/main.js` checks the visitor's Supabase Auth session
+  and, if signed in, checks `ec_subscribers.status = 'active'` for that user
+  before showing the gated content.
+- `supabase/functions/academy-checkout/` creates a Stripe Checkout Session
+  for the signed-in user and returns its URL for the browser to redirect to.
+- `supabase/functions/academy-stripe-webhook/` receives Stripe's webhook
+  events and keeps `ec_subscribers` in sync (activated, renewed, past due,
+  cancelled).
+- `ec_subscribers` (migration 022) is readable only by its own row's owner
+  (`auth.uid() = id`) and writable only by the service-role key the two Edge
+  Functions use — a member cannot grant themselves access by writing to the
+  table directly.
