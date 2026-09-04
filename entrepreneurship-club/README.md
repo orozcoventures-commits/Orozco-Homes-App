@@ -155,25 +155,3 @@ webhook lands).
   (`auth.uid() = id`) and writable only by the service-role key the two Edge
   Functions use — a member cannot grant themselves access by writing to the
   table directly.
-
-## Generic route-level password gate (`/secret-page`)
-
-Separate from the Academy paywall above: `netlify/edge-functions/auth-gate.js`
-is a standalone Netlify Edge Function that password-protects **any single
-route** at the server level, before the page is served at all — stronger
-than a client-side gate, since the protected content never reaches the
-browser until the password is right. `netlify.toml` currently routes it at
-`/secret-page`.
-
-- Set `PROTECTED_PAGE_PASSWORD` under **Site settings → Environment
-  variables** for this Netlify site (must be available to Edge Functions).
-- Visiting `/secret-page` without the `page_auth_session` cookie shows a
-  password form; a correct submission sets that cookie (scoped to
-  `/secret-page`, `HttpOnly`, 7-day expiry) and redirects back to the page.
-  A wrong password re-shows the form with an error.
-- **Note:** `/secret-page` isn't an existing page in this site yet — this
-  SPA rewrites every path to `index.html`, so right now unlocking it just
-  reveals the normal homepage. To actually protect something, either point
-  `path` in the `[[edge_functions]]` block at a real route (e.g. `/academy`,
-  as a stronger server-side alternative/companion to the client-side gate
-  described above) or add real content behind `/secret-page`.

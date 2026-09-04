@@ -288,7 +288,12 @@
   .link-btn{background:none; border:none; padding:0; color:var(--navy); font-size:13px; text-decoration:underline; cursor:pointer; font-family:inherit;}
   .gate-loading{color:var(--text-muted); font-size:14.5px; margin:0;}
   .gate-panel .confirm-msg, .gate-panel .error-msg{margin-top:18px; text-align:left;}
-  .gate-code-toggle{text-align:center; margin-top:20px;}
+  .gate-request{
+    text-align:center; font-size:13.5px; color:var(--text-muted); max-width:400px;
+    margin:24px auto 0;
+  }
+  .gate-request a{color:var(--navy); text-decoration:underline;}
+  .gate-code-toggle{text-align:center; margin-top:16px;}
   .gate-code-panel{
     max-width:340px; margin:16px auto 0; background:var(--paper-2); border:1px solid var(--line);
     border-radius:6px; padding:22px;
@@ -1058,8 +1063,13 @@
         <p class="gate-loading"><span class="i18n" data-en="Payment received — activating your access…" data-es="Pago recibido: activando tu acceso…">Payment received — activating your access…</span></p>
       </div>
 
+      <p class="gate-request">
+        <span class="i18n" data-en="Genesis Academy is for paying members. To request access, email" data-es="Genesis Academy es para miembros de pago. Para solicitar acceso, escribe a">Genesis Academy is for paying members. To request access, email</span>
+        <a href="mailto:orozcoventures@gmail.com">orozcoventures@gmail.com</a>.
+      </p>
+
       <div class="gate-code-toggle">
-        <button type="button" class="link-btn" id="gateCodeToggle"><span class="i18n" data-en="Have an access code from the club?" data-es="¿Tienes un código de acceso del club?">Have an access code from the club?</span></button>
+        <button type="button" class="link-btn" id="gateCodeToggle"><span class="i18n" data-en="Already have an access code?" data-es="¿Ya tienes un código de acceso?">Already have an access code?</span></button>
       </div>
       <div class="gate-code-panel" id="gateCodePanel" hidden>
         <form id="gateCodeForm">
