@@ -288,6 +288,12 @@
   .link-btn{background:none; border:none; padding:0; color:var(--navy); font-size:13px; text-decoration:underline; cursor:pointer; font-family:inherit;}
   .gate-loading{color:var(--text-muted); font-size:14.5px; margin:0;}
   .gate-panel .confirm-msg, .gate-panel .error-msg{margin-top:18px; text-align:left;}
+  .gate-code-toggle{text-align:center; margin-top:20px;}
+  .gate-code-panel{
+    max-width:340px; margin:16px auto 0; background:var(--paper-2); border:1px solid var(--line);
+    border-radius:6px; padding:22px;
+  }
+  .gate-code-panel .field{text-align:left;}
 
   /* ---------- VALUES / POLICY ---------- */
   .values-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:22px;}
@@ -1050,6 +1056,20 @@
 
       <div class="gate-panel" id="gateActivating" hidden>
         <p class="gate-loading"><span class="i18n" data-en="Payment received — activating your access…" data-es="Pago recibido: activando tu acceso…">Payment received — activating your access…</span></p>
+      </div>
+
+      <div class="gate-code-toggle">
+        <button type="button" class="link-btn" id="gateCodeToggle"><span class="i18n" data-en="Have an access code from the club?" data-es="¿Tienes un código de acceso del club?">Have an access code from the club?</span></button>
+      </div>
+      <div class="gate-code-panel" id="gateCodePanel" hidden>
+        <form id="gateCodeForm">
+          <div class="field">
+            <label for="gateCode"><span class="i18n" data-en="Access code" data-es="Código de acceso">Access code</span></label>
+            <input type="password" id="gateCode" autocomplete="off" required="">
+          </div>
+          <button type="submit" class="btn btn-outline-navy" style="width:100%;"><span class="i18n" data-en="Unlock" data-es="Desbloquear">Unlock</span></button>
+        </form>
+        <div class="error-msg" id="gateCodeError"><span class="i18n" data-en="That code isn&#39;t right. Double-check with whoever gave it to you." data-es="Ese código no es correcto. Verifícalo con quien te lo dio.">That code isn't right. Double-check with whoever gave it to you.</span></div>
       </div>
 
     </div>

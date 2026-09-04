@@ -151,9 +151,19 @@ function showGatePanel(name) {
   academyContent.hidden = true;
 }
 
+const ACADEMY_UNLOCK_KEY = 'ec_academy_unlocked';
+
 function unlockAcademy() {
   academyGate.style.display = 'none';
   academyContent.hidden = false;
+}
+
+function hasStoredAccessCode() {
+  try {
+    return localStorage.getItem(ACADEMY_UNLOCK_KEY) === '1';
+  } catch {
+    return false;
+  }
 }
 
 async function getActiveSubscription(userId) {
@@ -166,6 +176,11 @@ async function getActiveSubscription(userId) {
 }
 
 async function checkAcademyAccess() {
+  if (hasStoredAccessCode()) {
+    unlockAcademy();
+    return;
+  }
+
   if (supabaseConfigError) {
     console.error(supabaseConfigError);
     showGatePanel('signedOut');
@@ -246,6 +261,47 @@ gateSubscribeBtn?.addEventListener('click', async () => {
 gateSignOutBtn?.addEventListener('click', async () => {
   await supabase.auth.signOut();
   await checkAcademyAccess();
+});
+
+const gateCodeToggle = document.getElementById('gateCodeToggle');
+const gateCodePanel = document.getElementById('gateCodePanel');
+const gateCodeForm = document.getElementById('gateCodeForm');
+const gateCodeError = document.getElementById('gateCodeError');
+
+gateCodeToggle?.addEventListener('click', () => {
+  gateCodePanel.hidden = !gateCodePanel.hidden;
+});
+
+if (supabaseConfigError && gateCodeForm) {
+  console.error(supabaseConfigError);
+  gateCodeForm.querySelector('button[type="submit"]').disabled = true;
+}
+
+gateCodeForm?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  gateCodeError.style.display = 'none';
+  const submitBtn = gateCodeForm.querySelector('button[type="submit"]');
+  submitBtn.disabled = true;
+
+  const password = document.getElementById('gateCode').value;
+  const { data, error } = await supabase.functions.invoke('academy-access-check', {
+    body: { password },
+  });
+
+  if (error || !data?.ok) {
+    console.error('academy-access-check failed:', error || data);
+    gateCodeError.style.display = 'block';
+    submitBtn.disabled = false;
+    return;
+  }
+
+  try {
+    localStorage.setItem(ACADEMY_UNLOCK_KEY, '1');
+  } catch {
+    // localStorage unavailable (private browsing, etc.) -- access still
+    // works for the rest of this page load, just won't persist.
+  }
+  unlockAcademy();
 });
 
 supabase.auth.onAuthStateChange((event) => {

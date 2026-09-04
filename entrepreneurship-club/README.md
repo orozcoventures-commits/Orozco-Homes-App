@@ -62,6 +62,31 @@ Toolkit content. All of this is already built and wired up — **it just needs
 a Stripe account** to actually work. Until then, the sign-in form area shows
 correctly but nobody can complete a subscription.
 
+### Interim manual access (no Stripe needed)
+
+Below the sign-in form there's a "Have an access code from the club?" link
+that reveals a password field — a second, completely independent unlock
+path for letting specific people in before (or alongside) the paid
+subscription, fully under your control:
+
+1. Pick a password and set it as an Edge Function secret:
+   ```bash
+   supabase secrets set ACADEMY_ACCESS_PASSWORD=<whatever you choose>
+   ```
+2. Deploy the function:
+   ```bash
+   supabase functions deploy academy-access-check
+   ```
+3. Give that password directly to whoever you want to have access (text,
+   email, however you like). They enter it once and their browser
+   remembers it — no account, no email, no Stripe involved.
+
+To revoke everyone's access at once, just change the password (step 1) and
+redeploy — anyone who hasn't already unlocked their browser will need the
+new one. The real password is never sent to the browser: the check happens
+entirely in the Edge Function, comparing with a constant-time comparison so
+a wrong guess can't leak how much of it was correct.
+
 ### One-time setup, once you have a Stripe account
 
 1. **Create the product/price in Stripe**: Dashboard → Product catalog →
@@ -115,9 +140,12 @@ webhook lands).
 
 ### How it works
 
-- `entrepreneurship-club/main.js` checks the visitor's Supabase Auth session
+- `entrepreneurship-club/main.js` first checks for a locally-stored access
+  code unlock; failing that, it checks the visitor's Supabase Auth session
   and, if signed in, checks `ec_subscribers.status = 'active'` for that user
   before showing the gated content.
+- `supabase/functions/academy-access-check/` is the interim manual gate: a
+  single password, checked server-side only, that never reaches the browser.
 - `supabase/functions/academy-checkout/` creates a Stripe Checkout Session
   for the signed-in user and returns its URL for the browser to redirect to.
 - `supabase/functions/academy-stripe-webhook/` receives Stripe's webhook
