@@ -280,9 +280,14 @@ const gateCodeToggle = document.getElementById('gateCodeToggle');
 const gateCodePanel = document.getElementById('gateCodePanel');
 const gateCodeForm = document.getElementById('gateCodeForm');
 const gateCodeError = document.getElementById('gateCodeError');
+const gateCodeInput = document.getElementById('gateCode');
 
 gateCodeToggle?.addEventListener('click', () => {
   gateCodePanel.hidden = !gateCodePanel.hidden;
+});
+
+gateCodeInput?.addEventListener('input', () => {
+  gateCodeInput.value = gateCodeInput.value.replace(/\D/g, '').slice(0, 4);
 });
 
 if (supabaseConfigError && gateCodeForm) {

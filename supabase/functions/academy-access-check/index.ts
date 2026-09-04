@@ -1,17 +1,17 @@
 // Genesis Academy — interim manual access gate, independent of Stripe.
-// Roger sets a single access password as an Edge Function secret and
-// hands it out directly to whoever he wants to let in early (before the
-// paid subscription is live, or alongside it for comped/guest access).
+// Roger sets a single 4-digit PIN as an Edge Function secret and hands it
+// out directly to whoever he wants to let in early (before the paid
+// subscription is live, or alongside it for comped/guest access).
 //
-// This function never reveals the real password to the client: it only
-// ever returns { ok: true } or { ok: false }, checked with a constant-time
+// This function never reveals the real PIN to the client: it only ever
+// returns { ok: true } or { ok: false }, checked with a constant-time
 // comparison so a wrong guess can't be timed to learn how much of it
 // matched.
 //
 // Required Supabase Edge Function secret:
-//   ACADEMY_ACCESS_PASSWORD   (any string you choose -- change it any time
-//                              via `supabase secrets set` to revoke access
-//                              for everyone at once)
+//   ACADEMY_ACCESS_PASSWORD   (a 4-digit PIN, e.g. "4271" -- change it any
+//                              time via `supabase secrets set` to revoke
+//                              access for everyone at once)
 
 const ACADEMY_ACCESS_PASSWORD = Deno.env.get('ACADEMY_ACCESS_PASSWORD') ?? ''
 

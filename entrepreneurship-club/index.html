@@ -1067,7 +1067,7 @@
 
       <div class="gate-request-box">
         <h4 class="gate-request-title"><span class="i18n" data-en="Request access" data-es="Solicitar acceso">Request access</span></h4>
-        <p class="gate-sub" style="margin-bottom:16px;"><span class="i18n" data-en="Genesis Academy is for approved members. Tell us a bit about you and we&#39;ll follow up by email with your access code." data-es="Genesis Academy es para miembros aprobados. Cuéntanos un poco sobre ti y te contactaremos por correo con tu código de acceso.">Genesis Academy is for approved members. Tell us a bit about you and we'll follow up by email with your access code.</span></p>
+        <p class="gate-sub" style="margin-bottom:16px;"><span class="i18n" data-en="Genesis Academy is for approved members. Tell us a bit about you and we&#39;ll follow up by email with your PIN." data-es="Genesis Academy es para miembros aprobados. Cuéntanos un poco sobre ti y te contactaremos por correo con tu PIN.">Genesis Academy is for approved members. Tell us a bit about you and we'll follow up by email with your PIN.</span></p>
         <form id="academyRequestForm">
           <div class="field">
             <label for="reqFullName"><span class="i18n" data-en="Full name" data-es="Nombre completo">Full name</span></label>
@@ -1088,17 +1088,17 @@
       </div>
 
       <div class="gate-code-toggle">
-        <button type="button" class="link-btn" id="gateCodeToggle"><span class="i18n" data-en="Already have an access code?" data-es="¿Ya tienes un código de acceso?">Already have an access code?</span></button>
+        <button type="button" class="link-btn" id="gateCodeToggle"><span class="i18n" data-en="Already have a PIN?" data-es="¿Ya tienes un PIN?">Already have a PIN?</span></button>
       </div>
       <div class="gate-code-panel" id="gateCodePanel" hidden>
         <form id="gateCodeForm">
           <div class="field">
-            <label for="gateCode"><span class="i18n" data-en="Access code" data-es="Código de acceso">Access code</span></label>
-            <input type="password" id="gateCode" autocomplete="off" required="">
+            <label for="gateCode"><span class="i18n" data-en="PIN" data-es="PIN">PIN</span></label>
+            <input type="password" id="gateCode" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" required="">
           </div>
           <button type="submit" class="btn btn-outline-navy" style="width:100%;"><span class="i18n" data-en="Unlock" data-es="Desbloquear">Unlock</span></button>
         </form>
-        <div class="error-msg" id="gateCodeError"><span class="i18n" data-en="That code isn&#39;t right. Double-check with whoever gave it to you." data-es="Ese código no es correcto. Verifícalo con quien te lo dio.">That code isn't right. Double-check with whoever gave it to you.</span></div>
+        <div class="error-msg" id="gateCodeError"><span class="i18n" data-en="That PIN isn&#39;t right. Double-check with whoever gave it to you." data-es="Ese PIN no es correcto. Verifícalo con quien te lo dio.">That PIN isn't right. Double-check with whoever gave it to you.</span></div>
       </div>
 
     </div>

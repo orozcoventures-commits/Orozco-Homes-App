@@ -72,32 +72,32 @@ email, and why they want in) above the access-code link. Submissions are
 stored in `ec_academy_requests` (migration 023) — insert-only for anonymous
 visitors, readable only by an admin profile. Check that table in the
 Supabase dashboard (Table Editor → `ec_academy_requests`) to see who's
-asked, then follow up by email with their access code once you approve
+asked, then follow up by email with their PIN once you approve
 them. This replaces relying on people remembering to email you directly —
 you get a real, timestamped list of leads to review instead.
 
 ### Interim manual access (no Stripe needed)
 
-Below the request form there's a "Have an access code from the club?" link
-that reveals a password field — a second, completely independent unlock
-path for letting specific people in before (or alongside) the paid
-subscription, fully under your control:
+Below the request form there's a "Have a PIN?" link that reveals a 4-digit
+PIN field — a second, completely independent unlock path for letting
+specific people in before (or alongside) the paid subscription, fully
+under your control:
 
-1. Pick a password and set it as an Edge Function secret:
+1. Pick a 4-digit PIN and set it as an Edge Function secret:
    ```bash
-   supabase secrets set ACADEMY_ACCESS_PASSWORD=<whatever you choose>
+   supabase secrets set ACADEMY_ACCESS_PASSWORD=<four digits, e.g. 4271>
    ```
 2. Deploy the function:
    ```bash
    supabase functions deploy academy-access-check
    ```
-3. Give that password directly to whoever you want to have access (text,
+3. Give that PIN directly to whoever you want to have access (text,
    email, however you like). They enter it once and their browser
    remembers it — no account, no email, no Stripe involved.
 
-To revoke everyone's access at once, just change the password (step 1) and
+To revoke everyone's access at once, just change the PIN (step 1) and
 redeploy — anyone who hasn't already unlocked their browser will need the
-new one. The real password is never sent to the browser: the check happens
+new one. The real PIN is never sent to the browser: the check happens
 entirely in the Edge Function, comparing with a constant-time comparison so
 a wrong guess can't leak how much of it was correct.
 
