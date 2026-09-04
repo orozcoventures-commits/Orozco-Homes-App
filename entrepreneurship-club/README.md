@@ -34,22 +34,25 @@ Open the URL Vite prints (defaults to [http://localhost:5173](http://localhost:5
    - `VITE_SUPABASE_ANON_KEY`
 
    These can point at the same Supabase project the Orozco Homes app uses —
-   this site only ever reads/writes its own two tables (see below) — or a
+   this site only ever reads/writes its own tables (see below) — or a
    different project entirely. See `.env.example` in this directory.
-4. Before the membership/story forms will accept submissions, run
-   `supabase/migrations/021_entrepreneurship_club.sql` (at the repo root) in
-   that Supabase project's SQL Editor.
+4. Before the membership/story/access-request forms will accept
+   submissions, run these (at the repo root) in that Supabase project's
+   SQL Editor, in order:
+   - `supabase/migrations/021_entrepreneurship_club.sql`
+   - `supabase/migrations/023_academy_access_requests.sql`
 5. Deploy. Once it's live, this becomes its own site with its own domain,
    deploy history, and dashboard entry — fully decoupled from the Orozco
    Homes site's deploys.
 
 ## Database scope
 
-The two forms on this site write **only** to `ec_membership_requests` and
-`ec_success_stories`. Both tables are insert-only for anonymous visitors
-(Row Level Security); only a profile with `role = 'admin'` can read or
-moderate submissions. Nothing on this site queries or touches any
-material-selection, project, or client table from the Orozco Homes app.
+The forms on this site write **only** to `ec_membership_requests`,
+`ec_success_stories`, and `ec_academy_requests`. All three tables are
+insert-only for anonymous visitors (Row Level Security); only a profile
+with `role = 'admin'` can read or moderate submissions. Nothing on this
+site queries or touches any material-selection, project, or client table
+from the Orozco Homes app.
 
 ## Genesis Academy paywall
 
@@ -62,9 +65,20 @@ Toolkit content. All of this is already built and wired up — **it just needs
 a Stripe account** to actually work. Until then, the sign-in form area shows
 correctly but nobody can complete a subscription.
 
+### Access requests
+
+Every visitor who hits the gate sees a "Request access" form (full name,
+email, and why they want in) above the access-code link. Submissions are
+stored in `ec_academy_requests` (migration 023) — insert-only for anonymous
+visitors, readable only by an admin profile. Check that table in the
+Supabase dashboard (Table Editor → `ec_academy_requests`) to see who's
+asked, then follow up by email with their access code once you approve
+them. This replaces relying on people remembering to email you directly —
+you get a real, timestamped list of leads to review instead.
+
 ### Interim manual access (no Stripe needed)
 
-Below the sign-in form there's a "Have an access code from the club?" link
+Below the request form there's a "Have an access code from the club?" link
 that reveals a password field — a second, completely independent unlock
 path for letting specific people in before (or alongside) the paid
 subscription, fully under your control:

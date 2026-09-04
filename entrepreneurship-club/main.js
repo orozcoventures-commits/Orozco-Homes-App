@@ -126,6 +126,19 @@ wireForm({
   }),
 });
 
+wireForm({
+  formId: 'academyRequestForm',
+  errorId: 'academyRequestError',
+  confirmId: 'academyRequestConfirm',
+  table: 'ec_academy_requests',
+  buildRow: (form) => ({
+    full_name: form.reqFullName.value.trim(),
+    email: form.reqEmail.value.trim(),
+    reason: form.reqReason.value.trim(),
+    language: currentLang,
+  }),
+});
+
 // ---------- Genesis Academy paywall ----------
 const gatePanels = {
   checking: document.getElementById('gateChecking'),
