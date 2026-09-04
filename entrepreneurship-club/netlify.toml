@@ -5,6 +5,10 @@
 [build.environment]
   NODE_VERSION  = "20"
 
+[[edge_functions]]
+  path     = "/secret-page"
+  function = "auth-gate"
+
 [[redirects]]
   from   = "/*"
   to     = "/index.html"
