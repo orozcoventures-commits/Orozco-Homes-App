@@ -270,6 +270,38 @@
   }
   button[disabled]{opacity:.6; cursor:not-allowed;}
 
+  /* ---------- ACADEMY PAYWALL ---------- */
+  .gate-panel{
+    background:var(--card); border:1px solid var(--line); border-radius:6px; padding:36px; text-align:center;
+  }
+  .gate-panel h3{font-size:20px; margin-bottom:8px;}
+  .gate-badge{
+    display:inline-block; background:var(--paper-2); color:var(--navy); font-size:12px; font-weight:600;
+    letter-spacing:.4px; text-transform:uppercase; padding:5px 12px; border-radius:999px; margin-bottom:16px;
+  }
+  .gate-sub{color:var(--text-muted); font-size:14.5px; margin-bottom:24px;}
+  .gate-panel .field{text-align:left;}
+  .gate-price{margin-bottom:20px;}
+  .gate-price-amount{font-family:'Fraunces',serif; font-size:40px; font-weight:600; color:var(--ink);}
+  .gate-price-period{font-size:14px; color:var(--text-muted); margin-left:4px;}
+  .gate-account{font-size:13px; color:var(--text-muted); margin-top:18px;}
+  .link-btn{background:none; border:none; padding:0; color:var(--navy); font-size:13px; text-decoration:underline; cursor:pointer; font-family:inherit;}
+  .gate-loading{color:var(--text-muted); font-size:14.5px; margin:0;}
+  .gate-panel .confirm-msg, .gate-panel .error-msg{margin-top:18px; text-align:left;}
+  .gate-request-box{
+    max-width:400px; margin:24px auto 0; background:var(--paper-2); border:1px solid var(--line);
+    border-radius:6px; padding:26px;
+  }
+  .gate-request-title{font-size:16px; margin-bottom:6px;}
+  .gate-request-box .field{text-align:left;}
+  .gate-request-box .confirm-msg, .gate-request-box .error-msg{margin-top:14px;}
+  .gate-code-toggle{text-align:center; margin-top:16px;}
+  .gate-code-panel{
+    max-width:340px; margin:16px auto 0; background:var(--paper-2); border:1px solid var(--line);
+    border-radius:6px; padding:22px;
+  }
+  .gate-code-panel .field{text-align:left;}
+
   /* ---------- VALUES / POLICY ---------- */
   .values-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:22px;}
   .value-card{background:var(--card); border:1px solid var(--line); border-radius:6px; padding:26px;}
@@ -421,7 +453,7 @@
         <button class="navlink" data-target="values"><span class="i18n" data-en="Community Values" data-es="Valores de la Comunidad">Community Values</span></button>
         <button class="navlink" data-target="meetings"><span class="i18n" data-en="Meetings" data-es="Reuniones">Meetings</span></button>
         <button class="navlink" data-target="academy"><span class="i18n" data-en="Genesis Academy" data-es="Genesis Academy">Genesis Academy</span></button>
-        <button class="btn btn-gold" data-target="membership" style="margin-left:10px;"><span class="i18n" data-en="Request to Join" data-es="Solicitar Unirse">Request to Join</span></button>
+        <button class="btn btn-gold" data-target="membership" style="margin-left:10px;"><span class="i18n" data-en="Apply Now" data-es="Aplicar Ahora">Apply Now</span></button>
       </nav>
     </div>
   </div>
@@ -437,7 +469,7 @@
         <h1><span class="i18n" data-en="A global room where founders build, pitch, and grow together." data-es="Un espacio global donde los fundadores construyen, presentan y crecen juntos.">A global room where founders build, pitch, and grow together.</span></h1>
         <p class="lede"><span class="i18n" data-en="The Entrepreneurship Club connects founders, operators, and aspiring entrepreneurs across the world to trade ideas, sharpen strategy, and pitch directly to people who&#39;ve built businesses before them." data-es="El Entrepreneurship Club conecta a fundadores, operadores y aspirantes a emprendedores de todo el mundo para intercambiar ideas, perfeccionar estrategias y presentar sus proyectos directamente a personas que ya han construido negocios.">The Entrepreneurship Club connects founders, operators, and aspiring entrepreneurs across the world to trade ideas, sharpen strategy, and pitch directly to people who've built businesses before them.</span></p>
         <div class="hero-ctas">
-          <button class="btn btn-gold" data-target="membership"><span class="i18n" data-en="Request to Join" data-es="Solicitar Unirse">Request to Join</span></button>
+          <button class="btn btn-gold" data-target="membership"><span class="i18n" data-en="Apply Now" data-es="Aplicar Ahora">Apply Now</span></button>
           <button class="btn btn-outline-light" data-target="meetings"><span class="i18n" data-en="See how meetings work" data-es="Vea cómo funcionan las reuniones">See how meetings work</span></button>
         </div>
       </div>
@@ -518,7 +550,7 @@
         <h2><span class="i18n" data-en="Bring your idea to people who&#39;ve built one before." data-es="Lleva tu idea ante personas que ya han construido una.">Bring your idea to people who've built one before.</span></h2>
         <p><span class="i18n" data-en="Membership is by request. Review the requirements and apply in a few minutes." data-es="La membresía es por solicitud. Revisa los requisitos y postúlate en pocos minutos.">Membership is by request. Review the requirements and apply in a few minutes.</span></p>
       </div>
-      <button class="btn btn-gold" data-target="membership"><span class="i18n" data-en="Request to Join" data-es="Solicitar Unirse">Request to Join</span></button>
+      <button class="btn btn-gold" data-target="membership"><span class="i18n" data-en="Apply Now" data-es="Aplicar Ahora">Apply Now</span></button>
     </div>
   </section>
 
@@ -814,7 +846,7 @@
 
       <div style="margin-top:64px; max-width:640px;">
         <div class="apply-panel">
-          <h3><span class="i18n" data-en="Request to join" data-es="Solicitar unirse">Request to join</span></h3>
+          <h3><span class="i18n" data-en="Apply Now" data-es="Aplicar Ahora">Apply Now</span></h3>
           <p class="apply-sub"><span class="i18n" data-en="Takes about two minutes. We&#39;ll follow up by email with next steps." data-es="Toma unos dos minutos. Te contactaremos por correo electrónico con los próximos pasos.">Takes about two minutes. We'll follow up by email with next steps.</span></p>
           <form id="joinForm">
             <div class="field">
@@ -996,6 +1028,83 @@
     </div>
   </div>
 
+  <!-- ============ PAYWALL ============ -->
+  <section class="tight" id="academyGate">
+    <div class="wrap" style="max-width:520px;">
+
+      <div class="gate-panel" id="gateChecking">
+        <p class="gate-loading"><span class="i18n" data-en="Checking your access…" data-es="Verificando tu acceso…">Checking your access…</span></p>
+      </div>
+
+      <div class="gate-panel" id="gateSignedOut" hidden>
+        <div class="gate-badge"><span class="i18n" data-en="Members only" data-es="Solo miembros">Members only</span></div>
+        <h3><span class="i18n" data-en="Sign in to Genesis Academy" data-es="Inicia sesión en Genesis Academy">Sign in to Genesis Academy</span></h3>
+        <p class="gate-sub"><span class="i18n" data-en="Enter your email and we&#39;ll send you a one-click sign-in link — no password needed." data-es="Ingresa tu correo y te enviaremos un enlace de acceso con un clic, sin necesidad de contraseña.">Enter your email and we'll send you a one-click sign-in link — no password needed.</span></p>
+        <form id="gateSignInForm">
+          <div class="field">
+            <label for="gateEmail"><span class="i18n" data-en="Email address" data-es="Correo electrónico">Email address</span></label>
+            <input type="email" id="gateEmail" required="">
+          </div>
+          <button type="submit" class="btn btn-navy" style="width:100%;"><span class="i18n" data-en="Email me a sign-in link" data-es="Enviarme un enlace de acceso">Email me a sign-in link</span></button>
+        </form>
+        <div class="confirm-msg" id="gateSignInSent"><span class="i18n" data-en="Check your inbox — click the link we sent to sign in." data-es="Revisa tu bandeja de entrada: haz clic en el enlace que te enviamos para iniciar sesión.">Check your inbox — click the link we sent to sign in.</span></div>
+        <div class="error-msg" id="gateSignInError"><span class="i18n" data-en="Something went wrong sending your sign-in link. Please try again in a moment." data-es="Ocurrió un error al enviar tu enlace de acceso. Inténtalo de nuevo en unos minutos.">Something went wrong sending your sign-in link. Please try again in a moment.</span></div>
+      </div>
+
+      <div class="gate-panel" id="gateSignedIn" hidden>
+        <div class="gate-badge"><span class="i18n" data-en="Members only" data-es="Solo miembros">Members only</span></div>
+        <h3><span class="i18n" data-en="Subscribe to Genesis Academy" data-es="Suscríbete a Genesis Academy">Subscribe to Genesis Academy</span></h3>
+        <p class="gate-sub"><span class="i18n" data-en="Full access to every video masterclass, the Study Vault, and the Entrepreneur&#39;s Toolkit." data-es="Acceso completo a cada masterclass en video, la Bóveda de Estudio y el Kit del Emprendedor.">Full access to every video masterclass, the Study Vault, and the Entrepreneur's Toolkit.</span></p>
+        <div class="gate-price"><span class="gate-price-amount">$19</span><span class="gate-price-period"><span class="i18n" data-en="/ month" data-es="/ mes">/ month</span></span></div>
+        <button type="button" class="btn btn-gold" id="gateSubscribeBtn" style="width:100%;"><span class="i18n" data-en="Subscribe — $19/month" data-es="Suscribirme — $19/mes">Subscribe — $19/month</span></button>
+        <p class="gate-account"><span class="i18n" data-en="Signed in as" data-es="Sesión iniciada como">Signed in as</span> <strong id="gateEmailDisplay"></strong> · <button type="button" class="link-btn" id="gateSignOutBtn"><span class="i18n" data-en="Sign out" data-es="Cerrar sesión">Sign out</span></button></p>
+        <div class="error-msg" id="gateSubscribeError"><span class="i18n" data-en="Something went wrong starting checkout. Please try again in a moment." data-es="Ocurrió un error al iniciar el pago. Inténtalo de nuevo en unos minutos.">Something went wrong starting checkout. Please try again in a moment.</span></div>
+      </div>
+
+      <div class="gate-panel" id="gateActivating" hidden>
+        <p class="gate-loading"><span class="i18n" data-en="Payment received — activating your access…" data-es="Pago recibido: activando tu acceso…">Payment received — activating your access…</span></p>
+      </div>
+
+      <div class="gate-request-box">
+        <h4 class="gate-request-title"><span class="i18n" data-en="Request access" data-es="Solicitar acceso">Request access</span></h4>
+        <p class="gate-sub" style="margin-bottom:16px;"><span class="i18n" data-en="Genesis Academy is for approved members. Tell us a bit about you and we&#39;ll follow up by email with your PIN." data-es="Genesis Academy es para miembros aprobados. Cuéntanos un poco sobre ti y te contactaremos por correo con tu PIN.">Genesis Academy is for approved members. Tell us a bit about you and we'll follow up by email with your PIN.</span></p>
+        <form id="academyRequestForm">
+          <div class="field">
+            <label for="reqFullName"><span class="i18n" data-en="Full name" data-es="Nombre completo">Full name</span></label>
+            <input type="text" id="reqFullName" required="">
+          </div>
+          <div class="field">
+            <label for="reqEmail"><span class="i18n" data-en="Email address" data-es="Correo electrónico">Email address</span></label>
+            <input type="email" id="reqEmail" required="">
+          </div>
+          <div class="field">
+            <label for="reqReason"><span class="i18n" data-en="Why do you want access?" data-es="¿Por qué quieres acceso?">Why do you want access?</span></label>
+            <textarea id="reqReason" rows="3" required=""></textarea>
+          </div>
+          <button type="submit" class="btn btn-outline-navy" style="width:100%;"><span class="i18n" data-en="Request Access" data-es="Solicitar Acceso">Request Access</span></button>
+        </form>
+        <div class="confirm-msg" id="academyRequestConfirm"><span class="i18n" data-en="Thanks! We&#39;ve received your request and will email you once you&#39;re approved." data-es="¡Gracias! Recibimos tu solicitud y te enviaremos un correo cuando seas aprobado.">Thanks! We've received your request and will email you once you're approved.</span></div>
+        <div class="error-msg" id="academyRequestError"><span class="i18n" data-en="Something went wrong submitting your request. Please try again in a moment." data-es="Ocurrió un error al enviar tu solicitud. Inténtalo de nuevo en unos minutos.">Something went wrong submitting your request. Please try again in a moment.</span></div>
+      </div>
+
+      <div class="gate-code-toggle">
+        <button type="button" class="link-btn" id="gateCodeToggle"><span class="i18n" data-en="Already have a PIN?" data-es="¿Ya tienes un PIN?">Already have a PIN?</span></button>
+      </div>
+      <div class="gate-code-panel" id="gateCodePanel" hidden>
+        <form id="gateCodeForm">
+          <div class="field">
+            <label for="gateCode"><span class="i18n" data-en="PIN" data-es="PIN">PIN</span></label>
+            <input type="password" id="gateCode" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" required="">
+          </div>
+          <button type="submit" class="btn btn-outline-navy" style="width:100%;"><span class="i18n" data-en="Unlock" data-es="Desbloquear">Unlock</span></button>
+        </form>
+        <div class="error-msg" id="gateCodeError"><span class="i18n" data-en="That PIN isn&#39;t right. Double-check with whoever gave it to you." data-es="Ese PIN no es correcto. Verifícalo con quien te lo dio.">That PIN isn't right. Double-check with whoever gave it to you.</span></div>
+      </div>
+
+    </div>
+  </section>
+
+  <div id="academyContent" hidden>
   <!-- Zone 1: Video Masterclasses -->
   <section>
     <div class="wrap">
@@ -1142,6 +1251,7 @@
 
     </div>
   </section>
+  </div>
 </section>
 
 </main>
@@ -1172,7 +1282,7 @@
         <h5><span class="i18n" data-en="Join" data-es="Únete">Join</span></h5>
         <ul>
           <li><button data-target="meetings"><span class="i18n" data-en="Meeting schedule" data-es="Horario de reuniones">Meeting schedule</span></button></li>
-          <li><button data-target="membership"><span class="i18n" data-en="Request to join" data-es="Solicitar unirse">Request to join</span></button></li>
+          <li><button data-target="membership"><span class="i18n" data-en="Apply Now" data-es="Aplicar Ahora">Apply Now</span></button></li>
         </ul>
       </div>
       <div>
