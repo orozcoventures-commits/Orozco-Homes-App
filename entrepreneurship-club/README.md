@@ -38,7 +38,13 @@ Open the URL Vite prints (defaults to [http://localhost:5173](http://localhost:5
    different project entirely. See `.env.example` in this directory.
 4. Before the membership/story/access-request forms will accept
    submissions, run these (at the repo root) in that Supabase project's
-   SQL Editor, in order:
+   SQL Editor, **in this exact order**:
+   - `supabase/migrations/020_ec_standalone_admin_role.sql` — sets up the
+     admin-role helper the next two migrations depend on. **Required if
+     this is a brand-new, standalone Supabase project** (not the same one
+     the Orozco Homes app uses) — skip this specific file only if you
+     already ran the main app's `001_initial_schema.sql` in this same
+     project.
    - `supabase/migrations/021_entrepreneurship_club.sql`
    - `supabase/migrations/023_academy_access_requests.sql`
 5. Deploy. Once it's live, this becomes its own site with its own domain,
@@ -53,6 +59,18 @@ insert-only for anonymous visitors (Row Level Security); only a profile
 with `role = 'admin'` can read or moderate submissions. Nothing on this
 site queries or touches any material-selection, project, or client table
 from the Orozco Homes app.
+
+You don't actually need `role = 'admin'` for day-to-day use, though —
+as the project owner, the Supabase dashboard's **Table Editor** already
+shows you every row regardless of RLS. The admin role only matters if you
+ever want the *website itself* (not the dashboard) to show submissions to
+a signed-in account. If you do want that later, promote your own account
+after signing in once (via the Academy page's sign-in link) by running
+this in the SQL Editor:
+```sql
+update public.profiles set role = 'admin' where id =
+  (select id from auth.users where email = 'you@example.com');
+```
 
 ## Genesis Academy paywall
 
