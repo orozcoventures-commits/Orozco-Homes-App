@@ -19,6 +19,7 @@ const ACADEMY_URL       = Deno.env.get('ACADEMY_URL')       ?? 'http://localhost
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
 Deno.serve(async (req) => {
