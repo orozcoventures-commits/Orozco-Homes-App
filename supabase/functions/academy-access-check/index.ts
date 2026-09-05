@@ -18,6 +18,7 @@ const ACADEMY_ACCESS_PASSWORD = Deno.env.get('ACADEMY_ACCESS_PASSWORD') ?? ''
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
 function timingSafeEqual(a: string, b: string): boolean {
