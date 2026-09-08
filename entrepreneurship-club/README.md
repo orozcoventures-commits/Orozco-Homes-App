@@ -51,6 +51,41 @@ Open the URL Vite prints (defaults to [http://localhost:5173](http://localhost:5
    deploy history, and dashboard entry — fully decoupled from the Orozco
    Homes site's deploys.
 
+## Email notification for new membership requests
+
+Whenever someone submits the Membership ("Apply Now") form, you can get
+emailed instantly instead of having to check the Supabase Table Editor.
+This uses [Resend](https://resend.com) (free, no credit card needed) plus
+a Supabase Database Webhook:
+
+1. **Create a free Resend account** at resend.com, then go to **API Keys**
+   and create one. Copy it.
+2. **Deploy the notification function** and set its secrets:
+   ```bash
+   supabase secrets set RESEND_API_KEY=re_...
+   supabase secrets set DB_WEBHOOK_SECRET=<any random string you make up>
+   supabase secrets set NOTIFY_TO_EMAIL=genesisdelemprendimiento@gmail.com
+   supabase functions deploy notify-membership-request
+   ```
+   (No CLI? All three secrets and the function code can be entered the same
+   way as `academy-access-check` was — via the Supabase dashboard's Edge
+   Functions section directly in the browser.)
+3. **Create the Database Webhook**: Supabase dashboard → **Database** →
+   **Webhooks** → **Create a new webhook**.
+   - Table: `ec_membership_requests`
+   - Events: **Insert** only
+   - Type: **HTTP Request**, method **POST**
+   - URL: your deployed function's URL (shown after deploying, looks like
+     `https://<project-ref>.supabase.co/functions/v1/notify-membership-request`)
+   - HTTP Headers: add one — key `x-webhook-secret`, value: the same random
+     string you set as `DB_WEBHOOK_SECRET` in step 2.
+4. Submit a test entry on the live site's Membership page and confirm the
+   email arrives at `genesisdelemprendimiento@gmail.com`.
+
+The `x-webhook-secret` header is what stops a stranger from calling this
+function directly and spamming your inbox — the function only sends an
+email when that header matches exactly.
+
 ## Database scope
 
 The forms on this site write **only** to `ec_membership_requests`,
