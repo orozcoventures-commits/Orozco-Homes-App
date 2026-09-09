@@ -1,9 +1,10 @@
-# Entrepreneurship Club
+# Genesis of Entrepreneurship
 
-A standalone, static marketing site for the Entrepreneurship Club — completely
-independent of the Orozco Homes remodel app that lives in the rest of this
-repo. It's a single-page site (Home, About, Success Stories, Membership,
-Community Values, Meetings, Resources) with an EN/ES language toggle, built
+A standalone, static marketing site for Genesis of Entrepreneurship (branded
+site-wide; the Entrepreneurship Club is its membership/community page) —
+completely independent of the Orozco Homes remodel app that lives in the rest
+of this repo. It's a single-page site (Home, About, Success Stories,
+Entrepreneurship Club, Genesis Academy) with an EN/ES language toggle, built
 with plain Vite (no React).
 
 This directory has its own `package.json`, `vite.config.js`, and

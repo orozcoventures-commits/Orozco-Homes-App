@@ -26,8 +26,8 @@ showPage(document.getElementById(initialPage) ? initialPage : 'home');
 
 // ---------- Language toggle ----------
 const titles = {
-  en: 'Entrepreneurship Club — A Global Community of Founders',
-  es: 'Entrepreneurship Club — Una Comunidad Global de Fundadores',
+  en: 'Genesis of Entrepreneurship — A Global Community of Founders',
+  es: 'Genesis of Entrepreneurship — Una Comunidad Global de Fundadores',
 };
 const langButtons = document.querySelectorAll('.lang-btn');
 let currentLang = 'en';
