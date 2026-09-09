@@ -26,8 +26,8 @@ showPage(document.getElementById(initialPage) ? initialPage : 'home');
 
 // ---------- Language toggle ----------
 const titles = {
-  en: 'Genesis of Entrepreneurship — A Global Community of Founders',
-  es: 'Genesis of Entrepreneurship — Una Comunidad Global de Fundadores',
+  en: 'Genesis of Entrepreneurship — Where Every Great Company Has a Beginning',
+  es: 'Genesis of Entrepreneurship — Donde Toda Gran Empresa Tiene un Comienzo',
 };
 const langButtons = document.querySelectorAll('.lang-btn');
 let currentLang = 'en';
