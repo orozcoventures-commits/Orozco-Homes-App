@@ -361,3 +361,33 @@ if (academyGate) {
     checkAcademyAccess();
   }
 }
+
+// ---------- Study Vault presentation viewer ----------
+const presentationModal = document.getElementById('presentationModal');
+const presentationModalIframe = document.getElementById('presentationModalIframe');
+const presentationModalClose = document.getElementById('presentationModalClose');
+
+function openPresentationModal(src) {
+  if (!src || !presentationModal || !presentationModalIframe) return;
+  presentationModalIframe.src = src;
+  presentationModal.hidden = false;
+}
+
+function closePresentationModal() {
+  if (!presentationModal || !presentationModalIframe) return;
+  presentationModal.hidden = true;
+  presentationModalIframe.src = '';
+}
+
+document.querySelectorAll('.view-presentation-btn').forEach((btn) => {
+  btn.addEventListener('click', () => openPresentationModal(btn.dataset.canvaSrc));
+});
+
+presentationModalClose?.addEventListener('click', closePresentationModal);
+presentationModal?.querySelector('[data-close-modal]')?.addEventListener('click', closePresentationModal);
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && presentationModal && !presentationModal.hidden) {
+    closePresentationModal();
+  }
+});
