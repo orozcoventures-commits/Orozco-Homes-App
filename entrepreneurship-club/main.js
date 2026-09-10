@@ -166,9 +166,24 @@ function showGatePanel(name) {
 
 const ACADEMY_UNLOCK_KEY = 'ec_academy_unlocked';
 
+const ACADEMY_UNLOCK_COOKIE = 'academy_unlocked';
+
 function unlockAcademy() {
   academyGate.style.display = 'none';
   academyContent.hidden = false;
+  // Downloadable member files (e.g. the Study Vault PDF) live at real,
+  // guessable URLs -- hiding their links in the DOM doesn't stop someone
+  // from fetching the file directly. This cookie lets a Netlify Edge
+  // Function (netlify/edge-functions/protect-downloads.js) verify access
+  // server-side before serving anything under /downloads/.
+  try {
+    const maxAge = 60 * 60 * 24 * 90; // 90 days, refreshed on every visit
+    const secure = location.protocol === 'https:' ? '; Secure' : '';
+    document.cookie = `${ACADEMY_UNLOCK_COOKIE}=1; path=/; max-age=${maxAge}; SameSite=Lax${secure}`;
+  } catch {
+    // cookies unavailable (e.g. some private-browsing modes) -- the page
+    // gate above still works, only the direct-download protection is lost
+  }
 }
 
 function hasStoredAccessCode() {
