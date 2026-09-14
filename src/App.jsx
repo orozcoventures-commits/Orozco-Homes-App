@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { ProjectProvider, useProject } from './context/ProjectContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { supabaseConfigError } from './lib/supabase';
@@ -7,7 +7,6 @@ import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import Login from './pages/Login';
 import ProjectSelector from './pages/ProjectSelector';
-import ProjectDetail from './pages/ProjectDetail';
 import ClientPortal from './pages/ClientPortal';
 import PhotoLog from './pages/PhotoLog';
 import Approvals from './pages/Approvals';
@@ -17,6 +16,11 @@ import AdminCreateProject from './pages/AdminCreateProject';
 import ManageClients from './pages/ManageClients';
 import PinClientPortal from './pages/PinClientPortal';
 import ContractBuilder from './pages/ContractBuilder';
+import NewHomeBudget from './pages/NewHomeBudget';
+import RemodelBudget from './pages/RemodelBudget';
+import ScheduleCalendar from './pages/ScheduleCalendar';
+import DesignerWorkspace from './pages/DesignerWorkspace';
+import ReadMe from './pages/ReadMe';
 import './index.css';
 
 // Shown when VITE_SUPABASE_* env vars are missing in Netlify
@@ -108,12 +112,29 @@ function LoadingScreen() {
   );
 }
 
+// Pages each non-admin role is permitted to visit
+const DESIGNER_ALLOWED = new Set(['designer-workspace', 'readme']);
+const CLIENT_ALLOWED   = new Set(['home', 'client-portal', 'photo-log', 'messages', 'approvals', 'designer-workspace', 'readme']);
+
 function AppContent() {
-  const { state } = useProject();
-  const { isAuthenticated, loading, isPinMode } = useAuth();
+  const { state, dispatch } = useProject();
+  const { isAuthenticated, loading, isPinMode, isAdmin, isDesigner, isClient } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const page = state.activePage;
+  const rawPage = state.activePage;
+
+  // Compute the guarded page synchronously — prevents a forbidden component from ever mounting
+  const page = useMemo(() => {
+    if (!isAuthenticated || isAdmin) return rawPage;
+    if (isDesigner) return DESIGNER_ALLOWED.has(rawPage) ? rawPage : 'designer-workspace';
+    if (isClient)   return CLIENT_ALLOWED.has(rawPage)   ? rawPage : 'home';
+    return rawPage;
+  }, [rawPage, isAuthenticated, isAdmin, isDesigner, isClient]);
+
+  // Keep ProjectContext state in sync when guard overrides the page
+  useEffect(() => {
+    if (page !== rawPage) dispatch({ type: 'SET_PAGE', page });
+  }, [page, rawPage, dispatch]);
 
   if (loading) return <LoadingScreen />;
   if (isPinMode) return <PinClientPortal />;
@@ -134,18 +155,23 @@ function AppContent() {
         )}
 
         <main className={`flex-1 ${isMessages ? 'flex flex-col' : ''}`}>
-          {page === 'home'             && <ProjectSelector />}
-          {page === 'project'          && <ProjectDetail />}
-          {page === 'client-portal'    && <ClientPortal />}
-          {page === 'photo-log'        && <PhotoLog />}
-          {page === 'approvals'        && <Approvals />}
-          {page === 'messages'         && <MessageCenter />}
-          {page === 'weekly-updates'   && <WeeklyUpdates />}
-          {page === 'create-project'   && <AdminCreateProject />}
-          {page === 'manage-clients'   && <ManageClients />}
-          {page === 'contracts'        && <ContractBuilder />}
-          {!['home','project','client-portal','photo-log','approvals','messages',
-              'weekly-updates','create-project','manage-clients','contracts'].includes(page) && (
+          {page === 'home'               && <ProjectSelector />}
+          {page === 'client-portal'      && <ClientPortal />}
+          {page === 'photo-log'          && <PhotoLog />}
+          {page === 'approvals'          && <Approvals />}
+          {page === 'messages'           && <MessageCenter />}
+          {page === 'weekly-updates'     && <WeeklyUpdates />}
+          {page === 'create-project'     && <AdminCreateProject />}
+          {page === 'manage-clients'     && <ManageClients />}
+          {page === 'contracts'          && <ContractBuilder />}
+          {page === 'new-home-budget'    && <NewHomeBudget />}
+          {page === 'remodel-budget'     && <RemodelBudget />}
+          {page === 'schedule'           && <ScheduleCalendar />}
+          {page === 'designer-workspace' && <DesignerWorkspace />}
+          {page === 'readme'             && <ReadMe />}
+          {!['home','client-portal','photo-log','approvals','messages',
+              'weekly-updates','create-project','manage-clients','contracts',
+              'new-home-budget','remodel-budget','schedule','designer-workspace','readme'].includes(page) && (
             <div className="flex flex-col items-center justify-center py-32 px-6 text-center">
               <div
                 className="w-14 h-14 rounded-2xl flex items-center justify-center mb-5"
