@@ -14,8 +14,6 @@ export function AuthProvider({ children }) {
   });
 
   // Effect 1: sync auth state only — no Supabase API calls inside this callback.
-  // Calling supabase.from() inside onAuthStateChange can deadlock the auth client's
-  // internal lock in supabase-js v2, causing loadProfile to never resolve.
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
@@ -30,8 +28,6 @@ export function AuthProvider({ children }) {
   }, []);
 
   // Effect 2: fetch profile whenever the logged-in user changes.
-  // Depends on user?.id so a token refresh (same user, new object reference)
-  // does not trigger an unnecessary round-trip.
   useEffect(() => {
     if (!user) return;
     loadProfile(user.id);
@@ -54,7 +50,6 @@ export function AuthProvider({ children }) {
       console.error('[Auth] loadProfile threw unexpectedly:', err);
       setProfile(null);
     } finally {
-      // Always clear the loading gate — even on error or missing profile row.
       setLoading(false);
     }
   }
@@ -73,10 +68,6 @@ export function AuthProvider({ children }) {
     if (error) throw error;
   }
 
-  // Promotes the caller to admin only when no admin exists yet.
-  // Uses getSession() for the user ID instead of the `user` state variable,
-  // because this is called right after login() before React has re-rendered
-  // and the `user` closure value is still null.
   async function claimFirstAdmin() {
     const { data, error } = await supabase.rpc('promote_to_first_admin');
     if (error) {
@@ -123,11 +114,13 @@ export function AuthProvider({ children }) {
 
   const isAuthenticated = !!user && !loading;
   const isAdmin         = profile?.role === 'admin';
+  const isDesigner      = profile?.role === 'designer';
+  const isClient        = isAuthenticated && !isAdmin && !isDesigner;
   const isPinMode       = !!pinSession;
 
   return (
     <AuthContext.Provider value={{
-      user, profile, loading, isAuthenticated, isAdmin,
+      user, profile, loading, isAuthenticated, isAdmin, isDesigner, isClient,
       login, signup, claimFirstAdmin, logout,
       pinSession, isPinMode, verifyPin, exitPinMode,
     }}>
