@@ -99,6 +99,7 @@ export default function ProjectSelector() {
     dispatch({ type: 'SET_DB_PROJECT', project });
   }
 
+  // ── Client view ───────────────────────────────────────────────────────────
   if (!isAdmin) {
     return (
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-12">
@@ -129,6 +130,7 @@ export default function ProjectSelector() {
     );
   }
 
+  // ── Admin view ────────────────────────────────────────────────────────────
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <div className="flex items-center justify-between mb-6">

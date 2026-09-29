@@ -58,6 +58,7 @@ export function useDesignSpecs(projectId = null) {
     return {};
   }, []);
 
+  // Client action: approve or decline a spec
   const clientRespond = useCallback(async (specId, status, feedback = '') => {
     const { error } = await supabase.rpc('client_respond_to_spec', {
       p_spec_id:  specId,
@@ -71,6 +72,7 @@ export function useDesignSpecs(projectId = null) {
     return {};
   }, []);
 
+  // Fetch approved specs across all projects (for RemodelBudget injection)
   const fetchApprovedByProject = useCallback(async (pid) => {
     if (!pid) return [];
     const { data } = await supabase

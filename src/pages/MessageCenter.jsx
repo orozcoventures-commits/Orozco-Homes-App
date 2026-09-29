@@ -31,6 +31,7 @@ function formatTime(iso) {
   return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
 
+// ── Conversation sidebar item ─────────────────────────────────────────────────
 function ConversationItem({ project, isActive, onClick }) {
   const clientName = project.managed_client?.full_name
     ?? project.client_profile?.full_name
@@ -57,6 +58,7 @@ function ConversationItem({ project, isActive, onClick }) {
   );
 }
 
+// ── Chat message bubble ───────────────────────────────────────────────────────
 function MessageBubble({ msg, prevMsg, clientName, projectId, isNew }) {
   const isContractor = msg.sender_role === 'admin';
   const showDate = !prevMsg || formatDate(prevMsg.created_at) !== formatDate(msg.created_at);
@@ -98,6 +100,7 @@ function MessageBubble({ msg, prevMsg, clientName, projectId, isNew }) {
   );
 }
 
+// ── Main page ─────────────────────────────────────────────────────────────────
 export default function MessageCenter() {
   const { user, isAdmin, loading: authLoading } = useAuth();
 
@@ -110,16 +113,19 @@ export default function MessageCenter() {
 
   const bottomRef = useRef(null);
 
+  // The hook handles fetching + Realtime for the active project
   const { messages, loading: loadingMessages, sendMessage, realtimeIds } = useMessages(
     activeId,
     user?.id,
     isAdmin
   );
 
+  // Scroll to bottom whenever messages update
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages.length]);
 
+  // Fetch project list once on mount
   useEffect(() => {
     if (authLoading || !user) return;
     setLoadingProjects(true);
@@ -145,7 +151,7 @@ export default function MessageCenter() {
     setInput('');
     setSending(true);
     const { error } = await sendMessage(text);
-    if (error) setInput(text);
+    if (error) setInput(text); // restore on failure
     setSending(false);
   }
 
@@ -170,6 +176,7 @@ export default function MessageCenter() {
   return (
     <div className="flex h-[calc(100vh-56px)]" style={{ backgroundColor: '#F5F4F0' }}>
 
+      {/* ── Sidebar: project list ────────────────────────────────────── */}
       <div
         className={`${showList ? 'flex' : 'hidden'} md:flex flex-col shrink-0 border-r`}
         style={{ width: '280px', backgroundColor: '#fff', borderColor: '#E8E6E1' }}
@@ -205,9 +212,11 @@ export default function MessageCenter() {
         </div>
       </div>
 
+      {/* ── Chat panel ──────────────────────────────────────────────── */}
       <div className={`${showList ? 'hidden' : 'flex'} md:flex flex-1 flex-col min-w-0`}>
         {activeProject ? (
           <>
+            {/* Header */}
             <div
               className="flex items-center gap-3 px-4 sm:px-6 py-3.5 border-b shrink-0"
               style={{ backgroundColor: '#fff', borderColor: '#E8E6E1' }}
@@ -228,6 +237,7 @@ export default function MessageCenter() {
               </div>
             </div>
 
+            {/* Message list */}
             <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
               {loadingMessages ? (
                 <div className="flex justify-center py-12">
@@ -259,6 +269,7 @@ export default function MessageCenter() {
               <div ref={bottomRef} />
             </div>
 
+            {/* Input bar */}
             <div
               className="px-4 sm:px-6 py-3 border-t shrink-0"
               style={{ backgroundColor: '#fff', borderColor: '#E8E6E1' }}

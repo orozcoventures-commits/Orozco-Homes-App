@@ -199,6 +199,9 @@ export default function Sidebar({ isOpen, onClose }) {
       .then(({ count }) => setUnreadMessages(count ?? 0));
   }, [isAuthenticated, user?.id]);
 
+  // Designer: only Designer Workspace
+  // Client:   Designer Workspace + Messages + Photo Log
+  // Admin:    everything
   const DESIGNER_PAGES = new Set(['designer-workspace', 'readme']);
   const CLIENT_PAGES   = new Set(['designer-workspace', 'messages', 'photo-log', 'readme']);
 
@@ -216,6 +219,7 @@ export default function Sidebar({ isOpen, onClose }) {
       localStorage.setItem('messages_last_viewed', new Date().toISOString());
       setUnreadMessages(0);
     }
+    // Only admins need to clear the active project when switching pages
     if (isAdmin) dispatch({ type: 'CLEAR_DB_PROJECT' });
     dispatch({ type: 'SET_PAGE', page });
     onClose();
@@ -231,6 +235,7 @@ export default function Sidebar({ isOpen, onClose }) {
       className="flex flex-col h-full overflow-y-auto"
       style={{ backgroundColor: SIDEBAR_COLOR, width: '260px' }}
     >
+      {/* ── Brand ──────────────────────────────────────── */}
       <div
         className="flex items-center gap-3 px-5 py-5 shrink-0"
         style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}
@@ -255,6 +260,7 @@ export default function Sidebar({ isOpen, onClose }) {
           </div>
         </button>
 
+        {/* Mobile close button */}
         <button
           onClick={onClose}
           className="md:hidden ml-auto shrink-0 w-7 h-7 rounded-md flex items-center justify-center focus:outline-none"
@@ -267,6 +273,7 @@ export default function Sidebar({ isOpen, onClose }) {
         </button>
       </div>
 
+      {/* ── Nav ────────────────────────────────────────── */}
       <nav className="flex-1 px-3 py-4">
         <p
           className="px-3 mb-2 text-xs font-bold tracking-[0.14em] uppercase"
@@ -313,6 +320,7 @@ export default function Sidebar({ isOpen, onClose }) {
         </div>
       </nav>
 
+      {/* ── User info + logout ─────────────────────────── */}
       {isAuthenticated && user && profile && (
         <div
           className="px-4 py-3 shrink-0"
@@ -356,6 +364,7 @@ export default function Sidebar({ isOpen, onClose }) {
         </div>
       )}
 
+      {/* ── Footer ─────────────────────────────────────── */}
       <div
         className="px-5 py-3 shrink-0"
         style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}
@@ -369,10 +378,12 @@ export default function Sidebar({ isOpen, onClose }) {
 
   return (
     <>
+      {/* Desktop: permanent fixed sidebar */}
       <div className="hidden md:flex fixed left-0 top-0 h-full z-40" style={{ width: '260px' }}>
         {sidebar}
       </div>
 
+      {/* Mobile: slide-in overlay */}
       <div
         className="md:hidden fixed inset-0 z-40 transition-opacity duration-300"
         style={{

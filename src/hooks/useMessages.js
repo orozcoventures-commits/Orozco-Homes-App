@@ -6,6 +6,9 @@ export function useMessages(projectId, userId, isAdmin) {
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState(null);
 
+  // IDs that arrived via the realtime channel (not the initial fetch).
+  // Stored in a ref so reads in the render cycle are always current without
+  // triggering re-renders when the set is mutated.
   const realtimeIds = useRef(new Set());
 
   useEffect(() => {
@@ -19,6 +22,7 @@ export function useMessages(projectId, userId, isAdmin) {
     setError(null);
     realtimeIds.current = new Set();
 
+    // Initial fetch — sorted ascending so the chat reads top→bottom
     supabase
       .from('messages')
       .select('id, sender_id, sender_role, content, created_at')
@@ -30,6 +34,8 @@ export function useMessages(projectId, userId, isAdmin) {
         setLoading(false);
       });
 
+    // Live channel — INSERT events for this project arrive here instantly.
+    // The project_id filter requires REPLICA IDENTITY FULL (migration 021).
     const channel = supabase
       .channel(`messages:project:${projectId}`)
       .on(
@@ -42,6 +48,7 @@ export function useMessages(projectId, userId, isAdmin) {
         },
         (payload) => {
           setMessages((prev) => {
+            // Guard against duplicate: optimistic insert may already be present
             if (prev.some((m) => m.id === payload.new.id)) return prev;
             realtimeIds.current.add(payload.new.id);
             return [...prev, payload.new];

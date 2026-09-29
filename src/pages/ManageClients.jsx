@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 
+// Returns a random 4-digit zero-padded string, e.g. '0512' or '3921'.
 function generateUniquePin() {
   return String(Math.floor(Math.random() * 10000)).padStart(4, '0');
 }
@@ -153,12 +154,15 @@ function PinRow({ project, clientName, onCopy }) {
     <div className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl"
       style={{ backgroundColor: '#F9F8F6', border: '1px solid #F0EEE9' }}>
 
+      {/* Project name */}
       <div className="min-w-0 flex-1">
         <p className="text-xs font-semibold truncate" style={{ color: '#002147' }}>{project.project_name}</p>
         <p className="text-xs" style={{ color: '#9CA3AF' }}>Project PIN</p>
       </div>
 
+      {/* PIN display + controls */}
       <div className="flex items-center gap-1.5 shrink-0">
+        {/* PIN digits */}
         <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg"
           style={{ backgroundColor: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.35)' }}>
           <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -170,6 +174,7 @@ function PinRow({ project, clientName, onCopy }) {
           </span>
         </div>
 
+        {/* Show / Hide */}
         <button
           onClick={() => setRevealed((v) => !v)}
           className="text-xs px-2.5 py-1.5 rounded-lg focus:outline-none transition-colors"
@@ -178,6 +183,7 @@ function PinRow({ project, clientName, onCopy }) {
           {revealed ? 'Hide' : 'Show'}
         </button>
 
+        {/* Share — primary gold action */}
         <button
           onClick={handleShare}
           title={`Copy PIN access message for ${project.project_name}`}
@@ -201,6 +207,7 @@ function ClientRow({ client, projects, onCopy }) {
 
   return (
     <div style={{ borderBottom: '1px solid #F3F2EE' }}>
+      {/* Client identity */}
       <div className="flex items-center gap-3 px-5 pt-4 pb-3">
         <div
           className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white shrink-0"
@@ -216,6 +223,7 @@ function ClientRow({ client, projects, onCopy }) {
         </div>
       </div>
 
+      {/* Projects grouped under client with gold accent line */}
       <div className="pb-3 px-5">
         {clientProjects.length > 0 ? (
           <div className="pl-3 space-y-1.5" style={{ borderLeft: '2px solid rgba(212,175,55,0.35)' }}>
@@ -265,6 +273,7 @@ export default function ManageClients() {
 
     let projects = projectData ?? [];
 
+    // Backfill any legacy rows that have no PIN — generate, persist, and patch locally
     const missing = projects.filter((p) => !p.project_pin);
     if (missing.length > 0) {
       const patches = await Promise.all(
@@ -311,6 +320,7 @@ export default function ManageClients() {
     <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       <Toast message={toast} />
 
+      {/* Header */}
       <div className="flex items-start justify-between mb-8 gap-4">
         <div>
           <p className="text-xs font-bold tracking-[0.18em] uppercase mb-1" style={{ color: '#D4AF37' }}>Admin Tool</p>
@@ -340,6 +350,7 @@ export default function ManageClients() {
         </button>
       </div>
 
+      {/* Add client form */}
       {showForm && (
         <div
           className="rounded-2xl mb-6"
@@ -355,6 +366,7 @@ export default function ManageClients() {
         </div>
       )}
 
+      {/* Clients list */}
       <div
         className="rounded-2xl overflow-hidden"
         style={{ backgroundColor: '#fff', border: '1.5px solid #E8E6E1', boxShadow: '0 2px 12px rgba(0,33,71,0.06)' }}
@@ -399,6 +411,7 @@ export default function ManageClients() {
         )}
       </div>
 
+      {/* Info tip */}
       {clients.length > 0 && (
         <div
           className="mt-4 flex items-start gap-3 px-4 py-3 rounded-xl text-xs"

@@ -83,6 +83,8 @@ CREATE TRIGGER trg_job_schedule_updated_at
   FOR EACH ROW EXECUTE FUNCTION public.set_job_schedule_updated_at();
 
 -- ── 4. Conflict Detection RPC ─────────────────────────────────────────────────
+-- Returns a row for every scheduling conflict (subcontractor or equipment)
+-- that overlaps the requested [p_start, p_end) window.
 CREATE OR REPLACE FUNCTION public.check_schedule_conflicts(
   p_assigned_to UUID,
   p_resources   UUID[],
@@ -94,10 +96,11 @@ RETURNS TABLE (
   conflict_id      UUID,
   conflict_task    TEXT,
   conflict_project TEXT,
-  conflict_type    TEXT,
-  conflict_item    TEXT
+  conflict_type    TEXT,   -- 'subcontractor' | 'resource'
+  conflict_item    TEXT    -- name of the conflicting person or tool
 )
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  -- Subcontractor double-booking
   SELECT js.id, js.task_name, pr.project_name,
          'subcontractor'::TEXT, sc.name
   FROM   public.job_schedules  js
@@ -111,6 +114,7 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
 
   UNION ALL
 
+  -- Equipment / resource double-booking
   SELECT js.id, js.task_name, pr.project_name,
          'resource'::TEXT, r.name
   FROM   public.job_schedules js
@@ -126,6 +130,9 @@ $$;
 GRANT EXECUTE ON FUNCTION public.check_schedule_conflicts TO authenticated;
 
 -- ── 5. Dependency Cascade RPC ─────────────────────────────────────────────────
+-- Shifts every schedule that directly or transitively depends on p_root_id
+-- by the given interval.  The root itself is NOT moved here — caller already
+-- updated it.  Returns the UUID of each row that was shifted.
 CREATE OR REPLACE FUNCTION public.cascade_dependency_shift(
   p_root_id  UUID,
   p_interval INTERVAL,
@@ -148,6 +155,7 @@ BEGIN
 
     RETURN NEXT dep_id;
 
+    -- Recurse: shift dependents of dep_id
     RETURN QUERY SELECT * FROM public.cascade_dependency_shift(
       dep_id, p_interval, p_visited || dep_id
     );

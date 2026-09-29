@@ -51,6 +51,7 @@ export function useSchedule() {
     if (data) setProjects(data);
   }
 
+  // Returns array of conflict rows; empty means no conflict.
   const checkConflicts = useCallback(async ({
     assignedTo,
     resourcesAllocated = [],

@@ -301,6 +301,7 @@ function AccordionSection({ section, isOpen, onToggle }) {
         boxShadow: isOpen ? '0 4px 20px rgba(212,175,55,0.12)' : '0 1px 4px rgba(0,33,71,0.04)',
       }}
     >
+      {/* Header */}
       <button
         onClick={onToggle}
         className="w-full flex items-center gap-4 px-5 py-4 text-left focus:outline-none"
@@ -346,6 +347,7 @@ function AccordionSection({ section, isOpen, onToggle }) {
         </div>
       </button>
 
+      {/* Body */}
       {isOpen && (
         <div
           className="px-5 pb-5 pt-1"
@@ -385,6 +387,7 @@ export default function ReadMe() {
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
 
+      {/* Header */}
       <div className="mb-8">
         <p className="text-xs font-bold tracking-[0.18em] uppercase mb-1" style={{ color: '#D4AF37' }}>
           Documentation
@@ -395,6 +398,7 @@ export default function ReadMe() {
         </p>
       </div>
 
+      {/* Quick-expand controls */}
       <div className="flex items-center gap-3 mb-5">
         <button
           onClick={expandAll}
@@ -419,6 +423,7 @@ export default function ReadMe() {
         </span>
       </div>
 
+      {/* Accordion */}
       <div className="space-y-3">
         {SECTIONS.map((section) => (
           <AccordionSection
@@ -430,6 +435,7 @@ export default function ReadMe() {
         ))}
       </div>
 
+      {/* Footer */}
       <div className="mt-10 text-center">
         <p className="text-xs" style={{ color: '#9CA3AF' }}>
           Orozco Homes · Virginia Beach, VA · 2026

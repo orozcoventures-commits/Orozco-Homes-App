@@ -38,6 +38,9 @@ BEGIN
 END $$;
 
 -- ── 3. SECURITY DEFINER helper for project membership ────────────────────────
+-- Returns TRUE when the calling user (auth.uid()) may see rows for the given
+-- project_id.  Runs as the function owner (postgres) so auth.users is always
+-- accessible.  STABLE + SECURITY DEFINER matches the pattern of get_user_role().
 CREATE OR REPLACE FUNCTION public.user_can_access_project(pid UUID)
 RETURNS BOOLEAN
 LANGUAGE sql

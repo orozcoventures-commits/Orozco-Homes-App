@@ -51,11 +51,14 @@ CREATE TABLE IF NOT EXISTS public.remodel_budget_actuals (
   id           UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
   project_id   UUID          NOT NULL
                REFERENCES public.projects(id) ON DELETE CASCADE,
+  -- WBS key exactly as used in the calculator (e.g. '1.1', 'M.2')
   wbs_key      TEXT          NOT NULL,
+  -- Real-world cost: invoices, subcontractor payments, material receipts
   actual_cost  NUMERIC(14,2) NOT NULL DEFAULT 0,
   notes        TEXT,
   created_at   TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
   updated_at   TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+  -- One actual row per (project, WBS line) — enforces project isolation
   CONSTRAINT remodel_budget_actuals_project_wbs_key UNIQUE (project_id, wbs_key)
 );
 

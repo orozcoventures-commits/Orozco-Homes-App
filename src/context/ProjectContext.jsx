@@ -3,7 +3,7 @@ import { createContext, useContext, useReducer } from 'react';
 const ProjectContext = createContext(null);
 
 const initialState = {
-  activeDbProject: null,
+  activeDbProject: null,  // real Supabase projects row
   activePage:      'home',
 };
 

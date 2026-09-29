@@ -74,6 +74,8 @@ CREATE POLICY "design_specs: client read own project"
   USING (public.user_can_access_project(project_id));
 
 -- ── 4. Client Respond RPC ─────────────────────────────────────────────────────
+-- Allows clients to approve or decline a design spec (status + optional feedback).
+-- SECURITY DEFINER ensures it bypasses RLS while still validating access.
 CREATE OR REPLACE FUNCTION public.client_respond_to_spec(
   p_spec_id  UUID,
   p_status   TEXT,

@@ -32,6 +32,7 @@ function Section({ title, children }) {
   );
 }
 
+// ── Lightbox ──────────────────────────────────────────────────────────────────
 function Lightbox({ src, caption, onClose }) {
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
@@ -64,6 +65,7 @@ export default function PinClientPortal() {
   const [error, setError]     = useState('');
   const [lightbox, setLightbox] = useState(null);
 
+  // Message state
   const [msgInput, setMsgInput]   = useState('');
   const [sending, setSending]     = useState(false);
   const [localMsgs, setLocalMsgs] = useState([]);
@@ -78,10 +80,13 @@ export default function PinClientPortal() {
     msgEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [localMsgs, data?.messages]);
 
+  // Poll for new messages every 5 s — PIN clients have no Supabase auth session
+  // so Realtime cannot deliver events to them via RLS-gated postgres_changes.
   useEffect(() => {
     if (!pinSession || !data) return;
 
     const poll = async () => {
+      // Find the latest confirmed (non-optimistic) message timestamp
       const confirmed = localMsgs.filter((m) => !String(m.id).startsWith('tmp-'));
       const after = confirmed.length > 0
         ? confirmed[confirmed.length - 1].created_at
@@ -112,6 +117,7 @@ export default function PinClientPortal() {
 
     const pin        = String(pinSession.pin ?? '').trim();
     const projectId  = String(pinSession.projectId ?? '').trim();
+
 
     const { data: result, error: err } = await supabase.rpc('get_pin_portal_data', {
       p_project_id: projectId,
@@ -169,6 +175,7 @@ export default function PinClientPortal() {
   const weekly    = data?.weekly_update;
   const orders    = data?.change_orders ?? [];
   const photos    = data?.photo_logs ?? [];
+  // projects table has no 'status' column — status always comes from weekly_update
   const statusCfg = STATUS_CFG[weekly?.status] ?? STATUS_CFG['on-track'];
 
   return (
@@ -177,6 +184,7 @@ export default function PinClientPortal() {
 
       <div className="min-h-screen" style={{ backgroundColor: '#F5F4F0' }}>
 
+        {/* Top bar */}
         <div className="sticky top-0 z-30 flex items-center justify-between px-4 sm:px-6 py-4"
           style={{ backgroundColor: '#002147', boxShadow: '0 2px 12px rgba(0,0,0,0.18)' }}>
           <div className="flex items-center gap-3">
@@ -237,6 +245,7 @@ export default function PinClientPortal() {
 
           {!loading && !error && data && (
             <>
+              {/* Project header */}
               <div className="rounded-2xl p-6 mb-6"
                 style={{ backgroundColor: '#002147', boxShadow: '0 4px 20px rgba(0,33,71,0.18)' }}>
                 <p className="text-xs font-bold tracking-[0.16em] uppercase mb-1"
@@ -245,12 +254,14 @@ export default function PinClientPortal() {
 
                 {weekly && (
                   <>
+                    {/* Status pill */}
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold mb-4"
                       style={{ backgroundColor: statusCfg.bg, color: statusCfg.text }}>
                       <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: statusCfg.dot }} />
                       {statusCfg.label}
                     </span>
 
+                    {/* Progress bar */}
                     <div className="mb-3">
                       <div className="flex justify-between text-xs mb-1.5">
                         <span style={{ color: 'rgba(255,255,255,0.55)' }}>{weekly.current_phase || 'In Progress'}</span>
@@ -272,6 +283,7 @@ export default function PinClientPortal() {
                 )}
               </div>
 
+              {/* Change orders */}
               {orders.length > 0 && (
                 <Section title="Change Orders">
                   <div className="space-y-3">
@@ -306,6 +318,7 @@ export default function PinClientPortal() {
                 </Section>
               )}
 
+              {/* Photo log */}
               {photos.length > 0 && (
                 <Section title="Progress Photos">
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -326,6 +339,7 @@ export default function PinClientPortal() {
                             </svg>
                           </div>
                         )}
+                        {/* Category badge */}
                         <div className="absolute top-1.5 left-1.5">
                           <span className="text-xs font-bold px-1.5 py-0.5 rounded"
                             style={{ backgroundColor: '#D4AF37', color: '#002147', fontSize: '0.6rem' }}>
@@ -338,9 +352,12 @@ export default function PinClientPortal() {
                 </Section>
               )}
 
+              {/* Messages */}
               <Section title="Messages">
                 <div className="rounded-2xl overflow-hidden"
                   style={{ backgroundColor: '#fff', border: '1.5px solid #E8E6E1', boxShadow: '0 2px 8px rgba(0,33,71,0.05)' }}>
+
+                  {/* Message thread */}
                   <div className="p-4 space-y-3 max-h-72 overflow-y-auto">
                     {localMsgs.length === 0 ? (
                       <p className="text-xs text-center py-6" style={{ color: '#9CA3AF' }}>
@@ -371,6 +388,7 @@ export default function PinClientPortal() {
                     <div ref={msgEndRef} />
                   </div>
 
+                  {/* Message input */}
                   <form onSubmit={handleSend} className="flex gap-2 p-3"
                     style={{ borderTop: '1px solid #F3F2EE' }}>
                     <input
