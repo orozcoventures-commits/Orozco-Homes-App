@@ -1,4 +1,4 @@
--- Migration 021: Contracts table
+-- Migration 027: Contracts table
 -- Stores generated remodeling contracts (draft → sent → signed lifecycle)
 
 CREATE TABLE IF NOT EXISTS public.contracts (
