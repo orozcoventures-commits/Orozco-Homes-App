@@ -118,7 +118,6 @@ export default function PinClientPortal() {
     const pin        = String(pinSession.pin ?? '').trim();
     const projectId  = String(pinSession.projectId ?? '').trim();
 
-    console.log('[PinPortal] fetching data', { projectId, pin });
 
     const { data: result, error: err } = await supabase.rpc('get_pin_portal_data', {
       p_project_id: projectId,
@@ -129,7 +128,6 @@ export default function PinClientPortal() {
 
     if (err) {
       const isNotFound = err.code === 'PGRST202' || err.code === '42883';
-      console.error('[PinPortal] RPC error', { code: err.code, message: err.message, hint: err.hint, details: err.details });
       if (isNotFound) {
         setError('Portal not configured yet (function missing). Contractor: run migration 017 in Supabase SQL Editor.');
       } else {
@@ -139,12 +137,10 @@ export default function PinClientPortal() {
     }
 
     if (!result) {
-      console.warn('[PinPortal] RPC returned null — PIN mismatch or project not found', { projectId, pin });
       setError('Your PIN session no longer matches the project record. Please sign out and sign in again.');
       return;
     }
 
-    console.log('[PinPortal] data loaded successfully', result);
     setData(result);
     setLocalMsgs(result.messages ?? []);
   }
