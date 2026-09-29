@@ -15,8 +15,9 @@
 // (no native WebSocket), and the site's functions run on Node 20.
 
 function getConfig() {
-  const url = process.env.SUPABASE_URL?.replace(/\/+$/, '');
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  // Accept the project URL with a trailing slash or the Data API's /rest/v1 suffix.
+  const url = process.env.SUPABASE_URL?.trim().replace(/\/+$/, '').replace(/\/rest\/v1$/, '');
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
   if (!url || !key) throw new Error('SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is not set');
   return { url, key };
 }
@@ -29,18 +30,45 @@ async function supabaseGet({ url, key }, path, bearer = key) {
   return { ok: res.ok, status: res.status, body };
 }
 
+// Names the kind of key configured (never the key itself) so a misconfigured
+// anon/publishable key is obvious in the function log.
+function describeKey(key) {
+  if (key.startsWith('sb_secret_')) return 'secret';
+  if (key.startsWith('sb_publishable_')) return 'publishable (wrong key)';
+  try {
+    const { role } = JSON.parse(Buffer.from(key.split('.')[1], 'base64url').toString());
+    return role === 'service_role' ? 'service_role' : `${role} (wrong key)`;
+  } catch {
+    return 'unrecognized';
+  }
+}
+
+function denyAdmin(config, reason) {
+  console.error('[subcontractors-search] admin check failed:', reason, `| key type: ${describeKey(config.key)}`);
+  return false;
+}
+
 async function isAdmin(config, req) {
   const token = req.headers.get('authorization')?.match(/^Bearer\s+(.+)$/i)?.[1];
-  if (!token) return false;
+  if (!token) return denyAdmin(config, 'no access token sent');
 
   const user = await supabaseGet(config, '/auth/v1/user', token);
-  if (!user.ok || !user.body?.id) return false;
+  if (!user.ok || !user.body?.id) {
+    return denyAdmin(config, `auth/v1/user returned HTTP ${user.status} ${user.body?.msg ?? user.body?.message ?? ''}`);
+  }
 
   const profile = await supabaseGet(
     config,
     `/rest/v1/profiles?select=role&id=eq.${encodeURIComponent(user.body.id)}&limit=1`,
   );
-  return profile.ok && profile.body?.[0]?.role === 'admin';
+  if (!profile.ok) {
+    return denyAdmin(config, `profiles returned HTTP ${profile.status} ${profile.body?.message ?? ''}`);
+  }
+  const role = profile.body?.[0]?.role;
+  if (role !== 'admin') {
+    return denyAdmin(config, role ? `profile role is '${role}'` : 'no profile row visible for this user');
+  }
+  return true;
 }
 
 export function matchSubcontractors(subcontractors, taskName) {
