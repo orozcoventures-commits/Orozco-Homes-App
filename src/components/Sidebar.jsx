@@ -46,6 +46,19 @@ const CONTRACTOR_TOOLS = [
     ),
   },
   {
+    label: 'Subcontractors',
+    page: 'subcontractors',
+    adminOnly: true,
+    badge: null,
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M2 18a1 1 0 0 0 1 1h18a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v2z" />
+        <path d="M10 15V6a2 2 0 0 1 4 0v9" />
+        <path d="M4 15v-3a8 8 0 0 1 16 0v3" />
+      </svg>
+    ),
+  },
+  {
     label: 'Weekly Updates',
     page: 'weekly-updates',
     badge: null,

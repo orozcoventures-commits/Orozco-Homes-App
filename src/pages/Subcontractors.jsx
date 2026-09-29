@@ -185,7 +185,8 @@ export default function Subcontractors() {
       <div className="relative mb-3">
         <Search size={17} className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: '#9CA3AF' }} />
         <input
-          type="search"
+          type="text"
+          enterKeyHint="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search a trade, e.g. Drywall, Plumbing, HVAC…"
