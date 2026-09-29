@@ -2,7 +2,7 @@
 // table (migration 028). Safe to re-run — rows are upserted by id.
 // Delete this script once the data is in Supabase.
 //
-// Usage (from the repo root, with 028_subcontractors.sql already applied):
+// Usage (from the repo root, with 028_subcontractor_directory.sql already applied):
 //   SUPABASE_URL=https://<project>.supabase.co \
 //   SUPABASE_SERVICE_ROLE_KEY=<service role key> \
 //   node scripts/seed-subcontractors.mjs
@@ -52,14 +52,14 @@ if (!url || !key) {
 
 const supabase = createClient(url, key, { auth: { persistSession: false } });
 
-const { error } = await supabase.from('subcontractors').upsert(rows, { onConflict: 'id' });
+const { error } = await supabase.from('subcontractor_directory').upsert(rows, { onConflict: 'id' });
 if (error) {
   console.error('Upload failed:', error.message);
   process.exit(1);
 }
 
 const { count, error: countError } = await supabase
-  .from('subcontractors')
+  .from('subcontractor_directory')
   .select('id', { count: 'exact', head: true })
   .in('id', rows.map((r) => r.id));
 if (countError) {
@@ -67,5 +67,5 @@ if (countError) {
   process.exit(1);
 }
 
-console.log(`Done: ${count} of ${rows.length} rows present in public.subcontractors`);
+console.log(`Done: ${count} of ${rows.length} rows present in public.subcontractor_directory`);
 process.exit(count === rows.length ? 0 : 1);

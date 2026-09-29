@@ -3,7 +3,7 @@
 // Returns subcontractors whose `specialty` or `service` contains `taskName`
 // (case-insensitive). With no taskName, or no matches, returns the full list.
 //
-// Reads from the Supabase `subcontractors` table (migration 028) using the
+// Reads from the Supabase `subcontractor_directory` table (migration 028) using the
 // service role key, so callers must prove they are an admin: send the
 // logged-in user's Supabase access token as `Authorization: Bearer <token>`.
 //
@@ -71,7 +71,7 @@ export default async (req) => {
   // The whole directory is small (~115 rows), and the no-match fallback needs
   // the full list anyway, so fetch once and filter in memory.
   const { data: subcontractors, error } = await supabase
-    .from('subcontractors')
+    .from('subcontractor_directory')
     .select('id, service, name, company, specialty, phone, email, website, address, license, reference, notes')
     .order('id');
   if (error) {
