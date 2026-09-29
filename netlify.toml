@@ -9,7 +9,3 @@
   from   = "/*"
   to     = "/index.html"
   status = 200
-
-# Bundle the (uncommitted) subcontractor data with the search function only.
-[functions."subcontractors-search"]
-  included_files = ["subcontractors.json"]

@@ -3,39 +3,39 @@
 // Returns subcontractors whose `specialty` or `service` contains `taskName`
 // (case-insensitive). With no taskName, or no matches, returns the full list.
 //
-// Data comes from subcontractors.json at the repo root. That file holds
-// personal contact details and is intentionally not committed, so it must be
-// present at deploy time (see netlify.toml `included_files`) or pointed to via
-// the SUBCONTRACTORS_FILE environment variable.
+// Reads from the Supabase `subcontractors` table (migration 028) using the
+// service role key, so callers must prove they are an admin: send the
+// logged-in user's Supabase access token as `Authorization: Bearer <token>`.
+//
+// Required Netlify environment variables (server-side only, never VITE_*):
+//   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 
-import { readFile } from 'node:fs/promises';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { createClient } from '@supabase/supabase-js';
 
-const DATA_FILE = 'subcontractors.json';
+let client = null;
 
-function candidatePaths() {
-  const here = path.dirname(fileURLToPath(import.meta.url));
-  return [
-    process.env.SUBCONTRACTORS_FILE,
-    path.resolve(process.cwd(), DATA_FILE),
-    path.resolve(here, '../..', DATA_FILE),
-  ].filter(Boolean);
+function getSupabase() {
+  if (client) return client;
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) throw new Error('SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is not set');
+  client = createClient(url, key, { auth: { persistSession: false } });
+  return client;
 }
 
-let cache = null;
+async function isAdmin(supabase, req) {
+  const token = req.headers.get('authorization')?.match(/^Bearer\s+(.+)$/i)?.[1];
+  if (!token) return false;
 
-async function loadSubcontractors() {
-  if (cache) return cache;
-  for (const file of candidatePaths()) {
-    try {
-      cache = JSON.parse(await readFile(file, 'utf8'));
-      return cache;
-    } catch (err) {
-      if (err.code !== 'ENOENT') throw err;
-    }
-  }
-  throw new Error(`${DATA_FILE} not found`);
+  const { data: { user } = {}, error } = await supabase.auth.getUser(token);
+  if (error || !user) return false;
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle();
+  return profile?.role === 'admin';
 }
 
 export function matchSubcontractors(subcontractors, taskName) {
@@ -56,11 +56,26 @@ export default async (req) => {
     return Response.json({ error: 'Method not allowed' }, { status: 405, headers: { Allow: 'GET' } });
   }
 
-  let subcontractors;
+  let supabase;
   try {
-    subcontractors = await loadSubcontractors();
+    supabase = getSupabase();
   } catch (err) {
     console.error('[subcontractors-search]', err.message);
+    return Response.json({ error: 'Subcontractor data is unavailable' }, { status: 500 });
+  }
+
+  if (!(await isAdmin(supabase, req))) {
+    return Response.json({ error: 'Admin access required' }, { status: 401 });
+  }
+
+  // The whole directory is small (~115 rows), and the no-match fallback needs
+  // the full list anyway, so fetch once and filter in memory.
+  const { data: subcontractors, error } = await supabase
+    .from('subcontractors')
+    .select('id, service, name, company, specialty, phone, email, website, address, license, reference, notes')
+    .order('id');
+  if (error) {
+    console.error('[subcontractors-search]', error.message);
     return Response.json({ error: 'Subcontractor data is unavailable' }, { status: 500 });
   }
 
