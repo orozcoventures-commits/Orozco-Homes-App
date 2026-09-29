@@ -1,76 +1,45 @@
-import { useMemo, useState } from 'react';
-import { Search, X, Phone, Mail, Globe, MapPin, BadgeCheck, MessageSquareQuote, Users } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import {
+  Search, X, Phone, Mail, Globe, MapPin, BadgeCheck, MessageSquareQuote, Users,
+  LoaderCircle, TriangleAlert, LockKeyhole, RefreshCw,
+} from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
-// ── Placeholder data ──────────────────────────────────────────────────────────
-// Design preview only: fictional contractors in the same shape the
-// /api/subcontractors/search endpoint returns. Replaced by the live API later.
-const PLACEHOLDER_SUBCONTRACTORS = [
-  {
-    id: 1, service: 'Plumbing', name: 'Sam Carter', company: 'Harbor Plumbing Co.',
-    specialty: 'Plumbing, Sewer Line Camera Inspection & Pipe Cleaning',
-    phone: ['757-555-0101', '757-555-0102'], email: ['office@harborplumbing.example'], website: [],
-    address: '100 Example Ave, Virginia Beach, VA 23452', license: null,
-    reference: 'Do work for our company', notes: null,
-  },
-  {
-    id: 2, service: 'Drywall/Paint', name: 'Luis Ortega', company: null,
-    specialty: 'Drywall & Painting',
-    phone: ['757-555-0110'], email: [], website: [],
-    address: null, license: null, reference: 'Bishard Connection', notes: null,
-  },
-  {
-    id: 3, service: 'Electrical', name: 'Dana Reeves', company: 'Brightline Electric LLC',
-    specialty: 'Electrical',
-    phone: ['757-555-0120'], email: ['dana@brightline.example'], website: ['www.brightline.example'],
-    address: '200 Sample Rd, Chesapeake, VA 23320', license: 'VA-0000000000',
-    reference: 'Recommended by a client', notes: 'Only new homes',
-  },
-  {
-    id: 4, service: 'HVAC', name: null, company: 'Coastal Air Systems',
-    specialty: 'HVAC Installation, Ductwork & Air Control',
-    phone: ['757-555-0130', '757-555-0131'], email: [], website: [],
-    address: null, license: null, reference: 'Saw on the street', notes: null,
-  },
-  {
-    id: 5, service: 'Framing/Drywall', name: 'Ray Morales', company: null,
-    specialty: 'Framing & Drywall',
-    phone: ['757-555-0140'], email: [], website: [],
-    address: null, license: null, reference: null, notes: null,
-  },
-  {
-    id: 6, service: 'Cabinets', name: 'Erin Blake', company: 'Tidewater Cabinet Works',
-    specialty: 'Cabinets & Countertops',
-    phone: ['757-555-0150'], email: ['erin@tidewatercabinets.example', 'orders@tidewatercabinets.example'],
-    website: ['www.tidewatercabinets.example'], address: '300 Demo Blvd, Norfolk, VA 23502',
-    license: null, reference: null, notes: null,
-  },
-  {
-    id: 7, service: 'Tile', name: 'Marco Silva', company: null,
-    specialty: 'Tile, Drywall & Painting',
-    phone: ['757-555-0160'], email: [], website: [],
-    address: null, license: null, reference: 'Do work for our company', notes: null,
-  },
-  {
-    id: 8, service: 'Roofing/Siding', name: null, company: 'Summit Roofing & Siding',
-    specialty: 'Roofing & Siding',
-    phone: ['757-555-0170'], email: [], website: [],
-    address: null, license: 'Licensed and Insured', reference: null, notes: null,
-  },
-];
+const SEARCH_DEBOUNCE_MS = 250;
+
+class SearchError extends Error {
+  constructor(message, status) {
+    super(message);
+    this.status = status;
+  }
+}
+
+// Calls the admin-only search function with the signed-in user's access token.
+// Resolves to { taskName, matched, count, subcontractors }.
+async function searchSubcontractors(taskName, signal) {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new SearchError('Your session has expired. Please sign in again.', 401);
+
+  const params = new URLSearchParams();
+  if (taskName) params.set('taskName', taskName);
+
+  const res = await fetch(`/api/subcontractors/search?${params}`, {
+    headers: { Authorization: `Bearer ${session.access_token}` },
+    signal,
+  });
+  const body = await res.json().catch(() => null);
+
+  if (res.status === 401) {
+    throw new SearchError('Admin access required. Please sign in again with an admin account.', 401);
+  }
+  if (!res.ok || !Array.isArray(body?.subcontractors)) {
+    throw new SearchError(body?.error || 'Could not load subcontractors.', res.status);
+  }
+  return body;
+}
 
 // Quick filters for the trades used most across the remodel scopes.
 const QUICK_TRADES = ['Plumbing', 'Electrical', 'HVAC', 'Framing', 'Drywall', 'Tile', 'Cabinets', 'Roofing', 'Concrete', 'Painting'];
-
-// Same rule as the search API: case-insensitive match on specialty or service;
-// no term or no matches falls back to the full list.
-function matchSubcontractors(list, term) {
-  const q = term.trim().toLowerCase();
-  if (!q) return { matched: false, results: list };
-  const results = list.filter((s) =>
-    [s.specialty, s.service].some((field) => field?.toLowerCase().includes(q)),
-  );
-  return results.length ? { matched: true, results } : { matched: false, results: list };
-}
 
 const telHref = (phone) => `tel:${phone.replace(/[^\d+]/g, '')}`;
 const webHref = (site) => (/^https?:\/\//i.test(site) ? site : `https://${site}`);
@@ -162,13 +131,34 @@ function ContractorCard({ sub }) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function Subcontractors() {
   const [query, setQuery] = useState('');
-  const subcontractors = PLACEHOLDER_SUBCONTRACTORS;
+  const [attempt, setAttempt] = useState(0);
+  // Last completed request: `key` identifies which search it answered, so the
+  // page is loading whenever the current search hasn't come back yet.
+  const [response, setResponse] = useState({ key: null, data: null, error: null });
 
-  const { matched, results } = useMemo(
-    () => matchSubcontractors(subcontractors, query),
-    [subcontractors, query],
-  );
   const term = query.trim();
+  const requestKey = `${term}\u0000${attempt}`;
+  const loading = response.key !== requestKey;
+  const { data, error } = response;
+  const results = data?.subcontractors ?? [];
+  const shownTerm = data?.taskName ?? '';
+
+  useEffect(() => {
+    const controller = new AbortController();
+    // Debounce typing; the first load and cleared searches go out immediately.
+    const timer = setTimeout(() => {
+      searchSubcontractors(term, controller.signal)
+        .then((body) => setResponse({ key: requestKey, data: body, error: null }))
+        .catch((err) => {
+          if (err.name === 'AbortError') return;
+          setResponse((prev) => ({ key: requestKey, data: prev.data, error: err }));
+        });
+    }, term ? SEARCH_DEBOUNCE_MS : 0);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [term, requestKey]);
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -229,26 +219,71 @@ export default function Subcontractors() {
         })}
       </div>
 
-      {/* Result summary */}
-      <div className="flex items-center gap-2 mb-4 text-sm" style={{ color: '#6B7280' }}>
-        <Users size={15} />
-        {!term && <span>Showing all <strong style={{ color: '#002147' }}>{results.length}</strong> subcontractors</span>}
-        {term && matched && (
-          <span>
-            <strong style={{ color: '#002147' }}>{results.length}</strong> {results.length === 1 ? 'match' : 'matches'} for “{term}”
-          </span>
-        )}
-        {term && !matched && (
-          <span>
-            No match for “{term}”. Showing all <strong style={{ color: '#002147' }}>{results.length}</strong> subcontractors.
-          </span>
-        )}
-      </div>
+      {/* Error */}
+      {error && (
+        <div
+          className="flex items-start gap-3 px-4 py-3 mb-4 rounded-xl text-sm"
+          style={{ backgroundColor: '#FEF2F2', border: '1px solid #FECACA', color: '#991B1B' }}
+          role="alert"
+        >
+          {error.status === 401
+            ? <LockKeyhole size={16} className="shrink-0 mt-0.5" />
+            : <TriangleAlert size={16} className="shrink-0 mt-0.5" />}
+          <p className="flex-1">
+            {error.message.replace(/([^.!?])$/, '$1.')}
+            {data && ' Showing the last results that loaded.'}
+          </p>
+          {error.status !== 401 && (
+            <button
+              type="button"
+              onClick={() => setAttempt((n) => n + 1)}
+              className="shrink-0 flex items-center gap-1.5 text-xs font-bold focus:outline-none"
+              style={{ color: '#991B1B' }}
+            >
+              <RefreshCw size={13} /> Retry
+            </button>
+          )}
+        </div>
+      )}
 
-      {/* Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {results.map((sub) => <ContractorCard key={sub.id} sub={sub} />)}
-      </div>
+      {/* First load */}
+      {!data && loading && (
+        <div className="flex flex-col items-center justify-center py-20 gap-3" style={{ color: '#6B7280' }}>
+          <LoaderCircle size={22} className="animate-spin" style={{ color: '#D4AF37' }} />
+          <p className="text-sm">Loading subcontractors…</p>
+        </div>
+      )}
+
+      {data && (
+        <>
+          {/* Result summary */}
+          <div className="flex items-center gap-2 mb-4 text-sm" style={{ color: '#6B7280' }}>
+            {loading
+              ? <LoaderCircle size={15} className="animate-spin" style={{ color: '#D4AF37' }} />
+              : <Users size={15} />}
+            {!shownTerm && <span>Showing all <strong style={{ color: '#002147' }}>{data.count}</strong> subcontractors</span>}
+            {shownTerm && data.matched && (
+              <span>
+                <strong style={{ color: '#002147' }}>{data.count}</strong> {data.count === 1 ? 'match' : 'matches'} for “{shownTerm}”
+              </span>
+            )}
+            {shownTerm && !data.matched && (
+              <span>
+                No match for “{shownTerm}”. Showing all <strong style={{ color: '#002147' }}>{data.count}</strong> subcontractors.
+              </span>
+            )}
+          </div>
+
+          {/* Cards */}
+          <div
+            className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 transition-opacity duration-150"
+            style={{ opacity: loading ? 0.6 : 1 }}
+            aria-busy={loading}
+          >
+            {results.map((sub) => <ContractorCard key={sub.id} sub={sub} />)}
+          </div>
+        </>
+      )}
     </div>
   );
 }
