@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
 import {
   Search, X, Phone, Mail, Globe, MapPin, BadgeCheck, MessageSquareQuote, Users,
-  LoaderCircle, TriangleAlert, LockKeyhole, RefreshCw,
+  LoaderCircle, TriangleAlert, LockKeyhole, RefreshCw, Plus, Pencil, CheckCircle2,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import {
+  EMPTY_SUBCONTRACTOR_FORM, toForm, validateForm, createSubcontractor, updateSubcontractor,
+} from '../lib/subcontractorDirectory';
 
 const SEARCH_DEBOUNCE_MS = 250;
 
@@ -78,7 +81,7 @@ function DetailRow({ icon: Icon, children }) {
 }
 
 // ── Contractor card ───────────────────────────────────────────────────────────
-function ContractorCard({ sub }) {
+function ContractorCard({ sub, onEdit }) {
   const title = sub.company || sub.name || 'Unnamed contractor';
   const contact = sub.company && sub.name ? sub.name : null;
   const hasContact = sub.phone.length || sub.email.length || sub.website.length;
@@ -93,12 +96,24 @@ function ContractorCard({ sub }) {
           <h3 className="text-base font-bold leading-snug" style={{ color: '#002147' }}>{title}</h3>
           {contact && <p className="text-sm mt-0.5" style={{ color: '#6B7280' }}>{contact}</p>}
         </div>
-        <span
-          className="shrink-0 text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg"
-          style={{ backgroundColor: 'rgba(212,175,55,0.12)', color: '#8A6D12', border: '1px solid rgba(212,175,55,0.35)' }}
-        >
-          {sub.service}
-        </span>
+        <div className="shrink-0 flex items-center gap-1.5">
+          <span
+            className="text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg"
+            style={{ backgroundColor: 'rgba(212,175,55,0.12)', color: '#8A6D12', border: '1px solid rgba(212,175,55,0.35)' }}
+          >
+            {sub.service}
+          </span>
+          <button
+            type="button"
+            onClick={() => onEdit(sub)}
+            aria-label={`Edit ${title}`}
+            title="Edit"
+            className="w-7 h-7 rounded-lg flex items-center justify-center focus:outline-none hover:bg-gray-100"
+            style={{ color: '#6B7280' }}
+          >
+            <Pencil size={14} />
+          </button>
+        </div>
       </header>
 
       <p className="text-sm leading-relaxed" style={{ color: '#374151' }}>{sub.specialty}</p>
@@ -128,6 +143,127 @@ function ContractorCard({ sub }) {
   );
 }
 
+// ── Add / edit form ───────────────────────────────────────────────────────────
+const inputStyle = { border: '1.5px solid #E8E6E1', color: '#002147', backgroundColor: '#F9F8F6' };
+
+function Field({ label, hint, required, className = '', children }) {
+  return (
+    <div className={className}>
+      <label className="block text-xs font-semibold mb-1" style={{ color: '#374151' }}>
+        {label}{required && <span style={{ color: '#EF4444' }}> *</span>}
+      </label>
+      {children}
+      {hint && <p className="text-[11px] mt-1" style={{ color: '#9CA3AF' }}>{hint}</p>}
+    </div>
+  );
+}
+
+function SubcontractorModal({ mode, form, setForm, onSave, onClose, saving, error }) {
+  const isEdit = mode === 'edit';
+  const input = (field, props = {}) => (
+    <input
+      value={form[field]}
+      onChange={(e) => setForm((f) => ({ ...f, [field]: e.target.value }))}
+      className="w-full text-sm rounded-xl px-3 py-2 focus:outline-none"
+      style={inputStyle}
+      {...props}
+    />
+  );
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ backgroundColor: 'rgba(0,0,0,0.55)' }}
+      onClick={onClose}
+    >
+      <form
+        className="w-full max-w-lg rounded-2xl overflow-hidden flex flex-col"
+        style={{ backgroundColor: '#fff', maxHeight: '90vh', boxShadow: '0 20px 60px rgba(0,0,0,0.25)' }}
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={(e) => { e.preventDefault(); onSave(); }}
+        noValidate
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: '#E8E6E1' }}>
+          <h2 className="font-bold text-base" style={{ color: '#002147' }}>
+            {isEdit ? 'Edit Subcontractor' : 'Add Subcontractor'}
+          </h2>
+          <button type="button" onClick={onClose} aria-label="Close" className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-gray-100">
+            <X size={15} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+          {error && (
+            <div
+              className="flex items-start gap-2.5 px-4 py-3 rounded-xl text-sm"
+              style={{ backgroundColor: '#FEF2F2', border: '1px solid #FECACA', color: '#991B1B' }}
+              role="alert"
+            >
+              <TriangleAlert size={15} className="shrink-0 mt-0.5" /> {error}
+            </div>
+          )}
+
+          <div className="grid sm:grid-cols-2 gap-4">
+            <Field label="Company">{input('company', { placeholder: 'e.g. Harbor Plumbing Co.', autoFocus: true })}</Field>
+            <Field label="Contact name">{input('name', { placeholder: 'e.g. Sam Carter' })}</Field>
+            <Field label="Trade" required>{input('service', { placeholder: 'e.g. Plumbing' })}</Field>
+            <Field label="Specialty" hint="Leave blank to use the trade.">
+              {input('specialty', { placeholder: 'e.g. Sewer line repair' })}
+            </Field>
+          </div>
+
+          <Field label="Phone" hint="Separate multiple numbers with commas.">
+            {input('phone', { type: 'tel', placeholder: '757-555-0100, 757-555-0101' })}
+          </Field>
+          <Field label="Email" hint="Separate multiple emails with commas.">
+            {input('email', { type: 'email', placeholder: 'office@example.com' })}
+          </Field>
+          <Field label="Website">{input('website', { placeholder: 'www.example.com' })}</Field>
+          <Field label="Address">{input('address', { placeholder: 'Street, city, VA ZIP' })}</Field>
+
+          <div className="grid sm:grid-cols-2 gap-4">
+            <Field label="License">{input('license', { placeholder: 'e.g. VA-2710000000' })}</Field>
+            <Field label="How we know them">{input('reference', { placeholder: 'e.g. Bishard Connection' })}</Field>
+          </div>
+          <Field label="Notes">
+            <textarea
+              value={form.notes}
+              onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+              rows={2}
+              className="w-full text-sm rounded-xl px-3 py-2 focus:outline-none resize-y"
+              style={inputStyle}
+            />
+          </Field>
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t flex items-center gap-3" style={{ borderColor: '#E8E6E1' }}>
+          <div className="flex-1" />
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl text-sm font-medium"
+            style={{ backgroundColor: '#F5F4F0', color: '#374151' }}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={saving}
+            className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold disabled:opacity-50"
+            style={{ backgroundColor: '#002147', color: '#D4AF37' }}
+          >
+            {saving && <LoaderCircle size={13} className="animate-spin" />}
+            {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Add Subcontractor'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function Subcontractors() {
   const [query, setQuery] = useState('');
@@ -142,6 +278,57 @@ export default function Subcontractors() {
   const { data, error } = response;
   const results = data?.subcontractors ?? [];
   const shownTerm = data?.taskName ?? '';
+
+  // Add/edit modal: null when closed, else { mode: 'create' | 'edit', id? }
+  const [editor, setEditor] = useState(null);
+  const [form, setForm] = useState(EMPTY_SUBCONTRACTOR_FORM);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
+  const [notice, setNotice] = useState(null);
+
+  function openCreate() {
+    setForm(EMPTY_SUBCONTRACTOR_FORM);
+    setSaveError(null);
+    setEditor({ mode: 'create' });
+  }
+
+  function openEdit(sub) {
+    setForm(toForm(sub));
+    setSaveError(null);
+    setEditor({ mode: 'edit', id: sub.id });
+  }
+
+  function closeEditor() {
+    if (!saving) setEditor(null);
+  }
+
+  async function handleSave() {
+    const invalid = validateForm(form);
+    if (invalid) {
+      setSaveError(invalid);
+      return;
+    }
+    setSaving(true);
+    setSaveError(null);
+    const { error: err } = editor.mode === 'edit'
+      ? await updateSubcontractor(editor.id, form)
+      : await createSubcontractor(form);
+    setSaving(false);
+    if (err) {
+      setSaveError(err);
+      return;
+    }
+    const label = form.company.trim() || form.name.trim();
+    setNotice(editor.mode === 'edit' ? `Saved changes to ${label}.` : `Added ${label}.`);
+    setEditor(null);
+    setAttempt((n) => n + 1); // reload the list through the search API
+  }
+
+  useEffect(() => {
+    if (!notice) return undefined;
+    const timer = setTimeout(() => setNotice(null), 3500);
+    return () => clearTimeout(timer);
+  }, [notice]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -163,12 +350,24 @@ export default function Subcontractors() {
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       {/* Header */}
-      <div className="mb-6">
-        <p className="text-xs font-bold tracking-[0.18em] uppercase mb-1" style={{ color: '#D4AF37' }}>Admin Tool</p>
-        <h2 className="text-2xl font-bold" style={{ color: '#002147' }}>Subcontractors</h2>
-        <p className="text-sm mt-1" style={{ color: '#6B7280' }}>
-          Find the right trade partner for a task. Search by trade or specialty.
-        </p>
+      <div className="flex items-start justify-between gap-4 mb-6">
+        <div>
+          <p className="text-xs font-bold tracking-[0.18em] uppercase mb-1" style={{ color: '#D4AF37' }}>Admin Tool</p>
+          <h2 className="text-2xl font-bold" style={{ color: '#002147' }}>Subcontractors</h2>
+          <p className="text-sm mt-1" style={{ color: '#6B7280' }}>
+            Find the right trade partner for a task. Search by trade or specialty.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={openCreate}
+          className="shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all duration-150 focus:outline-none"
+          style={{ backgroundColor: '#002147', color: '#D4AF37' }}
+          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#003166'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#002147'; }}
+        >
+          <Plus size={15} strokeWidth={2.5} /> Add Subcontractor
+        </button>
       </div>
 
       {/* Search */}
@@ -280,9 +479,31 @@ export default function Subcontractors() {
             style={{ opacity: loading ? 0.6 : 1 }}
             aria-busy={loading}
           >
-            {results.map((sub) => <ContractorCard key={sub.id} sub={sub} />)}
+            {results.map((sub) => <ContractorCard key={sub.id} sub={sub} onEdit={openEdit} />)}
           </div>
         </>
+      )}
+
+      {editor && (
+        <SubcontractorModal
+          mode={editor.mode}
+          form={form}
+          setForm={setForm}
+          onSave={handleSave}
+          onClose={closeEditor}
+          saving={saving}
+          error={saveError}
+        />
+      )}
+
+      {notice && (
+        <div
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-3 rounded-2xl text-sm font-semibold shadow-xl"
+          style={{ backgroundColor: '#002147', color: '#D4AF37', pointerEvents: 'none', whiteSpace: 'nowrap' }}
+          role="status"
+        >
+          <CheckCircle2 size={15} /> {notice}
+        </div>
       )}
     </div>
   );
