@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 
 const SCHEDULE_SELECT = `
   *,
-  subcontractor:subcontractors(id, name, trade, color),
+  subcontractor:subcontractor_directory(id, name:display_name, trade:service),
   project:projects(id, project_name)
 `;
 
@@ -34,7 +34,10 @@ export function useSchedule() {
   }
 
   async function fetchSubcontractors() {
-    const { data } = await supabase.from('subcontractors').select('*').order('name');
+    const { data } = await supabase
+      .from('subcontractor_directory')
+      .select('id, name:display_name, trade:service')
+      .order('display_name');
     if (data) setSubcontractors(data);
   }
 
