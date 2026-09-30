@@ -106,7 +106,7 @@ export default async (req) => {
   const { ok, status, body: subcontractors } = await supabaseGet(
     config,
     '/rest/v1/subcontractor_directory'
-      + '?select=id,service,name,company,specialty,phone,email,website,address,license,reference,notes'
+      + '?select=id,service,name,company,specialty,phone,email,website,address,license,reference,notes,coi_expires_on,coi_file_path'
       + '&order=id.asc',
   );
   if (!ok || !Array.isArray(subcontractors)) {
