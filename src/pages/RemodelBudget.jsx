@@ -5,6 +5,8 @@ import {
   SPEC_LABELS,
   getProjectConfig,
   computeBaseLineValues,
+  DEFAULT_PCT_RATES,
+  grossMarginAmount,
 } from '../utils/remodelBudgetCalculator';
 import { supabase } from '../lib/supabase';
 import { useProject } from '../context/ProjectContext';
@@ -344,7 +346,7 @@ export default function RemodelBudget() {
   const [projectType,    setProjectType]    = useState('bathroom-medium');
   const [inputs,         setInputs]         = useState(() => defaultInputs('bathroom-medium'));
   const [specLevel,      setSpecLevel]      = useState('mid');
-  const [pctRates,       setPctRates]       = useState({ overheadPct: 18, profitPct: 12, contingencyPct: 10 });
+  const [pctRates,       setPctRates]       = useState(DEFAULT_PCT_RATES);
   const [userVals,       setUserVals]       = useState({});
   const [overrideFlags,  setOverrideFlags]  = useState({});
   const [openDivs,       setOpenDivs]       = useState({});
@@ -402,7 +404,7 @@ export default function RemodelBudget() {
       setProjectType(type);
       setInputs({ ...defaultInputs(type), ...(budget.inputs_json || {}) });
       setSpecLevel(budget.spec_level || 'mid');
-      setPctRates(budget.pct_rates_json || { overheadPct: 18, profitPct: 12, contingencyPct: 10 });
+      setPctRates(budget.pct_rates_json || DEFAULT_PCT_RATES);
       setUserVals(budget.overrides_json || {});
       setOverrideFlags(budget.flags_json || {});
       // Open all divisions
@@ -430,7 +432,7 @@ export default function RemodelBudget() {
     setProjectType('bathroom-medium');
     setInputs(defaultInputs('bathroom-medium'));
     setSpecLevel('mid');
-    setPctRates({ overheadPct: 18, profitPct: 12, contingencyPct: 10 });
+    setPctRates(DEFAULT_PCT_RATES);
     setUserVals({});
     setOverrideFlags({});
     setOpenDivs({});
@@ -514,7 +516,7 @@ export default function RemodelBudget() {
   function changeProjectType(typeId) {
     setProjectType(typeId);
     setInputs(defaultInputs(typeId));
-    setPctRates({ overheadPct: 18, profitPct: 12, contingencyPct: 10 });
+    setPctRates(DEFAULT_PCT_RATES);
     setUserVals({});
     setOverrideFlags({});
     const cfg = getProjectConfig(typeId);
@@ -542,9 +544,12 @@ export default function RemodelBudget() {
     }
     const nonPctWbs = allNonPctWbs(config);
     const baseSum = nonPctWbs.reduce((s, w) => s + (vals[w] ?? 0), 0) + designSpecsTotal;
-    vals['M.1'] = overrideFlags['M.1'] ? (userVals['M.1'] ?? 0) : baseSum * (pctRates.overheadPct / 100);
-    vals['M.2'] = overrideFlags['M.2'] ? (userVals['M.2'] ?? 0) : baseSum * (pctRates.profitPct   / 100);
     vals['M.3'] = overrideFlags['M.3'] ? (userVals['M.3'] ?? 0) : baseSum * (pctRates.contingencyPct / 100);
+    // Final Price = (Direct Costs + Contingency) / (1 - Target Gross Margin %).
+    // M.2 is the gross margin, which covers overhead and profit.
+    vals['M.2'] = overrideFlags['M.2']
+      ? (userVals['M.2'] ?? 0)
+      : grossMarginAmount(baseSum + vals['M.3'], pctRates.profitPct);
     return vals;
   }, [config, projectType, inputs, specLevel, pctRates, userVals, overrideFlags, designSpecsTotal]);
 
@@ -555,12 +560,12 @@ export default function RemodelBudget() {
 
     // Budget
     const directCosts        = nonPct.reduce((s, w) => s + (lineVals[w] ?? 0), 0) + designSpecsTotal;
-    const overhead           = lineVals['M.1'] ?? 0;
-    const profit             = lineVals['M.2'] ?? 0;
+    const profit             = lineVals['M.2'] ?? 0;   // gross margin (overhead + profit)
     const contingency        = lineVals['M.3'] ?? 0;
-    const totalClientPrice   = directCosts + overhead + profit + contingency;
-    const contractorMargin   = overhead + profit;
+    const totalClientPrice   = directCosts + contingency + profit;
+    const contractorMargin   = profit;
     const marginPct          = totalClientPrice > 0 ? contractorMargin / totalClientPrice : 0;
+    const marginTarget       = (pctRates.profitPct ?? 0) / 100;
     const sqftInput          = config.inputFields.find((f) => f.key === 'sqft');
     const costPerSqft        = sqftInput && inputs.sqft > 0 ? totalClientPrice / inputs.sqft : null;
 
@@ -578,12 +583,12 @@ export default function RemodelBudget() {
       divSums[div.key] = div.items.reduce((s, item) => s + (lineVals[item.wbs] ?? 0), 0);
 
     return {
-      directCosts, overhead, profit, contingency, totalClientPrice,
-      contractorMargin, marginPct, costPerSqft, divSums,
+      directCosts, profit, contingency, totalClientPrice,
+      contractorMargin, marginPct, marginTarget, costPerSqft, divSums,
       actualDirectCosts, actualOverhead, actualProfit, actualContingency,
       actualTotalPrice, totalVariance,
     };
-  }, [config, lineVals, inputs.sqft, designSpecsTotal, actualVals]);
+  }, [config, lineVals, inputs.sqft, designSpecsTotal, actualVals, pctRates.profitPct]);
 
   // ── Event handlers ──────────────────────────────────────────────────────────
   function handleLineChange(wbs, num)  { setUserVals((p) => ({ ...p, [wbs]: num })); setOverrideFlags((p) => ({ ...p, [wbs]: true })); }
@@ -723,9 +728,8 @@ export default function RemodelBudget() {
   </table>
   <div class="totals-block">
     <div class="totals-row sub"><span class="t-label">Direct Costs (Materials + Labor)</span><span class="t-value">$${Math.round(totals.directCosts).toLocaleString('en-US')}</span></div>
-    <div class="totals-row sub"><span class="t-label">Overhead (${pctRates.overheadPct}%)</span><span class="t-value">$${Math.round(totals.overhead).toLocaleString('en-US')}</span></div>
-    <div class="totals-row sub"><span class="t-label">Profit (${pctRates.profitPct}%)</span><span class="t-value">$${Math.round(totals.profit).toLocaleString('en-US')}</span></div>
     <div class="totals-row sub"><span class="t-label">Contingency (${pctRates.contingencyPct}%)</span><span class="t-value">$${Math.round(totals.contingency).toLocaleString('en-US')}</span></div>
+    <div class="totals-row sub"><span class="t-label">Gross Margin (${pctRates.profitPct}% of client price — covers overhead + profit)</span><span class="t-value">$${Math.round(totals.profit).toLocaleString('en-US')}</span></div>
     ${hasActuals ? `<div class="totals-row sub"><span class="t-label">Actual Total Expended</span><span class="t-value" style="color:#0369A1">$${Math.round(totals.actualTotalPrice).toLocaleString('en-US')}</span></div>` : ''}
     ${hasActuals ? `<div class="totals-row sub"><span class="t-label">Total Variance (Budget − Actual)</span><span class="t-value" style="color:${totals.totalVariance < 0 ? '#DC2626' : '#065F46'}">${totals.totalVariance >= 0 ? '+' : '−'}$${Math.round(Math.abs(totals.totalVariance)).toLocaleString('en-US')}</span></div>` : ''}
     <div class="totals-row grand"><span class="t-label">TOTAL CLIENT PRICE (BUDGET)</span><span class="t-value">$${Math.round(totals.totalClientPrice).toLocaleString('en-US')}</span></div>
@@ -884,8 +888,8 @@ export default function RemodelBudget() {
         </div>
         <SummaryCard label="Direct Costs" value={fmt(totals.directCosts)} sub="Materials + labor" />
         <SummaryCard label="Contractor Margin" value={fmt(totals.contractorMargin)} sub="Overhead + profit" />
-        <SummaryCard label="Gross Margin %" value={fmtPct(totals.marginPct)} sub="Of total client price"
-          color={totals.marginPct >= 0.25 ? '#059669' : '#D97706'} />
+        <SummaryCard label="Gross Margin %" value={fmtPct(totals.marginPct)} sub={`Target ${pctRates.profitPct}% of client price`}
+          color={totals.marginPct >= totals.marginTarget - 0.0005 ? '#059669' : '#D97706'} />
       </div>
 
       {/* Budget vs Actual summary bar — shown once actuals exist */}
@@ -1100,7 +1104,7 @@ export default function RemodelBudget() {
             ) : (
               <>
                 <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'rgba(212,175,55,0.6)' }}>Gross Margin</p>
-                <p className="text-xl font-extrabold" style={{ color: totals.marginPct >= 0.25 ? '#34D399' : '#FBBF24' }}>
+                <p className="text-xl font-extrabold" style={{ color: totals.marginPct >= totals.marginTarget - 0.0005 ? '#34D399' : '#FBBF24' }}>
                   {fmtPct(totals.marginPct)}
                 </p>
                 <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>
