@@ -3,10 +3,26 @@
 // Regional basis: Virginia Beach / Hampton Roads, VA  |  Index year: 2026
 // Covers: Bathrooms (S/M/L), Kitchens (S/M/L), Addition, Portico,
 //         Garage Conversion, Full Renovation
-// Overhead 18% + Net Profit 12% per CLAUDE.md remodel rule
+// Overhead 18% + Contingency 10% on direct costs; Net Profit is a 35% MARGIN
+// of the client price (Total Price = Total Cost / 0.65), not a markup.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const SPEC_LEVELS = ['standard', 'mid', 'custom'];
+
+export const DEFAULT_PCT_RATES = { overheadPct: 18, profitPct: 35, contingencyPct: 10 };
+const MAX_MARGIN_PCT = 95; // a 100% margin would divide by zero
+
+/**
+ * Net profit for a target margin of the client price (not a markup on cost).
+ *   Total Price = Total Cost / (1 - margin)   e.g. 35% → Total Cost / 0.65
+ *   Profit      = Total Price - Total Cost   = Total Cost * margin / (1 - margin)
+ * `totalCost` is everything the client pays for except profit:
+ * direct costs + overhead + contingency.
+ */
+export function profitForMargin(totalCost, marginPct) {
+  const m = Math.min(Math.max(Number(marginPct) || 0, 0), MAX_MARGIN_PCT) / 100;
+  return totalCost > 0 ? (totalCost / (1 - m)) - totalCost : 0;
+}
 export const SPEC_LABELS = { standard: 'Standard', mid: 'Mid-Range', custom: 'Custom/Luxury' };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -69,7 +85,7 @@ export const REMODEL_CONFIGS = {
         key: 'divM', num: 'M', label: 'Margins & Contingency',
         items: [
           { wbs: 'M.1', label: 'Overhead (18%)',      unit: 'pct', pctKey: 'overheadPct',     pctLabel: 'OH %'   },
-          { wbs: 'M.2', label: 'Net Profit (12%)',    unit: 'pct', pctKey: 'profitPct',        pctLabel: 'Profit %' },
+          { wbs: 'M.2', label: 'Net Profit (35% margin)',    unit: 'pct', pctKey: 'profitPct',        pctLabel: 'Margin %' },
           { wbs: 'M.3', label: 'Contingency (10%)',   unit: 'pct', pctKey: 'contingencyPct',  pctLabel: 'Reserve %' },
         ],
       },
@@ -131,7 +147,7 @@ export const REMODEL_CONFIGS = {
         key: 'divM', num: 'M', label: 'Margins & Contingency',
         items: [
           { wbs: 'M.1', label: 'Overhead (18%)',      unit: 'pct', pctKey: 'overheadPct',    pctLabel: 'OH %'     },
-          { wbs: 'M.2', label: 'Net Profit (12%)',    unit: 'pct', pctKey: 'profitPct',       pctLabel: 'Profit %' },
+          { wbs: 'M.2', label: 'Net Profit (35% margin)',    unit: 'pct', pctKey: 'profitPct',       pctLabel: 'Margin %' },
           { wbs: 'M.3', label: 'Contingency (10%)',   unit: 'pct', pctKey: 'contingencyPct', pctLabel: 'Reserve %'},
         ],
       },
@@ -194,7 +210,7 @@ export const REMODEL_CONFIGS = {
         key: 'divM', num: 'M', label: 'Margins & Contingency',
         items: [
           { wbs: 'M.1', label: 'Overhead (18%)',      unit: 'pct', pctKey: 'overheadPct',    pctLabel: 'OH %'     },
-          { wbs: 'M.2', label: 'Net Profit (12%)',    unit: 'pct', pctKey: 'profitPct',       pctLabel: 'Profit %' },
+          { wbs: 'M.2', label: 'Net Profit (35% margin)',    unit: 'pct', pctKey: 'profitPct',       pctLabel: 'Margin %' },
           { wbs: 'M.3', label: 'Contingency (10%)',   unit: 'pct', pctKey: 'contingencyPct', pctLabel: 'Reserve %'},
         ],
       },
@@ -255,7 +271,7 @@ export const REMODEL_CONFIGS = {
         key: 'divM', num: 'M', label: 'Margins & Contingency',
         items: [
           { wbs: 'M.1', label: 'Overhead (18%)',      unit: 'pct', pctKey: 'overheadPct',    pctLabel: 'OH %'     },
-          { wbs: 'M.2', label: 'Net Profit (12%)',    unit: 'pct', pctKey: 'profitPct',       pctLabel: 'Profit %' },
+          { wbs: 'M.2', label: 'Net Profit (35% margin)',    unit: 'pct', pctKey: 'profitPct',       pctLabel: 'Margin %' },
           { wbs: 'M.3', label: 'Contingency (10%)',   unit: 'pct', pctKey: 'contingencyPct', pctLabel: 'Reserve %'},
         ],
       },
@@ -317,7 +333,7 @@ export const REMODEL_CONFIGS = {
         key: 'divM', num: 'M', label: 'Margins & Contingency',
         items: [
           { wbs: 'M.1', label: 'Overhead (18%)',      unit: 'pct', pctKey: 'overheadPct',    pctLabel: 'OH %'     },
-          { wbs: 'M.2', label: 'Net Profit (12%)',    unit: 'pct', pctKey: 'profitPct',       pctLabel: 'Profit %' },
+          { wbs: 'M.2', label: 'Net Profit (35% margin)',    unit: 'pct', pctKey: 'profitPct',       pctLabel: 'Margin %' },
           { wbs: 'M.3', label: 'Contingency (10%)',   unit: 'pct', pctKey: 'contingencyPct', pctLabel: 'Reserve %'},
         ],
       },
@@ -380,7 +396,7 @@ export const REMODEL_CONFIGS = {
         key: 'divM', num: 'M', label: 'Margins & Contingency',
         items: [
           { wbs: 'M.1', label: 'Overhead (18%)',      unit: 'pct', pctKey: 'overheadPct',    pctLabel: 'OH %'     },
-          { wbs: 'M.2', label: 'Net Profit (12%)',    unit: 'pct', pctKey: 'profitPct',       pctLabel: 'Profit %' },
+          { wbs: 'M.2', label: 'Net Profit (35% margin)',    unit: 'pct', pctKey: 'profitPct',       pctLabel: 'Margin %' },
           { wbs: 'M.3', label: 'Contingency (10%)',   unit: 'pct', pctKey: 'contingencyPct', pctLabel: 'Reserve %'},
         ],
       },
@@ -437,7 +453,7 @@ export const REMODEL_CONFIGS = {
         key: 'divM', num: 'M', label: 'Margins & Contingency',
         items: [
           { wbs: 'M.1', label: 'Overhead (18%)',      unit: 'pct', pctKey: 'overheadPct',    pctLabel: 'OH %'     },
-          { wbs: 'M.2', label: 'Net Profit (12%)',    unit: 'pct', pctKey: 'profitPct',       pctLabel: 'Profit %' },
+          { wbs: 'M.2', label: 'Net Profit (35% margin)',    unit: 'pct', pctKey: 'profitPct',       pctLabel: 'Margin %' },
           { wbs: 'M.3', label: 'Contingency (10%)',   unit: 'pct', pctKey: 'contingencyPct', pctLabel: 'Reserve %'},
         ],
       },
@@ -486,7 +502,7 @@ export const REMODEL_CONFIGS = {
         key: 'divM', num: 'M', label: 'Margins & Contingency',
         items: [
           { wbs: 'M.1', label: 'Overhead (18%)',      unit: 'pct', pctKey: 'overheadPct',    pctLabel: 'OH %'     },
-          { wbs: 'M.2', label: 'Net Profit (12%)',    unit: 'pct', pctKey: 'profitPct',       pctLabel: 'Profit %' },
+          { wbs: 'M.2', label: 'Net Profit (35% margin)',    unit: 'pct', pctKey: 'profitPct',       pctLabel: 'Margin %' },
           { wbs: 'M.3', label: 'Contingency (10%)',   unit: 'pct', pctKey: 'contingencyPct', pctLabel: 'Reserve %'},
         ],
       },
@@ -537,7 +553,7 @@ export const REMODEL_CONFIGS = {
         key: 'divM', num: 'M', label: 'Margins & Contingency',
         items: [
           { wbs: 'M.1', label: 'Overhead (18%)',      unit: 'pct', pctKey: 'overheadPct',    pctLabel: 'OH %'     },
-          { wbs: 'M.2', label: 'Net Profit (12%)',    unit: 'pct', pctKey: 'profitPct',       pctLabel: 'Profit %' },
+          { wbs: 'M.2', label: 'Net Profit (35% margin)',    unit: 'pct', pctKey: 'profitPct',       pctLabel: 'Margin %' },
           { wbs: 'M.3', label: 'Contingency (10%)',   unit: 'pct', pctKey: 'contingencyPct', pctLabel: 'Reserve %'},
         ],
       },
@@ -590,7 +606,7 @@ export const REMODEL_CONFIGS = {
         key: 'divM', num: 'M', label: 'Margins & Contingency',
         items: [
           { wbs: 'M.1', label: 'Overhead (18%)',      unit: 'pct', pctKey: 'overheadPct',    pctLabel: 'OH %'     },
-          { wbs: 'M.2', label: 'Net Profit (12%)',    unit: 'pct', pctKey: 'profitPct',       pctLabel: 'Profit %' },
+          { wbs: 'M.2', label: 'Net Profit (35% margin)',    unit: 'pct', pctKey: 'profitPct',       pctLabel: 'Margin %' },
           { wbs: 'M.3', label: 'Contingency (10%)',   unit: 'pct', pctKey: 'contingencyPct', pctLabel: 'Reserve %'},
         ],
       },

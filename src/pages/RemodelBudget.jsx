@@ -5,6 +5,8 @@ import {
   SPEC_LABELS,
   getProjectConfig,
   computeBaseLineValues,
+  DEFAULT_PCT_RATES,
+  profitForMargin,
 } from '../utils/remodelBudgetCalculator';
 import { supabase } from '../lib/supabase';
 import { useProject } from '../context/ProjectContext';
@@ -344,7 +346,7 @@ export default function RemodelBudget() {
   const [projectType,    setProjectType]    = useState('bathroom-medium');
   const [inputs,         setInputs]         = useState(() => defaultInputs('bathroom-medium'));
   const [specLevel,      setSpecLevel]      = useState('mid');
-  const [pctRates,       setPctRates]       = useState({ overheadPct: 18, profitPct: 12, contingencyPct: 10 });
+  const [pctRates,       setPctRates]       = useState(DEFAULT_PCT_RATES);
   const [userVals,       setUserVals]       = useState({});
   const [overrideFlags,  setOverrideFlags]  = useState({});
   const [openDivs,       setOpenDivs]       = useState({});
@@ -402,7 +404,7 @@ export default function RemodelBudget() {
       setProjectType(type);
       setInputs({ ...defaultInputs(type), ...(budget.inputs_json || {}) });
       setSpecLevel(budget.spec_level || 'mid');
-      setPctRates(budget.pct_rates_json || { overheadPct: 18, profitPct: 12, contingencyPct: 10 });
+      setPctRates(budget.pct_rates_json || DEFAULT_PCT_RATES);
       setUserVals(budget.overrides_json || {});
       setOverrideFlags(budget.flags_json || {});
       // Open all divisions
@@ -430,7 +432,7 @@ export default function RemodelBudget() {
     setProjectType('bathroom-medium');
     setInputs(defaultInputs('bathroom-medium'));
     setSpecLevel('mid');
-    setPctRates({ overheadPct: 18, profitPct: 12, contingencyPct: 10 });
+    setPctRates(DEFAULT_PCT_RATES);
     setUserVals({});
     setOverrideFlags({});
     setOpenDivs({});
@@ -514,7 +516,7 @@ export default function RemodelBudget() {
   function changeProjectType(typeId) {
     setProjectType(typeId);
     setInputs(defaultInputs(typeId));
-    setPctRates({ overheadPct: 18, profitPct: 12, contingencyPct: 10 });
+    setPctRates(DEFAULT_PCT_RATES);
     setUserVals({});
     setOverrideFlags({});
     const cfg = getProjectConfig(typeId);
@@ -543,8 +545,10 @@ export default function RemodelBudget() {
     const nonPctWbs = allNonPctWbs(config);
     const baseSum = nonPctWbs.reduce((s, w) => s + (vals[w] ?? 0), 0) + designSpecsTotal;
     vals['M.1'] = overrideFlags['M.1'] ? (userVals['M.1'] ?? 0) : baseSum * (pctRates.overheadPct / 100);
-    vals['M.2'] = overrideFlags['M.2'] ? (userVals['M.2'] ?? 0) : baseSum * (pctRates.profitPct   / 100);
     vals['M.3'] = overrideFlags['M.3'] ? (userVals['M.3'] ?? 0) : baseSum * (pctRates.contingencyPct / 100);
+    // Profit is a margin of the client price: Price = (direct + overhead + contingency) / (1 - margin)
+    const totalCost = baseSum + vals['M.1'] + vals['M.3'];
+    vals['M.2'] = overrideFlags['M.2'] ? (userVals['M.2'] ?? 0) : profitForMargin(totalCost, pctRates.profitPct);
     return vals;
   }, [config, projectType, inputs, specLevel, pctRates, userVals, overrideFlags, designSpecsTotal]);
 
@@ -561,6 +565,7 @@ export default function RemodelBudget() {
     const totalClientPrice   = directCosts + overhead + profit + contingency;
     const contractorMargin   = overhead + profit;
     const marginPct          = totalClientPrice > 0 ? contractorMargin / totalClientPrice : 0;
+    const netMarginPct       = totalClientPrice > 0 ? profit / totalClientPrice : 0;
     const sqftInput          = config.inputFields.find((f) => f.key === 'sqft');
     const costPerSqft        = sqftInput && inputs.sqft > 0 ? totalClientPrice / inputs.sqft : null;
 
@@ -579,7 +584,7 @@ export default function RemodelBudget() {
 
     return {
       directCosts, overhead, profit, contingency, totalClientPrice,
-      contractorMargin, marginPct, costPerSqft, divSums,
+      contractorMargin, marginPct, netMarginPct, costPerSqft, divSums,
       actualDirectCosts, actualOverhead, actualProfit, actualContingency,
       actualTotalPrice, totalVariance,
     };
@@ -724,7 +729,7 @@ export default function RemodelBudget() {
   <div class="totals-block">
     <div class="totals-row sub"><span class="t-label">Direct Costs (Materials + Labor)</span><span class="t-value">$${Math.round(totals.directCosts).toLocaleString('en-US')}</span></div>
     <div class="totals-row sub"><span class="t-label">Overhead (${pctRates.overheadPct}%)</span><span class="t-value">$${Math.round(totals.overhead).toLocaleString('en-US')}</span></div>
-    <div class="totals-row sub"><span class="t-label">Profit (${pctRates.profitPct}%)</span><span class="t-value">$${Math.round(totals.profit).toLocaleString('en-US')}</span></div>
+    <div class="totals-row sub"><span class="t-label">Profit (${pctRates.profitPct}% of client price)</span><span class="t-value">$${Math.round(totals.profit).toLocaleString('en-US')}</span></div>
     <div class="totals-row sub"><span class="t-label">Contingency (${pctRates.contingencyPct}%)</span><span class="t-value">$${Math.round(totals.contingency).toLocaleString('en-US')}</span></div>
     ${hasActuals ? `<div class="totals-row sub"><span class="t-label">Actual Total Expended</span><span class="t-value" style="color:#0369A1">$${Math.round(totals.actualTotalPrice).toLocaleString('en-US')}</span></div>` : ''}
     ${hasActuals ? `<div class="totals-row sub"><span class="t-label">Total Variance (Budget − Actual)</span><span class="t-value" style="color:${totals.totalVariance < 0 ? '#DC2626' : '#065F46'}">${totals.totalVariance >= 0 ? '+' : '−'}$${Math.round(Math.abs(totals.totalVariance)).toLocaleString('en-US')}</span></div>` : ''}
@@ -884,8 +889,8 @@ export default function RemodelBudget() {
         </div>
         <SummaryCard label="Direct Costs" value={fmt(totals.directCosts)} sub="Materials + labor" />
         <SummaryCard label="Contractor Margin" value={fmt(totals.contractorMargin)} sub="Overhead + profit" />
-        <SummaryCard label="Gross Margin %" value={fmtPct(totals.marginPct)} sub="Of total client price"
-          color={totals.marginPct >= 0.25 ? '#059669' : '#D97706'} />
+        <SummaryCard label="Net Profit Margin" value={fmtPct(totals.netMarginPct)} sub={`Target ${pctRates.profitPct}% of client price`}
+          color={totals.netMarginPct >= pctRates.profitPct / 100 - 0.0005 ? '#059669' : '#D97706'} />
       </div>
 
       {/* Budget vs Actual summary bar — shown once actuals exist */}
