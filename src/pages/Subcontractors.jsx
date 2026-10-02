@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react';
 import {
   Search, X, Phone, Mail, Globe, MapPin, BadgeCheck, MessageSquareQuote, Users,
   LoaderCircle, TriangleAlert, LockKeyhole, RefreshCw, Plus, Pencil, CheckCircle2,
-  ShieldCheck, ShieldAlert, ShieldQuestion, FileText, Paperclip,
+  ShieldCheck, ShieldAlert, ShieldQuestion, FileText, Paperclip, Trash2,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import {
-  EMPTY_SUBCONTRACTOR_FORM, toForm, validateForm, createSubcontractor, updateSubcontractor,
+  EMPTY_SUBCONTRACTOR_FORM, toForm, validateForm, createSubcontractor, updateSubcontractor, deleteSubcontractor,
   COI_ACCEPT, openCoi, coiStatus, formatCoiDate,
 } from '../lib/subcontractorDirectory';
 
@@ -198,8 +198,9 @@ function Field({ label, hint, required, className = '', children }) {
   );
 }
 
-function SubcontractorModal({ mode, form, setForm, onSave, onClose, onOpenCoi, saving, error }) {
+function SubcontractorModal({ mode, title, form, setForm, onSave, onDelete, onClose, onOpenCoi, saving, error }) {
   const isEdit = mode === 'edit';
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const input = (field, props = {}) => (
     <input
       value={form[field]}
@@ -318,7 +319,44 @@ function SubcontractorModal({ mode, form, setForm, onSave, onClose, onOpenCoi, s
         </div>
 
         {/* Footer */}
+        {confirmingDelete ? (
+          <div className="px-6 py-4 border-t flex flex-wrap items-center gap-3" style={{ borderColor: '#FECACA', backgroundColor: '#FEF2F2' }} role="alertdialog" aria-label="Confirm delete">
+            <p className="flex-1 min-w-[200px] text-sm" style={{ color: '#991B1B' }}>
+              <strong>Delete {title}?</strong> This can't be undone. Their COI file is deleted too, and any Job Schedule tasks assigned to them become unassigned.
+            </p>
+            <button
+              type="button"
+              onClick={() => setConfirmingDelete(false)}
+              disabled={saving}
+              className="px-4 py-2 rounded-xl text-sm font-medium"
+              style={{ backgroundColor: '#fff', color: '#374151', border: '1px solid #E5E7EB' }}
+            >
+              Keep
+            </button>
+            <button
+              type="button"
+              onClick={onDelete}
+              disabled={saving}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold disabled:opacity-50"
+              style={{ backgroundColor: '#DC2626', color: '#fff' }}
+            >
+              {saving ? <LoaderCircle size={13} className="animate-spin" /> : <Trash2 size={13} />}
+              {saving ? 'Deleting…' : 'Delete permanently'}
+            </button>
+          </div>
+        ) : (
         <div className="px-6 py-4 border-t flex items-center gap-3" style={{ borderColor: '#E8E6E1' }}>
+          {isEdit && (
+            <button
+              type="button"
+              onClick={() => setConfirmingDelete(true)}
+              disabled={saving}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold"
+              style={{ backgroundColor: '#FEF2F2', color: '#DC2626' }}
+            >
+              <Trash2 size={12} /> Delete
+            </button>
+          )}
           <div className="flex-1" />
           <button
             type="button"
@@ -338,6 +376,7 @@ function SubcontractorModal({ mode, form, setForm, onSave, onClose, onOpenCoi, s
             {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Add Subcontractor'}
           </button>
         </div>
+        )}
       </form>
     </div>
   );
@@ -374,7 +413,12 @@ export default function Subcontractors() {
   function openEdit(sub) {
     setForm(toForm(sub));
     setSaveError(null);
-    setEditor({ mode: 'edit', id: sub.id, previousFilePath: sub.coi_file_path ?? null });
+    setEditor({
+      mode: 'edit',
+      id: sub.id,
+      title: sub.company || sub.name || 'this subcontractor',
+      previousFilePath: sub.coi_file_path ?? null,
+    });
   }
 
   function closeEditor() {
@@ -399,6 +443,20 @@ export default function Subcontractors() {
     }
     const label = form.company.trim() || form.name.trim();
     setNotice(editor.mode === 'edit' ? `Saved changes to ${label}.` : `Added ${label}.`);
+    setEditor(null);
+    setAttempt((n) => n + 1); // reload the list through the search API
+  }
+
+  async function handleDelete() {
+    setSaving(true);
+    setSaveError(null);
+    const { error: err } = await deleteSubcontractor(editor.id, editor.previousFilePath);
+    setSaving(false);
+    if (err) {
+      setSaveError(err);
+      return;
+    }
+    setNotice(`Deleted ${editor.title}.`);
     setEditor(null);
     setAttempt((n) => n + 1); // reload the list through the search API
   }
@@ -571,9 +629,11 @@ export default function Subcontractors() {
       {editor && (
         <SubcontractorModal
           mode={editor.mode}
+          title={editor.title}
           form={form}
           setForm={setForm}
           onSave={handleSave}
+          onDelete={handleDelete}
           onClose={closeEditor}
           onOpenCoi={handleOpenCoi}
           saving={saving}

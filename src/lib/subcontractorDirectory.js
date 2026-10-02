@@ -160,6 +160,26 @@ export function createSubcontractor(form) {
   );
 }
 
+// Deletes the row, then its COI file. Jobs assigned to this subcontractor in
+// the Job Schedule become unassigned (job_schedules.assigned_to ON DELETE SET NULL).
+export async function deleteSubcontractor(id, coiFilePath) {
+  const { error } = await supabase
+    .from('subcontractor_directory')
+    .delete()
+    .eq('id', id)
+    .select('id')
+    .single();
+  if (error) {
+    return {
+      error: error.code === 'PGRST116' || error.code === '42501'
+        ? 'You need to be signed in as an admin to delete subcontractors.'
+        : error.message || 'Could not delete the subcontractor.',
+    };
+  }
+  await removeCoi(coiFilePath);
+  return {};
+}
+
 export function updateSubcontractor(id, form, previousFilePath) {
   return save(
     (row) => supabase.from('subcontractor_directory').update(row).eq('id', id).select('id').single(),
