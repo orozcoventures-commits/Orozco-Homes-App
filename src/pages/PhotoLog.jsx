@@ -243,8 +243,9 @@ export default function PhotoLog() {
 
     // Upload photo if one was selected
     if (photoFile) {
-      const ext = photoFile.name.split('.').pop().toLowerCase();
-      const safeName = `${user.id}/${Date.now()}.${ext}`;
+      const ext = photoFile.name.split('.').pop().toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+      // Random, unguessable name: the bucket is public-by-link but not listable (migration 034).
+      const safeName = `${crypto.randomUUID()}.${ext}`;
 
       setUploadProgress(30);
       const { error: uploadErr } = await supabase.storage
