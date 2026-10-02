@@ -820,6 +820,15 @@ export default function DesignerWorkspace() {
                   </li>
                 ))}
               </ul>
+              {canEdit && (
+                <button
+                  onClick={() => setModal({ prefill: { room_category: activeRoom } })}
+                  className="mt-3 w-full flex items-center justify-center gap-1.5 px-4 py-3 rounded-xl text-xs font-bold"
+                  style={{ border: '1.5px dashed #D4AF37', color: '#002147', backgroundColor: 'transparent' }}
+                >
+                  + Add other material
+                </button>
+              )}
             </div>
           ) : filteredSpecs.length === 0 ? (
             <div className="rounded-2xl p-12 text-center" style={{ backgroundColor: '#fff', border: '1.5px dashed #E8E6E1' }}>
