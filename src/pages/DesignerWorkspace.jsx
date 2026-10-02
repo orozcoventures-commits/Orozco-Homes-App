@@ -180,6 +180,101 @@ function SpecCard({ spec, onEdit = () => {}, onDelete = () => {}, isAdmin, onApp
   );
 }
 
+const MAX_CHECKLIST_ITEMS = 20;
+
+// Inline editor for one room's "common materials" list (saved in
+// room_checklist_items, migration 038, and shared by every project).
+function ChecklistEditor({ roomLabel, items, defaults, onSave, onCancel }) {
+  const [list, setList]       = useState(items);
+  const [draft, setDraft]     = useState('');
+  const [error, setError]     = useState('');
+  const [saving, setSaving]   = useState(false);
+
+  function addItem() {
+    const name = draft.trim();
+    if (!name) return;
+    if (name.length > 80) { setError('Keep each item under 80 characters.'); return; }
+    if (list.some((x) => x.toLowerCase() === name.toLowerCase())) { setError(`"${name}" is already on the list.`); return; }
+    if (list.length >= MAX_CHECKLIST_ITEMS) { setError(`A list can have up to ${MAX_CHECKLIST_ITEMS} items.`); return; }
+    setList((l) => [...l, name]);
+    setDraft('');
+    setError('');
+  }
+
+  async function handleSave() {
+    const clean = list.map((x) => x.trim()).filter(Boolean);
+    if (clean.length === 0) { setError('Keep at least one item on the list.'); return; }
+    const lower = clean.map((x) => x.toLowerCase());
+    const dup = clean.find((x, i) => lower.indexOf(x.toLowerCase()) !== i);
+    if (dup) { setError(`"${dup}" is on the list twice.`); return; }
+    if (clean.some((x) => x.length > 80)) { setError('Keep each item under 80 characters.'); return; }
+    setSaving(true);
+    const err = await onSave(clean);
+    setSaving(false);
+    if (err) setError(err);
+  }
+
+  return (
+    <div>
+      <p className="text-xs mb-3" style={{ color: '#6B7280' }}>
+        Edit the common materials for {roomLabel}. Changes apply to every project.
+      </p>
+      <ul className="space-y-2">
+        {list.map((item, i) => (
+          <li key={i} className="flex items-center gap-2">
+            <input
+              value={item}
+              onChange={(e) => setList((l) => l.map((x, j) => (j === i ? e.target.value : x)))}
+              aria-label={`Item ${i + 1}`}
+              maxLength={80}
+              className="flex-1 px-3 py-2 rounded-lg text-sm focus:outline-none"
+              style={{ border: '1.5px solid #E8E6E1', color: '#002147' }}
+            />
+            <button type="button" onClick={() => setList((l) => l.filter((_, j) => j !== i))}
+              aria-label={`Remove ${item || `item ${i + 1}`}`}
+              className="shrink-0 w-8 h-8 rounded-lg text-sm font-bold"
+              style={{ backgroundColor: '#FEF2F2', color: '#DC2626' }}>
+              ×
+            </button>
+          </li>
+        ))}
+      </ul>
+      <div className="flex items-center gap-2 mt-3">
+        <input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addItem(); } }}
+          placeholder="Add a material, e.g. Ceiling Fan"
+          aria-label="New material"
+          maxLength={80}
+          className="flex-1 px-3 py-2 rounded-lg text-sm focus:outline-none"
+          style={{ border: '1.5px dashed #D4AF37', color: '#002147' }}
+        />
+        <button type="button" onClick={addItem}
+          className="shrink-0 px-3 py-2 rounded-lg text-xs font-bold"
+          style={{ backgroundColor: '#F5F4F0', color: '#002147', border: '1px solid #E8E6E1' }}>
+          + Add
+        </button>
+      </div>
+      {error && <p role="alert" className="text-xs font-semibold mt-2" style={{ color: '#DC2626' }}>{error}</p>}
+      <div className="flex flex-wrap items-center gap-2 mt-4">
+        <button type="button" onClick={() => { setList(defaults); setError(''); }} disabled={saving}
+          className="text-xs font-semibold underline mr-auto" style={{ color: '#6B7280' }}>
+          Reset to default list
+        </button>
+        <button type="button" onClick={onCancel} disabled={saving}
+          className="px-4 py-2 rounded-xl text-xs font-medium" style={{ backgroundColor: '#F5F4F0', color: '#374151' }}>
+          Cancel
+        </button>
+        <button type="button" onClick={handleSave} disabled={saving}
+          className="px-4 py-2 rounded-xl text-xs font-bold disabled:opacity-60" style={{ backgroundColor: '#002147', color: '#D4AF37' }}>
+          {saving ? 'Saving…' : 'Save list'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // `prefill` (optional) seeds a new spec's fields; the modal stays in Add mode.
 function SpecModal({ initial, prefill, projects, onSave, onClose, saving }) {
   const [form, setForm] = useState(initial ?? { ...EMPTY_FORM, ...prefill });
@@ -611,8 +706,25 @@ export default function DesignerWorkspace() {
   const [saving,      setSaving]      = useState(false);
   const [toast,       setToast]       = useState('');
   const [deleteId,    setDeleteId]    = useState(null);
+  const [customLists, setCustomLists] = useState(null);  // { room: [items] } from room_checklist_items; null until loaded
+  const [editingList, setEditingList] = useState(null);  // room key whose checklist is being edited
 
   const { specs, loading, createSpec, updateSpec, deleteSpec } = useDesignSpecs(projectId || null);
+
+  // Saved checklists. If the table isn't there yet (migration 038), the
+  // built-in lists are used and editing stays hidden.
+  useEffect(() => {
+    supabase
+      .from('room_checklist_items')
+      .select('room_category, item_name, sort_order')
+      .order('sort_order')
+      .then(({ data, error }) => {
+        if (error) return;
+        const lists = {};
+        for (const row of data ?? []) (lists[row.room_category] ??= []).push(row.item_name);
+        setCustomLists(lists);
+      });
+  }, []);
 
   // Load projects on mount
   useEffect(() => {
@@ -645,6 +757,24 @@ export default function DesignerWorkspace() {
   function showToast(msg) {
     setToast(msg);
     setTimeout(() => setToast(''), 2800);
+  }
+
+  const defaultChecklist = (room) => ROOM_CHECKLISTS[room] ?? DEFAULT_ROOM_CHECKLIST;
+  const roomChecklist = (room) => (customLists?.[room]?.length ? customLists[room] : defaultChecklist(room));
+
+  // Returns an error message, or null when saved.
+  async function saveChecklist(room, items) {
+    const { error } = await supabase.rpc('set_room_checklist', { p_room: room, p_items: items });
+    if (error) {
+      return error.code === '42501' || error.code === 'PGRST301'
+        ? 'Only admins and designers can change checklists.'
+        : error.code === '23505' ? 'Each item can only be on the list once.'
+        : error.message || 'Could not save the list.';
+    }
+    setCustomLists((prev) => ({ ...prev, [room]: items }));
+    setEditingList(null);
+    showToast('Checklist saved');
+    return null;
   }
 
   async function handleSave(payload, editId) {
@@ -795,12 +925,33 @@ export default function DesignerWorkspace() {
             </div>
           ) : filteredSpecs.length === 0 && activeRoom !== 'all' ? (
             <div className="rounded-2xl p-6 sm:p-8" style={{ backgroundColor: '#fff', border: '1.5px dashed #E8E6E1' }}>
-              <p className="font-semibold text-sm" style={{ color: '#374151' }}>
-                Common materials for {ROOM_CATEGORIES.find((r) => r.key === activeRoom)?.label.toLowerCase()}
-              </p>
+              <div className="flex items-start justify-between gap-3">
+                <p className="font-semibold text-sm" style={{ color: '#374151' }}>
+                  Common materials for {ROOM_CATEGORIES.find((r) => r.key === activeRoom)?.label.toLowerCase()}
+                </p>
+                {canEdit && customLists && editingList !== activeRoom && (
+                  <button onClick={() => setEditingList(activeRoom)}
+                    className="shrink-0 text-xs font-bold underline" style={{ color: '#002147' }}>
+                    Edit list
+                  </button>
+                )}
+              </div>
+              {editingList === activeRoom ? (
+                <div className="mt-3">
+                  <ChecklistEditor
+                    key={activeRoom}
+                    roomLabel={ROOM_CATEGORIES.find((r) => r.key === activeRoom)?.label.toLowerCase()}
+                    items={roomChecklist(activeRoom)}
+                    defaults={defaultChecklist(activeRoom)}
+                    onSave={(items) => saveChecklist(activeRoom, items)}
+                    onCancel={() => setEditingList(null)}
+                  />
+                </div>
+              ) : (
+              <>
               <p className="text-xs mt-0.5 mb-4" style={{ color: '#9CA3AF' }}>No specs yet. Start with one of these.</p>
               <ul className="grid sm:grid-cols-2 gap-2">
-                {(ROOM_CHECKLISTS[activeRoom] ?? DEFAULT_ROOM_CHECKLIST).map((item) => (
+                {roomChecklist(activeRoom).map((item) => (
                   <li key={item} className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl"
                     style={{ backgroundColor: '#F9F8F6', border: '1px solid #F0EEE9' }}>
                     <span className="flex items-center gap-2.5 text-sm font-medium" style={{ color: '#002147' }}>
@@ -828,6 +979,8 @@ export default function DesignerWorkspace() {
                 >
                   + Add other material
                 </button>
+              )}
+              </>
               )}
             </div>
           ) : filteredSpecs.length === 0 ? (
