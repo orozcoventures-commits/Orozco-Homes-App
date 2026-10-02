@@ -19,6 +19,24 @@ function avatarColor(id) {
   return AVATAR_COLORS[h % AVATAR_COLORS.length];
 }
 
+// '7578790228', '1-757-8790228', '(757) 879 0228' → '757-879-0228'. Anything
+// that isn't a 10-digit US number is kept as typed.
+function formatPhone(raw) {
+  const trimmed = (raw || '').trim();
+  let digits = trimmed.replace(/\D/g, '');
+  if (digits.length === 11 && digits.startsWith('1')) digits = digits.slice(1);
+  return digits.length === 10 ? `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}` : trimmed;
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Supabase error → message for the admin.
+function clientSaveError(error) {
+  if (error.code === '23505') return 'Another client already uses this email address.';
+  if (error.code === 'PGRST116' || error.code === '42501') return 'You need to be signed in as an admin to change clients.';
+  return error.message || 'Could not save the client.';
+}
+
 const inputStyle = { border: '1.5px solid #E8E6E1', color: '#002147', backgroundColor: '#fff' };
 
 function Field({ label, required, children }) {
@@ -64,11 +82,11 @@ function AddClientForm({ onAdded }) {
     setSaving(true);
     const { data, error: insertError } = await supabase
       .from('clients')
-      .insert({ full_name: name.trim(), email: email.trim().toLowerCase(), phone: phone.trim() || null, created_by: user?.id })
+      .insert({ full_name: name.trim(), email: email.trim().toLowerCase(), phone: formatPhone(phone) || null, created_by: user?.id })
       .select()
       .single();
     setSaving(false);
-    if (insertError) { setError(insertError.message); return; }
+    if (insertError) { setError(clientSaveError(insertError)); return; }
     setName(''); setEmail(''); setPhone('');
     onAdded(data);
   }
@@ -87,15 +105,7 @@ function AddClientForm({ onAdded }) {
         <StyledInput type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 000-0000" autoComplete="tel" />
       </Field>
 
-      {error && (
-        <div className="flex items-start gap-2.5 px-4 py-3 rounded-xl text-sm"
-          style={{ backgroundColor: '#FEF2F2', border: '1px solid #FECACA', color: '#991B1B' }}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-0.5">
-            <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
-          </svg>
-          {error}
-        </div>
-      )}
+      {error && <ErrorBox>{error}</ErrorBox>}
 
       <div className="flex justify-end pt-1">
         <button
@@ -121,6 +131,101 @@ function AddClientForm({ onAdded }) {
         </button>
       </div>
     </form>
+  );
+}
+
+function ErrorBox({ children }) {
+  return (
+    <div role="alert" className="flex items-start gap-2.5 px-4 py-3 rounded-xl text-sm"
+      style={{ backgroundColor: '#FEF2F2', border: '1px solid #FECACA', color: '#991B1B' }}>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-0.5">
+        <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+      </svg>
+      {children}
+    </div>
+  );
+}
+
+function EditClientModal({ client, onSaved, onClose }) {
+  const [name, setName]     = useState(client.full_name ?? '');
+  const [email, setEmail]   = useState(client.email ?? '');
+  const [phone, setPhone]   = useState(client.phone ?? '');
+  const [saving, setSaving] = useState(false);
+  const [error, setError]   = useState('');
+
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape' && !saving) onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose, saving]);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    const cleanEmail = email.trim().toLowerCase();
+    if (!name.trim()) { setError('Enter the client\'s full name.'); return; }
+    if (!EMAIL_RE.test(cleanEmail)) { setError('Enter a valid email address.'); return; }
+    const cleanPhone = formatPhone(phone);
+    if (cleanPhone && cleanPhone.replace(/\D/g, '').length < 7) { setError(`"${cleanPhone}" doesn't look like a phone number.`); return; }
+
+    setError('');
+    setSaving(true);
+    const { data, error: updateError } = await supabase
+      .from('clients')
+      .update({ full_name: name.trim(), email: cleanEmail, phone: cleanPhone || null })
+      .eq('id', client.id)
+      .select('id, full_name, email, phone, created_at')
+      .single();
+    setSaving(false);
+    if (updateError) { setError(clientSaveError(updateError)); return; }
+    onSaved(data);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ backgroundColor: 'rgba(0,33,71,0.45)' }}
+      onMouseDown={(e) => { if (e.target === e.currentTarget && !saving) onClose(); }}>
+      <form onSubmit={handleSubmit} noValidate role="dialog" aria-modal="true" aria-label="Edit Client"
+        className="w-full max-w-lg rounded-2xl overflow-hidden"
+        style={{ backgroundColor: '#fff', boxShadow: '0 20px 50px rgba(0,33,71,0.25)' }}>
+        <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid #F3F2EE' }}>
+          <p className="text-base font-bold" style={{ color: '#002147' }}>Edit Client</p>
+          <button type="button" onClick={onClose} disabled={saving} aria-label="Close"
+            className="w-8 h-8 rounded-lg flex items-center justify-center focus:outline-none"
+            style={{ color: '#6B7280' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+          </button>
+        </div>
+
+        <div className="space-y-4 p-6">
+          <Field label="Full Name" required>
+            <StyledInput value={name} onChange={(e) => setName(e.target.value)} placeholder="Maria Johnson" autoComplete="off" />
+          </Field>
+          <Field label="Email Address" required>
+            <StyledInput type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="maria@example.com" autoComplete="off" />
+          </Field>
+          <Field label="Phone Number">
+            <StyledInput type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="757-555-0100" autoComplete="off" />
+          </Field>
+          <p className="text-xs" style={{ color: '#9CA3AF' }}>
+            Phone numbers are saved as 757-555-0100. Project PINs don't change when you edit a client.
+          </p>
+          {error && <ErrorBox>{error}</ErrorBox>}
+        </div>
+
+        <div className="flex items-center justify-end gap-3 px-6 py-4" style={{ borderTop: '1px solid #F3F2EE' }}>
+          <button type="button" onClick={onClose} disabled={saving}
+            className="px-4 py-2.5 rounded-xl text-sm font-medium focus:outline-none"
+            style={{ backgroundColor: '#F5F4F0', color: '#374151' }}>
+            Cancel
+          </button>
+          <button type="submit" disabled={saving}
+            className="px-6 py-2.5 rounded-xl text-sm font-bold focus:outline-none disabled:opacity-60"
+            style={{ backgroundColor: '#002147', color: '#D4AF37' }}>
+            {saving ? 'Saving…' : 'Save Changes'}
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
 
@@ -202,7 +307,7 @@ function PinRow({ project, clientName, onCopy }) {
   );
 }
 
-function ClientRow({ client, projects, onCopy }) {
+function ClientRow({ client, projects, onCopy, onEdit }) {
   const clientProjects = projects.filter((p) => p.managed_client_id === client.id);
 
   return (
@@ -215,12 +320,24 @@ function ClientRow({ client, projects, onCopy }) {
         >
           {getInitials(client.full_name)}
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold leading-snug" style={{ color: '#002147' }}>{client.full_name}</p>
           <p className="text-xs leading-snug" style={{ color: '#6B7280' }}>
             {client.email}{client.phone ? ` · ${client.phone}` : ''}
           </p>
         </div>
+        <button
+          onClick={() => onEdit(client)}
+          aria-label={`Edit ${client.full_name}`}
+          title="Edit client"
+          className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold focus:outline-none transition-colors"
+          style={{ backgroundColor: '#F5F4F0', color: '#002147', border: '1px solid #E8E6E1' }}
+        >
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+          </svg>
+          Edit
+        </button>
       </div>
 
       {/* Projects grouped under client with gold accent line */}
@@ -250,6 +367,7 @@ export default function ManageClients() {
   const [loading, setLoading]   = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [toast, setToast]       = useState('');
+  const [editing, setEditing]   = useState(null);   // client being edited
   const toastTimer              = useRef(null);
 
   function showToast(msg) {
@@ -311,6 +429,12 @@ export default function ManageClients() {
     );
   }
 
+  function handleSaved(updated) {
+    setClients((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+    setEditing(null);
+    showToast(`Saved changes to ${updated.full_name}.`);
+  }
+
   function handleAdded(newClient) {
     setClients((prev) => [newClient, ...prev]);
     setShowForm(false);
@@ -319,6 +443,7 @@ export default function ManageClients() {
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       <Toast message={toast} />
+      {editing && <EditClientModal client={editing} onSaved={handleSaved} onClose={() => setEditing(null)} />}
 
       {/* Header */}
       <div className="flex items-start justify-between mb-8 gap-4">
@@ -405,7 +530,7 @@ export default function ManageClients() {
         ) : (
           <div>
             {clients.map((client) => (
-              <ClientRow key={client.id} client={client} projects={projects} onCopy={showToast} />
+              <ClientRow key={client.id} client={client} projects={projects} onCopy={showToast} onEdit={setEditing} />
             ))}
           </div>
         )}
