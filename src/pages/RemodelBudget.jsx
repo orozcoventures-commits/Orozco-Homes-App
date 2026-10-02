@@ -43,6 +43,12 @@ const DIV_COLORS = {
 
 function divStyle(num) { return DIV_COLORS[num] ?? DIV_COLORS['4']; }
 
+// The gross margin line is pricing, not a cost, so it has no "actual" spend
+// and is left out of every Budget vs Actual comparison.
+const isMarginLine = (item) => item.pctKey === 'profitPct';
+const divCostBudget = (div, lineVals) =>
+  div.items.reduce((s, item) => (isMarginLine(item) ? s : s + (lineVals[item.wbs] ?? 0)), 0);
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function fmt(n)    { return '$' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
@@ -183,7 +189,7 @@ function PctCell({ value, onChange, label }) {
 
 // ── Line row — triple-column layout ──────────────────────────────────────────
 
-function LineRow({ item, divStyle: ds, value, isOverridden, onChange, onReset, pctRate, onPctChange, isFirst, actual, onActualChange, showActuals }) {
+function LineRow({ item, divStyle: ds, value, isOverridden, onChange, onReset, pctRate, onPctChange, isFirst, actual, onActualChange, showActuals, actualsDisabled }) {
   const variance = value - (actual ?? 0);
   const hasActual = (actual ?? 0) > 0;
 
@@ -220,17 +226,19 @@ function LineRow({ item, divStyle: ds, value, isOverridden, onChange, onReset, p
       {/* Budgeted */}
       <DollarCell value={value} isOverridden={isOverridden} onChange={onChange} />
 
-      {/* Actual — hidden on xs */}
+      {/* Actual — hidden on xs; the margin line has no actual spend */}
       {showActuals && (
         <div className="hidden sm:block">
-          <ActualCell value={actual ?? 0} onChange={(v) => onActualChange(item.wbs, v)} />
+          {actualsDisabled
+            ? <div className="shrink-0 text-right text-xs pr-2" style={{ width: 110, color: '#9CA3AF' }} title="The gross margin is pricing, not a cost">n/a</div>
+            : <ActualCell value={actual ?? 0} onChange={(v) => onActualChange(item.wbs, v)} />}
         </div>
       )}
 
       {/* Variance — hidden on xs */}
       {showActuals && (
         <div className="hidden sm:block">
-          <VarianceCell variance={variance} show={hasActual} />
+          <VarianceCell variance={variance} show={hasActual && !actualsDisabled} />
         </div>
       )}
     </div>
@@ -569,13 +577,16 @@ export default function RemodelBudget() {
     const sqftInput          = config.inputFields.find((f) => f.key === 'sqft');
     const costPerSqft        = sqftInput && inputs.sqft > 0 ? totalClientPrice / inputs.sqft : null;
 
-    // Actual
+    // Actual — compared with the COST budget (direct + contingency), never with
+    // the client price, which also contains the gross margin.
+    const budgetCost         = directCosts + contingency;
     const actualDirectCosts  = nonPct.reduce((s, w) => s + (actualVals[w] ?? 0), 0);
-    const actualOverhead     = actualVals['M.1'] ?? 0;
-    const actualProfit       = actualVals['M.2'] ?? 0;
+    const actualOverhead     = actualVals['M.1'] ?? 0;   // legacy line from before the gross-margin model
     const actualContingency  = actualVals['M.3'] ?? 0;
-    const actualTotalPrice   = actualDirectCosts + actualOverhead + actualProfit + actualContingency;
-    const totalVariance      = totalClientPrice - actualTotalPrice;
+    const actualTotalCost    = actualDirectCosts + actualOverhead + actualContingency;
+    const totalVariance      = budgetCost - actualTotalCost;
+    const projectedMargin    = totalClientPrice - actualTotalCost;
+    const projectedMarginPct = totalClientPrice > 0 ? projectedMargin / totalClientPrice : 0;
 
     // Per-division sums
     const divSums = {};
@@ -585,8 +596,8 @@ export default function RemodelBudget() {
     return {
       directCosts, profit, contingency, totalClientPrice,
       contractorMargin, marginPct, marginTarget, costPerSqft, divSums,
-      actualDirectCosts, actualOverhead, actualProfit, actualContingency,
-      actualTotalPrice, totalVariance,
+      budgetCost, actualDirectCosts, actualOverhead, actualContingency,
+      actualTotalCost, totalVariance, projectedMargin, projectedMarginPct,
     };
   }, [config, lineVals, inputs.sqft, designSpecsTotal, actualVals, pctRates.profitPct]);
 
@@ -599,7 +610,7 @@ export default function RemodelBudget() {
   function toggleDiv(key)              { setOpenDivs((p) => ({ ...p, [key]: !(resolvedOpenDivs[key] ?? true) })); }
 
   const hasOverrides = Object.values(overrideFlags).some(Boolean);
-  const hasActuals   = Object.values(actualVals).some((v) => (Number(v) || 0) > 0);
+  const hasActuals   = Object.entries(actualVals).some(([wbs, v]) => wbs !== 'M.2' && (Number(v) || 0) > 0);
 
   if (!config) return null;
 
@@ -629,8 +640,8 @@ export default function RemodelBudget() {
     let wbsRowsHTML = '';
     for (const div of config.divisions) {
       const divTotal  = totals.divSums?.[div.key] ?? 0;
-      const divActual = div.items.reduce((s, item) => s + (actualVals[item.wbs] ?? 0), 0);
-      const divVar    = divTotal - divActual;
+      const divActual = div.items.reduce((s, item) => (isMarginLine(item) ? s : s + (actualVals[item.wbs] ?? 0)), 0);
+      const divVar    = divCostBudget(div, lineVals) - divActual;
       const varCol    = divVar < 0 ? '#DC2626' : '#065F46';
       wbsRowsHTML += `<tr class="div-header">
         <td colspan="2">${div.label}</td>
@@ -640,7 +651,7 @@ export default function RemodelBudget() {
       for (const item of div.items) {
         const val = lineVals[item.wbs] ?? 0;
         if (val === 0) continue;
-        const act = actualVals[item.wbs] ?? 0;
+        const act = isMarginLine(item) ? 0 : (actualVals[item.wbs] ?? 0);
         const vari = val - act;
         wbsRowsHTML += `<tr>
           <td class="wbs-code">${item.wbs}</td>
@@ -730,8 +741,9 @@ export default function RemodelBudget() {
     <div class="totals-row sub"><span class="t-label">Direct Costs (Materials + Labor)</span><span class="t-value">$${Math.round(totals.directCosts).toLocaleString('en-US')}</span></div>
     <div class="totals-row sub"><span class="t-label">Contingency (${pctRates.contingencyPct}%)</span><span class="t-value">$${Math.round(totals.contingency).toLocaleString('en-US')}</span></div>
     <div class="totals-row sub"><span class="t-label">Gross Margin (${pctRates.profitPct}% of client price — covers overhead + profit)</span><span class="t-value">$${Math.round(totals.profit).toLocaleString('en-US')}</span></div>
-    ${hasActuals ? `<div class="totals-row sub"><span class="t-label">Actual Total Expended</span><span class="t-value" style="color:#0369A1">$${Math.round(totals.actualTotalPrice).toLocaleString('en-US')}</span></div>` : ''}
-    ${hasActuals ? `<div class="totals-row sub"><span class="t-label">Total Variance (Budget − Actual)</span><span class="t-value" style="color:${totals.totalVariance < 0 ? '#DC2626' : '#065F46'}">${totals.totalVariance >= 0 ? '+' : '−'}$${Math.round(Math.abs(totals.totalVariance)).toLocaleString('en-US')}</span></div>` : ''}
+    ${hasActuals ? `<div class="totals-row sub"><span class="t-label">Cost Budget (Direct + Contingency)</span><span class="t-value">$${Math.round(totals.budgetCost).toLocaleString('en-US')}</span></div>` : ''}
+    ${hasActuals ? `<div class="totals-row sub"><span class="t-label">Actual Cost Expended</span><span class="t-value" style="color:#0369A1">$${Math.round(totals.actualTotalCost).toLocaleString('en-US')}</span></div>` : ''}
+    ${hasActuals ? `<div class="totals-row sub"><span class="t-label">Cost Variance (Cost Budget − Actual)</span><span class="t-value" style="color:${totals.totalVariance < 0 ? '#DC2626' : '#065F46'}">${totals.totalVariance >= 0 ? '+' : '−'}$${Math.round(Math.abs(totals.totalVariance)).toLocaleString('en-US')}</span></div>` : ''}
     <div class="totals-row grand"><span class="t-label">TOTAL CLIENT PRICE (BUDGET)</span><span class="t-value">$${Math.round(totals.totalClientPrice).toLocaleString('en-US')}</span></div>
   </div>
   <div class="sig-block">
@@ -899,14 +911,15 @@ export default function RemodelBudget() {
           <p className="text-xs font-bold tracking-[0.14em] uppercase mb-4" style={{ color: '#0369A1' }}>
             Budget vs. Actual — Project Summary
           </p>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: '#9CA3AF' }}>Total Budget</p>
-              <p className="text-lg font-extrabold" style={{ color: '#002147' }}>{fmt(totals.totalClientPrice)}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: '#9CA3AF' }}>Cost Budget</p>
+              <p className="text-lg font-extrabold" style={{ color: '#002147' }}>{fmt(totals.budgetCost)}</p>
+              <p className="text-xs mt-0.5" style={{ color: '#9CA3AF' }}>Direct + contingency</p>
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: '#9CA3AF' }}>Total Actual</p>
-              <p className="text-lg font-extrabold" style={{ color: '#0369A1' }}>{fmt(totals.actualTotalPrice)}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: '#9CA3AF' }}>Actual Cost</p>
+              <p className="text-lg font-extrabold" style={{ color: '#0369A1' }}>{fmt(totals.actualTotalCost)}</p>
             </div>
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: '#9CA3AF' }}>Variance</p>
@@ -918,18 +931,28 @@ export default function RemodelBudget() {
                 {totals.totalVariance >= 0 ? 'Under budget' : 'Over budget'}
               </p>
             </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: '#9CA3AF' }}>Projected Margin</p>
+              <p className="text-lg font-extrabold"
+                style={{ color: totals.projectedMarginPct >= totals.marginTarget - 0.0005 ? '#059669' : '#D97706' }}>
+                {fmt(totals.projectedMargin)}
+              </p>
+              <p className="text-xs mt-0.5" style={{ color: '#9CA3AF' }}>
+                {fmtPct(totals.projectedMarginPct)} of client price
+              </p>
+            </div>
           </div>
           {/* Visual progress bar */}
-          {totals.totalClientPrice > 0 && (
+          {totals.budgetCost > 0 && (
             <div className="mt-4">
               <div className="flex justify-between text-xs mb-1" style={{ color: '#9CA3AF' }}>
-                <span>Actuals: {Math.round((totals.actualTotalPrice / totals.totalClientPrice) * 100)}% of budget spent</span>
-                <span>{fmt(totals.totalClientPrice)} budget</span>
+                <span>Actuals: {Math.round((totals.actualTotalCost / totals.budgetCost) * 100)}% of cost budget spent</span>
+                <span>{fmt(totals.budgetCost)} cost budget</span>
               </div>
               <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: '#F3F4F6' }}>
                 <div className="h-full rounded-full transition-all duration-500"
                   style={{
-                    width: `${Math.min((totals.actualTotalPrice / totals.totalClientPrice) * 100, 100)}%`,
+                    width: `${Math.min((totals.actualTotalCost / totals.budgetCost) * 100, 100)}%`,
                     backgroundColor: totals.totalVariance < 0 ? '#EF4444' : '#0369A1',
                   }} />
               </div>
@@ -966,9 +989,9 @@ export default function RemodelBudget() {
           const ds       = divStyle(div.num);
           const isOpen   = resolvedOpenDivs[div.key] ?? true;
           const divTotal = totals.divSums?.[div.key] ?? 0;
-          const divActual = div.items.reduce((s, item) => s + (actualVals[item.wbs] ?? 0), 0);
-          const divVariance = divTotal - divActual;
-          const divHasActual = div.items.some((item) => (actualVals[item.wbs] ?? 0) > 0);
+          const divActual = div.items.reduce((s, item) => (isMarginLine(item) ? s : s + (actualVals[item.wbs] ?? 0)), 0);
+          const divVariance = divCostBudget(div, lineVals) - divActual;
+          const divHasActual = div.items.some((item) => !isMarginLine(item) && (actualVals[item.wbs] ?? 0) > 0);
 
           return (
             <div key={div.key} className="rounded-2xl overflow-hidden" style={{ border: `1.5px solid ${ds.border}` }}>
@@ -1035,6 +1058,7 @@ export default function RemodelBudget() {
                       actual={actualVals[item.wbs]}
                       onActualChange={handleActualChange}
                       showActuals={hasActuals}
+                      actualsDisabled={isMarginLine(item)}
                     />
                   ))}
 
@@ -1090,7 +1114,7 @@ export default function RemodelBudget() {
             )}
           </div>
           <div>
-            {hasActuals && totals.actualTotalPrice > 0 ? (
+            {hasActuals && totals.actualTotalCost > 0 ? (
               <>
                 <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'rgba(212,175,55,0.6)' }}>Total Variance</p>
                 <p className="text-xl font-extrabold"
@@ -1098,7 +1122,7 @@ export default function RemodelBudget() {
                   {totals.totalVariance >= 0 ? '+' : '−'}{fmt(Math.abs(totals.totalVariance))}
                 </p>
                 <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>
-                  {totals.totalVariance >= 0 ? 'Under budget' : 'Over budget'} · Actual: {fmt(totals.actualTotalPrice)}
+                  {totals.totalVariance >= 0 ? 'Under budget' : 'Over budget'} · Actual cost: {fmt(totals.actualTotalCost)}
                 </p>
               </>
             ) : (
