@@ -146,12 +146,16 @@ function ErrorBox({ children }) {
   );
 }
 
-function EditClientModal({ client, onSaved, onClose }) {
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+function EditClientModal({ client, projectNames, onSaved, onDeleted, onClose }) {
   const [name, setName]     = useState(client.full_name ?? '');
   const [email, setEmail]   = useState(client.email ?? '');
   const [phone, setPhone]   = useState(client.phone ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError]   = useState('');
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [blockedBy, setBlockedBy] = useState(null);   // project names that prevent deleting
 
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape' && !saving) onClose(); };
@@ -178,6 +182,38 @@ function EditClientModal({ client, onSaved, onClose }) {
     setSaving(false);
     if (updateError) { setError(clientSaveError(updateError)); return; }
     onSaved(data);
+  }
+
+  function askDelete() {
+    setError('');
+    if (projectNames.length > 0) { setBlockedBy(projectNames); return; }
+    setConfirmingDelete(true);
+  }
+
+  async function handleDelete() {
+    setError('');
+    setSaving(true);
+    // Re-check in the database: a project may have been added since the list loaded.
+    const { data: linked, error: countError } = await supabase
+      .from('projects')
+      .select('project_name')
+      .eq('managed_client_id', client.id);
+    if (countError) { setSaving(false); setError(countError.message); return; }
+    if (linked.length > 0) {
+      setSaving(false);
+      setConfirmingDelete(false);
+      setBlockedBy(linked.map((p) => p.project_name));
+      return;
+    }
+    const { error: deleteError } = await supabase
+      .from('clients')
+      .delete()
+      .eq('id', client.id)
+      .select('id')
+      .single();
+    setSaving(false);
+    if (deleteError) { setError(clientSaveError(deleteError)); return; }
+    onDeleted(client);
   }
 
   return (
@@ -209,10 +245,45 @@ function EditClientModal({ client, onSaved, onClose }) {
           <p className="text-xs" style={{ color: '#9CA3AF' }}>
             Phone numbers are saved as 757-555-0100. Project PINs don't change when you edit a client.
           </p>
+          {blockedBy && (
+            <div role="alert" className="px-4 py-3 rounded-xl text-sm"
+              style={{ backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', color: '#92400E' }}>
+              <strong>{client.full_name} can't be deleted</strong> because they still have{' '}
+              {plural(blockedBy.length, 'project')}: {blockedBy.join(', ')}. This keeps the project's
+              budget, photos, messages and PIN safe. A client can be deleted once they have no projects.
+            </div>
+          )}
           {error && <ErrorBox>{error}</ErrorBox>}
         </div>
 
+        {confirmingDelete ? (
+          <div role="alertdialog" aria-label="Confirm delete"
+            className="flex flex-wrap items-center gap-3 px-6 py-4"
+            style={{ borderTop: '1px solid #FECACA', backgroundColor: '#FEF2F2' }}>
+            <p className="flex-1 min-w-[200px] text-sm" style={{ color: '#991B1B' }}>
+              <strong>Delete {client.full_name}?</strong> This can't be undone.
+            </p>
+            <button type="button" onClick={() => setConfirmingDelete(false)} disabled={saving}
+              className="px-4 py-2 rounded-xl text-sm font-medium focus:outline-none"
+              style={{ backgroundColor: '#fff', color: '#374151', border: '1px solid #E5E7EB' }}>
+              Keep
+            </button>
+            <button type="button" onClick={handleDelete} disabled={saving}
+              className="px-4 py-2 rounded-xl text-sm font-bold focus:outline-none disabled:opacity-60"
+              style={{ backgroundColor: '#DC2626', color: '#fff' }}>
+              {saving ? 'Deleting…' : 'Delete permanently'}
+            </button>
+          </div>
+        ) : (
         <div className="flex items-center justify-end gap-3 px-6 py-4" style={{ borderTop: '1px solid #F3F2EE' }}>
+          <button type="button" onClick={askDelete} disabled={saving}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold focus:outline-none mr-auto"
+            style={{ backgroundColor: '#FEF2F2', color: '#DC2626' }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+            </svg>
+            Delete
+          </button>
           <button type="button" onClick={onClose} disabled={saving}
             className="px-4 py-2.5 rounded-xl text-sm font-medium focus:outline-none"
             style={{ backgroundColor: '#F5F4F0', color: '#374151' }}>
@@ -224,6 +295,7 @@ function EditClientModal({ client, onSaved, onClose }) {
             {saving ? 'Saving…' : 'Save Changes'}
           </button>
         </div>
+        )}
       </form>
     </div>
   );
@@ -435,6 +507,12 @@ export default function ManageClients() {
     showToast(`Saved changes to ${updated.full_name}.`);
   }
 
+  function handleDeleted(deleted) {
+    setClients((prev) => prev.filter((c) => c.id !== deleted.id));
+    setEditing(null);
+    showToast(`Deleted ${deleted.full_name}.`);
+  }
+
   function handleAdded(newClient) {
     setClients((prev) => [newClient, ...prev]);
     setShowForm(false);
@@ -443,7 +521,15 @@ export default function ManageClients() {
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       <Toast message={toast} />
-      {editing && <EditClientModal client={editing} onSaved={handleSaved} onClose={() => setEditing(null)} />}
+      {editing && (
+        <EditClientModal
+          client={editing}
+          projectNames={projects.filter((p) => p.managed_client_id === editing.id).map((p) => p.project_name)}
+          onSaved={handleSaved}
+          onDeleted={handleDeleted}
+          onClose={() => setEditing(null)}
+        />
+      )}
 
       {/* Header */}
       <div className="flex items-start justify-between mb-8 gap-4">
