@@ -17,6 +17,11 @@ const ROOM_CATEGORIES = [
   { key: 'other',    label: 'Other' },
 ];
 
+// Shown in an empty room tab as a starting checklist (hardcoded, not saved).
+const ROOM_CHECKLISTS = {
+  bathroom: ['Vanity / Cabinetry', 'Floor Tile', 'Shower Fixtures', 'Toilet'],
+};
+
 const UNIT_TYPES = ['sqft', 'lf', 'ea', 'hr', 'ls', 'cy', 'sy'];
 
 const STATUS_CFG = {
@@ -170,8 +175,9 @@ function SpecCard({ spec, onEdit = () => {}, onDelete = () => {}, isAdmin, onApp
   );
 }
 
-function SpecModal({ initial, projects, onSave, onClose, saving }) {
-  const [form, setForm] = useState(initial ?? EMPTY_FORM);
+// `prefill` (optional) seeds a new spec's fields; the modal stays in Add mode.
+function SpecModal({ initial, prefill, projects, onSave, onClose, saving }) {
+  const [form, setForm] = useState(initial ?? { ...EMPTY_FORM, ...prefill });
   const [projectId, setProjectId] = useState(initial?.project_id ?? (projects[0]?.id ?? ''));
   const [error, setError] = useState('');
 
@@ -782,6 +788,34 @@ export default function DesignerWorkspace() {
               </svg>
               <span className="text-sm" style={{ color: '#9CA3AF' }}>Loading specs…</span>
             </div>
+          ) : filteredSpecs.length === 0 && ROOM_CHECKLISTS[activeRoom] ? (
+            <div className="rounded-2xl p-6 sm:p-8" style={{ backgroundColor: '#fff', border: '1.5px dashed #E8E6E1' }}>
+              <p className="font-semibold text-sm" style={{ color: '#374151' }}>
+                Common materials for {ROOM_CATEGORIES.find((r) => r.key === activeRoom)?.label.toLowerCase()}
+              </p>
+              <p className="text-xs mt-0.5 mb-4" style={{ color: '#9CA3AF' }}>No specs yet. Start with one of these.</p>
+              <ul className="grid sm:grid-cols-2 gap-2">
+                {ROOM_CHECKLISTS[activeRoom].map((item) => (
+                  <li key={item} className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl"
+                    style={{ backgroundColor: '#F9F8F6', border: '1px solid #F0EEE9' }}>
+                    <span className="flex items-center gap-2.5 text-sm font-medium" style={{ color: '#002147' }}>
+                      <span className="w-4 h-4 rounded shrink-0" style={{ border: '1.5px solid #D1D5DB', backgroundColor: '#fff' }} />
+                      {item}
+                    </span>
+                    {canEdit && (
+                      <button
+                        onClick={() => setModal({ prefill: { room_category: activeRoom, product_name: item } })}
+                        aria-label={`Add spec for ${item}`}
+                        className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold"
+                        style={{ backgroundColor: '#002147', color: '#D4AF37' }}
+                      >
+                        + Add Spec
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
           ) : filteredSpecs.length === 0 ? (
             <div className="rounded-2xl p-12 text-center" style={{ backgroundColor: '#fff', border: '1.5px dashed #E8E6E1' }}>
               <p className="font-semibold text-sm mb-1" style={{ color: '#374151' }}>No specs yet for this {activeRoom === 'all' ? 'project' : 'room'}</p>
@@ -814,7 +848,8 @@ export default function DesignerWorkspace() {
       {/* Add / Edit modal */}
       {modal && (
         <SpecModal
-          initial={modal === 'add' ? null : modal}
+          initial={modal === 'add' || modal.prefill ? null : modal}
+          prefill={modal.prefill}
           projects={projects}
           onSave={handleSave}
           onClose={() => setModal(null)}
