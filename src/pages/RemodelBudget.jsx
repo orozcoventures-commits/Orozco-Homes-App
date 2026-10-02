@@ -324,6 +324,74 @@ function DesignSpecsSection({ approvedSpecs, total, isOpen, onToggle }) {
   );
 }
 
+// ── Approved change orders section ───────────────────────────────────────────
+
+const coDelta = (co) => (Number(co.new_cost) || 0) - (Number(co.original_cost) || 0);
+const fmtSigned = (n) => `${n < 0 ? '−' : '+'}$${Math.abs(n).toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+const fmtCoDate = (iso) => (iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : null);
+
+function ChangeOrdersSection({ changeOrders, total, cost, margin, marginPct, isOpen, onToggle }) {
+  if (changeOrders.length === 0) return null;
+  return (
+    <div className="rounded-2xl overflow-hidden mb-3" style={{ border: '1.5px solid #FCD34D' }}>
+      <button onClick={onToggle}
+        className="w-full flex items-center justify-between px-5 py-4 focus:outline-none"
+        style={{ backgroundColor: '#FFFBEB' }}>
+        <div className="flex items-center gap-3">
+          <span className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-extrabold shrink-0"
+            style={{ backgroundColor: '#92400E', color: '#fff' }}>CO</span>
+          <span className="text-sm font-bold text-left" style={{ color: '#92400E' }}>Approved Change Orders</span>
+          <span className="text-xs px-2 py-0.5 rounded-full font-bold"
+            style={{ backgroundColor: '#FEF3C7', color: '#92400E' }}>{changeOrders.length} {changeOrders.length === 1 ? 'order' : 'orders'}</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-extrabold" style={{ color: '#92400E' }}>{fmtSigned(total)}</span>
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#92400E"
+            strokeWidth="2" strokeLinecap="round"
+            style={{ transition: 'transform 0.2s', transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+            <polyline points="1 4 6 8 11 4" />
+          </svg>
+        </div>
+      </button>
+      {isOpen && (
+        <div style={{ backgroundColor: '#fff' }}>
+          {changeOrders.map((co, i) => {
+            const delta = coDelta(co);
+            const approved = [fmtCoDate(co.approved_at), co.approved_by].filter(Boolean).join(' · ');
+            return (
+              <div key={co.id}
+                className="flex items-center gap-3 px-4 py-2.5"
+                style={{ borderTop: i === 0 ? '1px solid #FCD34D' : '1px solid #F3F4F6' }}>
+                <span className="text-xs font-bold w-8 text-center py-0.5 rounded shrink-0"
+                  style={{ backgroundColor: '#FFFBEB', color: '#92400E' }}>CO</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm truncate" style={{ color: '#374151' }}>
+                    {co.title}
+                    {co.category && <span className="text-xs ml-2" style={{ color: '#9CA3AF' }}>{co.category}</span>}
+                  </p>
+                  {approved && <p className="text-xs" style={{ color: '#9CA3AF' }}>Approved {approved}</p>}
+                </div>
+                <span className="text-sm font-semibold shrink-0" style={{ color: delta < 0 ? '#059669' : '#92400E' }}>
+                  {fmtSigned(delta)}
+                </span>
+              </div>
+            );
+          })}
+          <div className="px-4 py-3" style={{ borderTop: '1px solid #FCD34D', backgroundColor: '#FFFBEB' }}>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold tracking-wide" style={{ color: '#92400E' }}>Approved Change Orders Total</span>
+              <span className="text-sm font-extrabold" style={{ color: '#92400E' }}>{fmtSigned(total)}</span>
+            </div>
+            <p className="text-xs mt-1" style={{ color: '#B45309' }}>
+              Client price changes exactly as approved: {fmtSigned(cost)} to direct cost, {fmtSigned(margin)} to gross margin ({marginPct}%).
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function RemodelBudget() {
@@ -366,6 +434,10 @@ export default function RemodelBudget() {
   const [approvedSpecs,  setApprovedSpecs]  = useState([]);
   const [specsDivOpen,   setSpecsDivOpen]   = useState(true);
 
+  // ── Approved change orders ──────────────────────────────────────────────────
+  const [approvedChangeOrders, setApprovedChangeOrders] = useState([]);
+  const [coDivOpen,            setCoDivOpen]            = useState(true);
+
   // ── Persistence state ───────────────────────────────────────────────────────
   const [budgetLoading,  setBudgetLoading]  = useState(false);
   const [saving,         setSaving]         = useState(false);
@@ -387,6 +459,18 @@ export default function RemodelBudget() {
       .eq('status', 'approved')
       .order('room_category');
     setApprovedSpecs(data ?? []);
+  }, []);
+
+  // ── Load approved change orders ─────────────────────────────────────────────
+  const loadApprovedChangeOrders = useCallback(async (pid) => {
+    if (!pid) { setApprovedChangeOrders([]); return; }
+    const { data } = await supabase
+      .from('change_works')
+      .select('id, title, category, original_cost, new_cost, approved_at, approved_by')
+      .eq('project_id', pid)
+      .eq('status', 'approved')
+      .order('approved_at', { ascending: true });
+    setApprovedChangeOrders(data ?? []);
   }, []);
 
   // ── Load budget from DB ─────────────────────────────────────────────────────
@@ -446,6 +530,7 @@ export default function RemodelBudget() {
     setOpenDivs({});
     setActualVals({});
     setApprovedSpecs([]);
+    setApprovedChangeOrders([]);
     setLastSaved(null);
     setSaving(false);
 
@@ -456,7 +541,8 @@ export default function RemodelBudget() {
 
     loadBudget(selectedProjId);
     loadApprovedSpecs(selectedProjId);
-  }, [selectedProjId, loadBudget, loadApprovedSpecs]);
+    loadApprovedChangeOrders(selectedProjId);
+  }, [selectedProjId, loadBudget, loadApprovedSpecs, loadApprovedChangeOrders]);
 
   // ── Debounced auto-save for budget header ───────────────────────────────────
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -537,6 +623,13 @@ export default function RemodelBudget() {
     [approvedSpecs]
   );
 
+  // ── Approved change orders total (new cost − original cost, as the client
+  // approved it) ───────────────────────────────────────────────────────────────
+  const changeOrdersTotal = useMemo(
+    () => approvedChangeOrders.reduce((s, co) => s + coDelta(co), 0),
+    [approvedChangeOrders]
+  );
+
   // ── Cascade engine (estimated line values) ──────────────────────────────────
   const lineVals = useMemo(() => {
     if (!config) return {};
@@ -566,9 +659,15 @@ export default function RemodelBudget() {
     if (!config) return {};
     const nonPct = allNonPctWbs(config);
 
+    // Approved change orders are added to the client price exactly as approved.
+    // They are assumed to carry the same target gross margin, so that share goes
+    // to margin and the rest to direct cost (and the cost budget).
+    const changeOrderMargin  = changeOrdersTotal * ((pctRates.profitPct ?? 0) / 100);
+    const changeOrderCost    = changeOrdersTotal - changeOrderMargin;
+
     // Budget
-    const directCosts        = nonPct.reduce((s, w) => s + (lineVals[w] ?? 0), 0) + designSpecsTotal;
-    const profit             = lineVals['M.2'] ?? 0;   // gross margin (overhead + profit)
+    const directCosts        = nonPct.reduce((s, w) => s + (lineVals[w] ?? 0), 0) + designSpecsTotal + changeOrderCost;
+    const profit             = (lineVals['M.2'] ?? 0) + changeOrderMargin;   // gross margin (overhead + profit)
     const contingency        = lineVals['M.3'] ?? 0;
     const totalClientPrice   = directCosts + contingency + profit;
     const contractorMargin   = profit;
@@ -598,8 +697,9 @@ export default function RemodelBudget() {
       contractorMargin, marginPct, marginTarget, costPerSqft, divSums,
       budgetCost, actualDirectCosts, actualOverhead, actualContingency,
       actualTotalCost, totalVariance, projectedMargin, projectedMarginPct,
+      changeOrderCost, changeOrderMargin,
     };
-  }, [config, lineVals, inputs.sqft, designSpecsTotal, actualVals, pctRates.profitPct]);
+  }, [config, lineVals, inputs.sqft, designSpecsTotal, changeOrdersTotal, actualVals, pctRates.profitPct]);
 
   // ── Event handlers ──────────────────────────────────────────────────────────
   function handleLineChange(wbs, num)  { setUserVals((p) => ({ ...p, [wbs]: num })); setOverrideFlags((p) => ({ ...p, [wbs]: true })); }
@@ -634,6 +734,26 @@ export default function RemodelBudget() {
           <thead><tr><th>Product</th><th>Supplier</th><th class="amount">Qty / Unit</th><th class="amount">Installed Cost</th></tr></thead>
           <tbody>${rows}</tbody>
           <tfoot><tr><td colspan="3" class="amount-label">Design Selections Total</td><td class="amount">$${designSpecsTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td></tr></tfoot>
+        </table>`;
+    }
+
+    let changeOrdersHTML = '';
+    if (approvedChangeOrders.length > 0) {
+      // approved_by is the client's typed signature, so escape everything.
+      const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+      const money = (n) => `${n < 0 ? '−' : '+'}$${Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+      const rows = approvedChangeOrders.map((co) => `
+        <tr>
+          <td>${esc(co.title)}${co.category ? ` <span style="color:#9CA3AF">(${esc(co.category)})</span>` : ''}</td>
+          <td>${esc([fmtCoDate(co.approved_at), co.approved_by].filter(Boolean).join(' · ') || '—')}</td>
+          <td class="amount">${money(coDelta(co))}</td>
+        </tr>`).join('');
+      changeOrdersHTML = `
+        <h2>Approved Change Orders</h2>
+        <table>
+          <thead><tr><th>Change Order</th><th>Approved</th><th class="amount">Price Change</th></tr></thead>
+          <tbody>${rows}</tbody>
+          <tfoot><tr><td colspan="2" class="amount-label">Approved Change Orders Total</td><td class="amount">${money(changeOrdersTotal)}</td></tr></tfoot>
         </table>`;
     }
 
@@ -732,6 +852,7 @@ export default function RemodelBudget() {
     ${paramRows}
   </div>
   ${specsTableHTML}
+  ${changeOrdersHTML}
   <h2>Work Breakdown Structure${hasActuals ? ' — Budget vs Actual' : ''}</h2>
   <table>
     <thead><tr><th style="width:40px">WBS</th><th>Description</th><th class="amount">Budget</th>${extraColHeaders}</tr></thead>
@@ -980,6 +1101,15 @@ export default function RemodelBudget() {
           total={designSpecsTotal}
           isOpen={specsDivOpen}
           onToggle={() => setSpecsDivOpen((o) => !o)}
+        />
+        <ChangeOrdersSection
+          changeOrders={approvedChangeOrders}
+          total={changeOrdersTotal}
+          cost={totals.changeOrderCost}
+          margin={totals.changeOrderMargin}
+          marginPct={pctRates.profitPct}
+          isOpen={coDivOpen}
+          onToggle={() => setCoDivOpen((o) => !o)}
         />
       </div>
 
