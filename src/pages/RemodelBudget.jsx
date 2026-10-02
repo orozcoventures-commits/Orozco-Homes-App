@@ -10,6 +10,7 @@ import {
 } from '../utils/remodelBudgetCalculator';
 import { supabase } from '../lib/supabase';
 import { useProject } from '../context/ProjectContext';
+import { buildContractPrefill } from '../utils/contractPrefill';
 
 // ── Project type groupings ────────────────────────────────────────────────────
 
@@ -395,7 +396,7 @@ function ChangeOrdersSection({ changeOrders, total, cost, margin, marginPct, isO
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function RemodelBudget() {
-  const { state: projectState } = useProject();
+  const { state: projectState, dispatch } = useProject();
   // Used only to pre-populate the picker when admin arrives from a project view
   const contextProjectId = projectState.activeDbProject?.id ?? null;
 
@@ -436,6 +437,8 @@ export default function RemodelBudget() {
 
   // ── Approved change orders ──────────────────────────────────────────────────
   const [approvedChangeOrders, setApprovedChangeOrders] = useState([]);
+  const [generatingContract,   setGeneratingContract]   = useState(false);
+  const [contractError,        setContractError]        = useState('');
   const [coDivOpen,            setCoDivOpen]            = useState(true);
 
   // ── Persistence state ───────────────────────────────────────────────────────
@@ -714,6 +717,56 @@ export default function RemodelBudget() {
 
   if (!config) return null;
 
+  // ── Generate Contract ───────────────────────────────────────────────────────
+  // Sends only client-facing values to the Contracts page (see contractPrefill.js):
+  // client details, work descriptions, selections and the total client price.
+  async function handleGenerateContract() {
+    if (!currentProjectId) return;
+    setContractError('');
+    setGeneratingContract(true);
+    const { data: project, error: projectError } = await supabase
+      .from('projects')
+      .select('id, project_name, managed_client_id')
+      .eq('id', currentProjectId)
+      .single();
+    let client = null;
+    if (!projectError && project.managed_client_id) {
+      ({ data: client } = await supabase
+        .from('clients')
+        .select('id, full_name, email, phone')
+        .eq('id', project.managed_client_id)
+        .maybeSingle());
+    }
+    setGeneratingContract(false);
+    if (projectError) { setContractError('Could not load the project. Try again.'); return; }
+
+    const values = buildContractPrefill({
+      client,
+      projectType: project.project_name || config.label,
+      scope: config.divisions
+        .filter((div) => !div.items.every(isMarginLine))
+        .map((div) => ({
+          division: div.label,
+          items: div.items.filter((item) => !isMarginLine(item) && (lineVals[item.wbs] ?? 0) > 0).map((item) => item.label),
+        })),
+      changeOrders: approvedChangeOrders.filter((co) => coDelta(co) !== 0).map((co) => co.title),
+      materials: approvedSpecs.map((sp) =>
+        [sp.product_name, sp.supplier && `(${sp.supplier})`, sp.quantity && `— ${sp.quantity} ${sp.unit_type ?? ''}`.trim()]
+          .filter(Boolean).join(' ')),
+      clientPrice: totals.totalClientPrice,
+    });
+
+    dispatch({
+      type: 'OPEN_CONTRACT_DRAFT',
+      draft: {
+        values,
+        source: project.project_name,
+        projectId: project.id,
+        managedClientId: client?.id ?? null,
+      },
+    });
+  }
+
   // ── Export to print window ──────────────────────────────────────────────────
   function handleExport() {
     const dateStr        = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
@@ -935,10 +988,9 @@ export default function RemodelBudget() {
             </button>
           )}
           <button onClick={handleExport}
+            title="Internal budget with costs and margin. Don't send this to clients."
             className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold"
-            style={{ backgroundColor: '#002147', color: '#D4AF37' }}
-            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#003166'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#002147'; }}>
+            style={{ backgroundColor: '#fff', color: '#002147', border: '1.5px solid #E8E6E1' }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
               strokeLinecap="round" strokeLinejoin="round">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -947,10 +999,31 @@ export default function RemodelBudget() {
               <line x1="9" y1="15" x2="12" y2="18"/>
               <line x1="15" y1="15" x2="12" y2="18"/>
             </svg>
-            Export Contract
+            Export Budget (Internal)
+          </button>
+          <button onClick={handleGenerateContract}
+            disabled={!currentProjectId || generatingContract || budgetLoading}
+            title={currentProjectId ? 'Open a contract filled with this client and the total price' : 'Pick a project first'}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ backgroundColor: '#002147', color: '#D4AF37' }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+              strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <path d="M9 15l2 2 4-4"/>
+            </svg>
+            {generatingContract ? 'Opening…' : 'Generate Contract'}
           </button>
         </div>
       </div>
+      {!currentProjectId && (
+        <p className="-mt-4 mb-4 text-xs text-right" style={{ color: '#9CA3AF' }}>
+          Pick a project to generate its contract.
+        </p>
+      )}
+      {contractError && (
+        <p role="alert" className="-mt-4 mb-4 text-xs text-right" style={{ color: '#DC2626' }}>{contractError}</p>
+      )}
 
       {/* Project type selector */}
       <div className="rounded-2xl p-5 mb-5"

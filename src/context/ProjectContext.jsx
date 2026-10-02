@@ -5,6 +5,7 @@ const ProjectContext = createContext(null);
 const initialState = {
   activeDbProject: null,  // real Supabase projects row
   activePage:      'home',
+  contractDraft:   null,  // client-safe values handed from Remodel Budget to Contracts
 };
 
 function reducer(state, action) {
@@ -17,6 +18,10 @@ function reducer(state, action) {
       };
     case 'SET_PAGE':
       return { ...state, activePage: action.page };
+    case 'OPEN_CONTRACT_DRAFT':
+      return { ...state, contractDraft: action.draft, activePage: 'contracts' };
+    case 'CLEAR_CONTRACT_DRAFT':
+      return { ...state, contractDraft: null };
     case 'CLEAR_DB_PROJECT':
       return { ...state, activeDbProject: null };
     default:
