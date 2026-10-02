@@ -1293,9 +1293,10 @@ export default function RemodelBudget() {
         })}
       </div>
 
-      {/* Grand total footer */}
+      {/* Grand total footer — reads left to right like the pricing formula:
+          Direct + Contingency = Total Project Cost; ÷ (1 − margin) = Client Price */}
       <div className="mt-6 rounded-2xl p-6" style={{ backgroundColor: '#002147' }}>
-        <div className={`grid gap-6 ${hasActuals ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2 sm:grid-cols-4'}`}>
+        <div className="grid gap-6 grid-cols-2 sm:grid-cols-5">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'rgba(212,175,55,0.6)' }}>Direct Costs</p>
             <p className="text-base font-extrabold text-white">{fmt(totals.directCosts)}</p>
@@ -1306,41 +1307,51 @@ export default function RemodelBudget() {
             )}
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'rgba(212,175,55,0.6)' }}>Overhead + Profit</p>
-            <p className="text-base font-extrabold text-white">{fmt(totals.contractorMargin)}</p>
+            <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'rgba(212,175,55,0.6)' }}>
+              + Contingency{overrideFlags['M.3'] ? '' : ` (${pctRates.contingencyPct}%)`}
+            </p>
+            <p className="text-base font-extrabold text-white">{fmt(totals.contingency)}</p>
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'rgba(212,175,55,0.6)' }}>= Total Project Cost</p>
+            <p className="text-base font-extrabold text-white">{fmt(totals.budgetCost)}</p>
+            <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>
+              {hasActuals && totals.actualTotalCost > 0 ? `Actual: ${fmt(totals.actualTotalCost)}` : 'Your cost'}
+            </p>
           </div>
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'rgba(212,175,55,0.6)' }}>Total Client Price</p>
             <p className="text-xl font-extrabold" style={{ color: '#D4AF37' }}>{fmt(totals.totalClientPrice)}</p>
-            {totals.costPerSqft != null && (
-              <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>{fmtD(totals.costPerSqft)}/sqft</p>
-            )}
+            <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>
+              {overrideFlags['M.2']
+                ? 'Margin entered by hand'
+                : `Total project cost ÷ ${(1 - (pctRates.profitPct ?? 0) / 100).toFixed(2)}`}
+              {totals.costPerSqft != null && ` · ${fmtD(totals.costPerSqft)}/sqft`}
+            </p>
           </div>
           <div>
-            {hasActuals && totals.actualTotalCost > 0 ? (
-              <>
-                <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'rgba(212,175,55,0.6)' }}>Total Variance</p>
-                <p className="text-xl font-extrabold"
-                  style={{ color: totals.totalVariance < 0 ? '#F87171' : '#34D399' }}>
-                  {totals.totalVariance >= 0 ? '+' : '−'}{fmt(Math.abs(totals.totalVariance))}
-                </p>
-                <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>
-                  {totals.totalVariance >= 0 ? 'Under budget' : 'Over budget'} · Actual cost: {fmt(totals.actualTotalCost)}
-                </p>
-              </>
-            ) : (
-              <>
-                <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'rgba(212,175,55,0.6)' }}>Gross Margin</p>
-                <p className="text-xl font-extrabold" style={{ color: totals.marginPct >= totals.marginTarget - 0.0005 ? '#34D399' : '#FBBF24' }}>
-                  {fmtPct(totals.marginPct)}
-                </p>
-                <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>
-                  {fmt(totals.contractorMargin)} contractor margin
-                </p>
-              </>
-            )}
+            <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'rgba(212,175,55,0.6)' }}>Overhead + Profit</p>
+            <p className="text-base font-extrabold text-white">{fmt(totals.contractorMargin)}</p>
+            <p className="text-xs mt-0.5 font-semibold"
+              style={{ color: totals.marginPct >= totals.marginTarget - 0.0005 ? '#34D399' : '#FBBF24' }}>
+              {fmtPct(totals.marginPct)} of client price
+            </p>
           </div>
         </div>
+
+        {hasActuals && totals.actualTotalCost > 0 && (
+          <div className="mt-5 pt-4 flex flex-wrap items-baseline justify-between gap-2"
+            style={{ borderTop: '1px solid rgba(255,255,255,0.12)' }}>
+            <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'rgba(212,175,55,0.6)' }}>Total Variance</p>
+            <p className="text-sm" style={{ color: 'rgba(255,255,255,0.6)' }}>
+              <span className="text-lg font-extrabold mr-2"
+                style={{ color: totals.totalVariance < 0 ? '#F87171' : '#34D399' }}>
+                {totals.totalVariance >= 0 ? '+' : '−'}{fmt(Math.abs(totals.totalVariance))}
+              </span>
+              {totals.totalVariance >= 0 ? 'Under budget' : 'Over budget'} · Actual cost {fmt(totals.actualTotalCost)} vs {fmt(totals.budgetCost)} project cost
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Actuals hint when none entered yet */}
