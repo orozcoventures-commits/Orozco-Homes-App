@@ -133,10 +133,10 @@ function ActualCell({ value, onChange, width = 110 }) {
         type="text" inputMode="numeric"
         value={focused ? raw : filled ? (Number(value) || 0).toLocaleString('en-US', { maximumFractionDigits: 0 }) : ''}
         placeholder="0"
-        onFocus={() => { setFocused(true); setRaw(String(Math.round(Number(value) || 0))); }}
+        onFocus={() => { setFocused(true); setRaw(filled ? String(Math.round(Number(value))) : ''); }}
         onBlur={() => setFocused(false)}
         onChange={(e) => {
-          const d = e.target.value.replace(/[^0-9]/g, '');
+          const d = e.target.value.replace(/[^0-9]/g, '').replace(/^0+(?=\d)/, '');
           setRaw(d);
           onChange(Number(d) || 0);
         }}
@@ -190,15 +190,67 @@ function PctCell({ value, onChange, label }) {
 
 // ── Line row — triple-column layout ──────────────────────────────────────────
 
-function LineRow({ item, divStyle: ds, value, isOverridden, onChange, onReset, pctRate, onPctChange, isFirst, actual, onActualChange, showActuals, actualsDisabled }) {
-  const variance = value - (actual ?? 0);
-  const hasActual = (actual ?? 0) > 0;
+// Actual costs are entered by type (migration 037). `unsplit` holds an older
+// total that was saved before the split existed.
+const ACTUAL_TYPES = [
+  { key: 'material', label: 'Material',      column: 'material_cost' },
+  { key: 'labor',    label: 'Labor',         column: 'labor_cost'    },
+  { key: 'sub',      label: 'Subcontractor', column: 'sub_cost'      },
+];
+const EMPTY_PARTS = { material: 0, labor: 0, sub: 0, unsplit: 0 };
+const partsTotal = (p) => (p ? p.material + p.labor + p.sub + p.unsplit : 0);
+
+// Total actual for a line; click to open the by-type breakdown.
+function ActualTotalButton({ total, open, onClick, width = 110 }) {
+  const filled = total > 0;
+  return (
+    <button type="button" onClick={onClick} aria-expanded={open}
+      className="shrink-0 flex items-center justify-between gap-1 pl-2.5 pr-2 py-1.5 rounded-lg text-sm font-semibold focus:outline-none"
+      style={{
+        width,
+        backgroundColor: filled ? '#F0F9FF' : '#F9FAFB',
+        border: `1.5px solid ${open ? '#0369A1' : filled ? '#BAE6FD' : '#E5E7EB'}`,
+        color: filled ? '#002147' : '#9CA3AF',
+      }}>
+      <span className="text-xs" style={{ transition: 'transform 0.15s', transform: open ? 'rotate(90deg)' : 'none', color: '#0369A1' }}>▸</span>
+      <span>{filled ? `$${Math.round(total).toLocaleString('en-US')}` : 'Add'}</span>
+    </button>
+  );
+}
+
+// By-type inputs for one line's actual cost.
+function ActualBreakdown({ parts, showUnsplit, onPartChange }) {
+  const p = parts ?? EMPTY_PARTS;
+  const fields = [...ACTUAL_TYPES, ...(showUnsplit ? [{ key: 'unsplit', label: 'Not split (earlier total)' }] : [])];
+  return (
+    <div className="px-4 pb-3 pt-1">
+      <div className="ml-auto rounded-xl p-3 flex flex-wrap items-end gap-3 sm:justify-end"
+        style={{ backgroundColor: '#F0F9FF', border: '1px solid #BAE6FD' }}>
+        {fields.map((f) => (
+          <label key={f.key} className="flex flex-col gap-1">
+            <span className="text-xs font-semibold" style={{ color: '#0369A1' }}>{f.label}</span>
+            <ActualCell value={p[f.key]} onChange={(v) => onPartChange(f.key, v)} />
+          </label>
+        ))}
+        <div className="flex flex-col gap-1 text-right" style={{ minWidth: 90 }}>
+          <span className="text-xs font-semibold" style={{ color: '#6B7280' }}>Total actual</span>
+          <span className="py-1.5 text-sm font-extrabold" style={{ color: '#002147' }}>
+            ${Math.round(partsTotal(p)).toLocaleString('en-US')}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LineRow({ item, divStyle: ds, value, isOverridden, onChange, onReset, pctRate, onPctChange, isFirst, actualParts, showUnsplit, actualOpen, onToggleActual, onActualPartChange, showActuals, actualsDisabled }) {
+  const actual = partsTotal(actualParts);
+  const variance = value - actual;
+  const hasActual = actual > 0;
 
   return (
-    <div
-      className="flex items-center gap-2 px-4 py-2.5"
-      style={{ borderTop: `1px solid ${isFirst ? ds.border : '#F3F4F6'}` }}
-    >
+    <div style={{ borderTop: `1px solid ${isFirst ? ds.border : '#F3F4F6'}` }}>
+    <div className="flex items-center gap-2 px-4 py-2.5">
       {/* WBS badge */}
       <span className="text-xs font-bold w-8 text-center py-0.5 rounded shrink-0"
         style={{ backgroundColor: ds.bg, color: ds.color }}>
@@ -227,21 +279,36 @@ function LineRow({ item, divStyle: ds, value, isOverridden, onChange, onReset, p
       {/* Budgeted */}
       <DollarCell value={value} isOverridden={isOverridden} onChange={onChange} />
 
-      {/* Actual — hidden on xs; the margin line has no actual spend */}
+      {/* Actual (desktop) — the margin line has no actual spend */}
       {showActuals && (
         <div className="hidden sm:block">
           {actualsDisabled
             ? <div className="shrink-0 text-right text-xs pr-2" style={{ width: 110, color: '#9CA3AF' }} title="The gross margin is pricing, not a cost">n/a</div>
-            : <ActualCell value={actual ?? 0} onChange={(v) => onActualChange(item.wbs, v)} />}
+            : <ActualTotalButton total={actual} open={actualOpen} onClick={onToggleActual} />}
         </div>
       )}
 
-      {/* Variance — hidden on xs */}
+      {/* Variance (desktop) */}
       {showActuals && (
         <div className="hidden sm:block">
           <VarianceCell variance={variance} show={hasActual && !actualsDisabled} />
         </div>
       )}
+    </div>
+
+    {/* Actual + variance on phones, under the budget amount */}
+    {showActuals && !actualsDisabled && (
+      <div className="sm:hidden flex items-center justify-end gap-2 px-4 pb-2.5 -mt-1">
+        <span className="text-xs font-semibold" style={{ color: '#0369A1' }}>Actual</span>
+        <ActualTotalButton total={actual} open={actualOpen} onClick={onToggleActual} />
+        <VarianceCell variance={variance} show={hasActual} />
+      </div>
+    )}
+
+    {showActuals && actualOpen && !actualsDisabled && (
+      <ActualBreakdown parts={actualParts} showUnsplit={showUnsplit}
+        onPartChange={(key, v) => onActualPartChange(item.wbs, key, v)} />
+    )}
     </div>
   );
 }
@@ -429,7 +496,15 @@ export default function RemodelBudget() {
   const [openDivs,       setOpenDivs]       = useState({});
 
   // ── Actuals state ───────────────────────────────────────────────────────────
-  const [actualVals,     setActualVals]     = useState({});
+  const [actualParts,    setActualParts]    = useState({});   // { wbs: { material, labor, sub, unsplit } }
+  const [unsplitWbs,     setUnsplitWbs]     = useState(() => new Set());  // lines loaded with an older, unsplit total
+  const [openActual,     setOpenActual]     = useState(null); // wbs whose breakdown is open
+  const [actualsOn,      setActualsOn]      = useState(true);
+  const [actualsError,   setActualsError]   = useState('');
+  const actualVals = useMemo(
+    () => Object.fromEntries(Object.entries(actualParts).map(([wbs, p]) => [wbs, partsTotal(p)])),
+    [actualParts]
+  );
 
   // ── Design specs ────────────────────────────────────────────────────────────
   const [approvedSpecs,  setApprovedSpecs]  = useState([]);
@@ -490,8 +565,12 @@ export default function RemodelBudget() {
         .maybeSingle(),
       supabase
         .from('remodel_budget_actuals')
-        .select('wbs_key, actual_cost')
-        .eq('project_id', projectId),
+        .select(`wbs_key, actual_cost, ${ACTUAL_TYPES.map((t) => t.column).join(', ')}`)
+        .eq('project_id', projectId)
+        .then(async (res) => (res.error
+          // Before migration 037 the by-type columns don't exist yet.
+          ? supabase.from('remodel_budget_actuals').select('wbs_key, actual_cost').eq('project_id', projectId)
+          : res)),
     ]);
 
     if (budget) {
@@ -507,11 +586,14 @@ export default function RemodelBudget() {
       if (cfg) setOpenDivs(Object.fromEntries(cfg.divisions.map((d) => [d.key, true])));
     }
 
-    if (actuals && actuals.length > 0) {
-      setActualVals(Object.fromEntries(actuals.map((a) => [a.wbs_key, Number(a.actual_cost)])));
-    } else {
-      setActualVals({});
+    const loaded = {};
+    for (const a of actuals ?? []) {
+      const parts = Object.fromEntries(ACTUAL_TYPES.map((t) => [t.key, Number(a[t.column]) || 0]));
+      const split = parts.material + parts.labor + parts.sub;
+      loaded[a.wbs_key] = { ...parts, unsplit: Math.max(0, (Number(a.actual_cost) || 0) - split) };
     }
+    setActualParts(loaded);
+    setUnsplitWbs(new Set(Object.keys(loaded).filter((w) => loaded[w].unsplit > 0)));
 
     setBudgetLoading(false);
     // Allow auto-save one tick after state settles
@@ -531,7 +613,10 @@ export default function RemodelBudget() {
     setUserVals({});
     setOverrideFlags({});
     setOpenDivs({});
-    setActualVals({});
+    setActualParts({});
+    setUnsplitWbs(new Set());
+    setOpenActual(null);
+    setActualsError('');
     setApprovedSpecs([]);
     setApprovedChangeOrders([]);
     setLastSaved(null);
@@ -585,18 +670,25 @@ export default function RemodelBudget() {
   ]);
 
   // ── Save actual cost for one WBS line (debounced 800ms) ────────────────────
-  function handleActualChange(wbs, val) {
-    setActualVals((p) => ({ ...p, [wbs]: val }));
+  function handleActualPartChange(wbs, key, val) {
+    const parts = { ...EMPTY_PARTS, ...actualParts[wbs], [key]: val };
+    setActualParts((p) => ({ ...p, [wbs]: parts }));
     if (!currentProjectId) return;
 
     if (actualTimers.current[wbs]) clearTimeout(actualTimers.current[wbs]);
-    actualTimers.current[wbs] = setTimeout(() => {
-      supabase
+    actualTimers.current[wbs] = setTimeout(async () => {
+      const { error } = await supabase
         .from('remodel_budget_actuals')
         .upsert(
-          { project_id: currentProjectId, wbs_key: wbs, actual_cost: val },
+          {
+            project_id:  currentProjectId,
+            wbs_key:     wbs,
+            actual_cost: partsTotal(parts),
+            ...Object.fromEntries(ACTUAL_TYPES.map((t) => [t.column, parts[t.key]])),
+          },
           { onConflict: 'project_id,wbs_key' }
         );
+      setActualsError(error ? `Actual cost for line ${wbs} was not saved: ${error.message}` : '');
     }, 800);
   }
 
@@ -713,6 +805,12 @@ export default function RemodelBudget() {
   function toggleDiv(key)              { setOpenDivs((p) => ({ ...p, [key]: !(resolvedOpenDivs[key] ?? true) })); }
 
   const hasOverrides = Object.values(overrideFlags).some(Boolean);
+  const showActuals  = !!currentProjectId && actualsOn;
+  const actualByType = Object.entries(actualParts).reduce((acc, [wbs, p]) => {
+    if (wbs === 'M.2') return acc;
+    for (const k of Object.keys(EMPTY_PARTS)) acc[k] += p[k];
+    return acc;
+  }, { ...EMPTY_PARTS });
   const hasActuals   = Object.entries(actualVals).some(([wbs, v]) => wbs !== 'M.2' && (Number(v) || 0) > 0);
 
   if (!config) return null;
@@ -1155,16 +1253,31 @@ export default function RemodelBudget() {
         </div>
       )}
 
-      {/* Column headers for WBS table (desktop only, when actuals exist) */}
-      {hasActuals && (
-        <div className="hidden sm:flex items-center gap-2 px-4 pb-1 mb-0.5">
-          <div className="w-8 shrink-0" />
+      {/* Actuals switch + column headers (headers on desktop only) */}
+      {currentProjectId && (
+        <div className="flex items-center gap-2 px-4 pb-1 mb-0.5">
+          <button type="button" role="switch" aria-checked={actualsOn} onClick={() => setActualsOn((v) => !v)}
+            className="flex items-center gap-2 text-xs font-semibold focus:outline-none" style={{ color: '#0369A1' }}>
+            <span className="relative inline-block w-8 h-4 rounded-full transition-colors"
+              style={{ backgroundColor: actualsOn ? '#0369A1' : '#D1D5DB' }}>
+              <span className="absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all"
+                style={{ left: actualsOn ? '1.125rem' : '0.125rem' }} />
+            </span>
+            Show actuals
+          </button>
           <div className="flex-1" />
-          <div className="w-14 hidden sm:block" />
-          <div className="text-xs font-bold uppercase tracking-wide text-center shrink-0" style={{ width: 110, color: '#6B7280' }}>Budgeted</div>
-          <div className="text-xs font-bold uppercase tracking-wide text-center shrink-0" style={{ width: 110, color: '#0369A1' }}>Actual</div>
-          <div className="text-xs font-bold uppercase tracking-wide text-center shrink-0" style={{ width: 86, color: '#6B7280' }}>Variance</div>
+          {showActuals && (
+            <>
+              <div className="w-14 hidden sm:block" />
+              <div className="hidden sm:block text-xs font-bold uppercase tracking-wide text-center shrink-0" style={{ width: 110, color: '#6B7280' }}>Budgeted</div>
+              <div className="hidden sm:block text-xs font-bold uppercase tracking-wide text-center shrink-0" style={{ width: 110, color: '#0369A1' }}>Actual</div>
+              <div className="hidden sm:block text-xs font-bold uppercase tracking-wide text-center shrink-0" style={{ width: 86, color: '#6B7280' }}>Variance</div>
+            </>
+          )}
         </div>
+      )}
+      {actualsError && (
+        <p role="alert" className="px-4 mb-2 text-xs font-semibold" style={{ color: '#DC2626' }}>{actualsError}</p>
       )}
 
       {/* Design Selections division */}
@@ -1258,9 +1371,12 @@ export default function RemodelBudget() {
                       pctRate={item.pctKey ? pctRates[item.pctKey] : null}
                       onPctChange={setPctRate}
                       isFirst={i === 0}
-                      actual={actualVals[item.wbs]}
-                      onActualChange={handleActualChange}
-                      showActuals={hasActuals}
+                      actualParts={actualParts[item.wbs]}
+                      showUnsplit={unsplitWbs.has(item.wbs)}
+                      actualOpen={openActual === item.wbs}
+                      onToggleActual={() => setOpenActual((w) => (w === item.wbs ? null : item.wbs))}
+                      onActualPartChange={handleActualPartChange}
+                      showActuals={showActuals}
                       actualsDisabled={isMarginLine(item)}
                     />
                   ))}
@@ -1350,6 +1466,11 @@ export default function RemodelBudget() {
               </span>
               {totals.totalVariance >= 0 ? 'Under budget' : 'Over budget'} · Actual cost {fmt(totals.actualTotalCost)} vs {fmt(totals.budgetCost)} project cost
             </p>
+            <p className="w-full text-xs" style={{ color: 'rgba(255,255,255,0.6)' }}>
+              <span className="font-semibold uppercase tracking-wide mr-2" style={{ color: 'rgba(212,175,55,0.6)' }}>Actual spent by type</span>
+              {ACTUAL_TYPES.map((t) => `${t.label} ${fmt(actualByType[t.key])}`).join(' · ')}
+              {actualByType.unsplit > 0 && ` · Not split ${fmt(actualByType.unsplit)}`}
+            </p>
           </div>
         )}
       </div>
@@ -1357,7 +1478,9 @@ export default function RemodelBudget() {
       {/* Actuals hint when none entered yet */}
       {!hasActuals && (
         <p className="text-xs text-center mt-4" style={{ color: '#9CA3AF' }}>
-          Enter actual costs in the "Actual" column (desktop) to enable Budget vs. Actual tracking across all line items.
+          {currentProjectId
+            ? 'Click an Actual cell to enter what you spent on that line by Material, Labor and Subcontractor.'
+            : 'Pick a project to track actual costs against this budget.'}
         </p>
       )}
     </div>
