@@ -20,7 +20,12 @@ const ROOM_CATEGORIES = [
 // Shown in an empty room tab as a starting checklist (hardcoded, not saved).
 const ROOM_CHECKLISTS = {
   bathroom: ['Vanity / Cabinetry', 'Floor Tile', 'Shower Fixtures', 'Toilet'],
+  kitchen:  ['Cabinets', 'Countertops', 'Backsplash Tile', 'Appliances'],
+  bedroom:  ['Bed Frame', 'Nightstands', 'Lighting / Sconces', 'Closet System'],
+  living:   ['Sofa / Sectional', 'Area Rug', 'Coffee Table', 'Accent Chairs'],
 };
+// Any other room tab (Addition, Exterior / Portico, Garage, Attic, Other).
+const DEFAULT_ROOM_CHECKLIST = ['Item 1', 'Item 2', 'Item 3', 'Item 4'];
 
 const UNIT_TYPES = ['sqft', 'lf', 'ea', 'hr', 'ls', 'cy', 'sy'];
 
@@ -788,14 +793,14 @@ export default function DesignerWorkspace() {
               </svg>
               <span className="text-sm" style={{ color: '#9CA3AF' }}>Loading specs…</span>
             </div>
-          ) : filteredSpecs.length === 0 && ROOM_CHECKLISTS[activeRoom] ? (
+          ) : filteredSpecs.length === 0 && activeRoom !== 'all' ? (
             <div className="rounded-2xl p-6 sm:p-8" style={{ backgroundColor: '#fff', border: '1.5px dashed #E8E6E1' }}>
               <p className="font-semibold text-sm" style={{ color: '#374151' }}>
                 Common materials for {ROOM_CATEGORIES.find((r) => r.key === activeRoom)?.label.toLowerCase()}
               </p>
               <p className="text-xs mt-0.5 mb-4" style={{ color: '#9CA3AF' }}>No specs yet. Start with one of these.</p>
               <ul className="grid sm:grid-cols-2 gap-2">
-                {ROOM_CHECKLISTS[activeRoom].map((item) => (
+                {(ROOM_CHECKLISTS[activeRoom] ?? DEFAULT_ROOM_CHECKLIST).map((item) => (
                   <li key={item} className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl"
                     style={{ backgroundColor: '#F9F8F6', border: '1px solid #F0EEE9' }}>
                     <span className="flex items-center gap-2.5 text-sm font-medium" style={{ color: '#002147' }}>
