@@ -1,6 +1,8 @@
 // src/pages/ContractBuilder.jsx — Orozco Homes Contract Generator
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useProject } from '../context/ProjectContext';
+import { CONTRACT_PREFILL_KEYS } from '../utils/contractPrefill';
 import { supabase } from '../lib/supabase';
 import {
   CONTRACT_FIELDS,
@@ -166,20 +168,43 @@ function SavedList({ onLoad }) {
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
+const todayISO = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
 export default function ContractBuilder() {
   const { isAdmin } = useAuth();
+  const { state: projectState, dispatch } = useProject();
 
   const defaultValues = CONTRACT_FIELDS.reduce((acc, f) => {
     if (f.defaultValue) acc[f.key] = f.defaultValue;
     return acc;
   }, {});
 
-  const [values,      setValues]      = useState(defaultValues);
+  // A draft handed over by "Generate Contract" in the Remodel Budget. Only the
+  // allowlisted client-facing keys are accepted, whatever the draft contains.
+  const [draft] = useState(() => projectState.contractDraft);
+  const [values,      setValues]      = useState(() => {
+    if (!draft) return defaultValues;
+    const allowed = Object.fromEntries(
+      CONTRACT_PREFILL_KEYS.filter((k) => draft.values?.[k]).map((k) => [k, String(draft.values[k])]),
+    );
+    return { ...defaultValues, ...allowed, contract_date: todayISO() };
+  });
+  const [link,        setLink]        = useState(() => (draft
+    ? { projectId: draft.projectId ?? null, managedClientId: draft.managedClientId ?? null, source: draft.source }
+    : null));
   const [activeTab,   setActiveTab]   = useState('form');
   const [saving,      setSaving]      = useState(false);
   const [contractId,  setContractId]  = useState(null);
   const [toast,       setToast]       = useState({ msg: '', type: '' });
   const printRef = useRef();
+
+  // The draft is used once; clear it so reopening Contracts starts blank.
+  useEffect(() => {
+    if (projectState.contractDraft) dispatch({ type: 'CLEAR_CONTRACT_DRAFT' });
+  }, [projectState.contractDraft, dispatch]);
 
   useEffect(() => {
     const el = document.createElement('style');
@@ -209,6 +234,7 @@ export default function ContractBuilder() {
     if (!confirm('Clear all fields and start a new contract?')) return;
     setValues(defaultValues);
     setContractId(null);
+    setLink(null);
     setActiveTab('form');
   }
 
@@ -221,6 +247,7 @@ export default function ContractBuilder() {
         contract_date:   values.contract_date   || null,
         status:          'draft',
         form_data:       values,
+        ...(link && { project_id: link.projectId, managed_client_id: link.managedClientId }),
       };
       let err;
       if (contractId) {
@@ -244,6 +271,7 @@ export default function ContractBuilder() {
     if (error || !data) { showToast('Could not load contract.', 'error'); return; }
     setValues(data.form_data || {});
     setContractId(data.id);
+    setLink(null);
     setActiveTab('form');
     showToast('Contract loaded.');
   }
@@ -324,6 +352,16 @@ export default function ContractBuilder() {
             </button>
           ))}
         </div>
+
+        {link?.source && (
+          <div role="status" className="mt-4 px-4 py-3 rounded-xl text-xs"
+            style={{ backgroundColor: '#ECFDF5', border: '1px solid #A7F3D0', color: '#065F46' }}>
+            <strong>Filled from the Remodel Budget for {link.source}:</strong> client name, email and phone,
+            project type, scope, selections and the total contract price. Internal costs and margin are not included.
+            Please add the client mailing address, project address, payment schedule and dates, then review the scope.
+            {!values.client_name && ' This project has no client in Manage Clients, so enter the client details too.'}
+          </div>
+        )}
       </div>
 
       <div className="px-6 pb-16 max-w-5xl mx-auto">
