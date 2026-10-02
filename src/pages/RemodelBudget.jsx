@@ -1065,8 +1065,8 @@ export default function RemodelBudget() {
                   {/* Division subtotal */}
                   <div className="flex items-center justify-between px-4 py-3"
                     style={{ borderTop: `1px solid ${ds.border}`, backgroundColor: ds.bg }}>
-                    <span className="text-xs font-bold uppercase tracking-wide" style={{ color: ds.color }}>
-                      Division {div.num} Total
+                    <span className="text-xs font-bold tracking-wide" style={{ color: ds.color }}>
+                      {div.label} Total
                     </span>
                     <div className="flex items-center gap-4">
                       <span className="text-sm font-extrabold" style={{ color: ds.color }}>{fmt(divTotal)}</span>
