@@ -25,7 +25,7 @@ export function useMessages(projectId, userId, isAdmin) {
     // Initial fetch — sorted ascending so the chat reads top→bottom
     supabase
       .from('messages')
-      .select('id, sender_id, sender_role, content, created_at')
+      .select('*') // '*' so the page still loads before migration 045 adds attachment_path
       .eq('project_id', projectId)
       .order('created_at', { ascending: true })
       .then(({ data, error: err }) => {
@@ -63,16 +63,18 @@ export function useMessages(projectId, userId, isAdmin) {
   }, [projectId]);
 
   const sendMessage = useCallback(
-    async (content) => {
+    async (content, attachmentPath = null) => {
       const text = (content ?? '').trim();
-      if (!text || !projectId || !userId) return { error: 'Missing data' };
+      if ((!text && !attachmentPath) || !projectId || !userId) return { error: 'Missing data' };
 
-      const { error: err } = await supabase.from('messages').insert({
+      const row = {
         project_id:  projectId,
         sender_id:   userId,
         sender_role: isAdmin ? 'admin' : 'client',
         content:     text,
-      });
+      };
+      if (attachmentPath) row.attachment_path = attachmentPath;
+      const { error: err } = await supabase.from('messages').insert(row);
 
       return { error: err?.message ?? null };
     },
