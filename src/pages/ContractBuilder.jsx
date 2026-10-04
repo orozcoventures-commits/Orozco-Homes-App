@@ -112,8 +112,19 @@ const PRINT_CSS = `
 }
 `;
 
+const STATUS_BADGE = {
+  draft:         { label: 'Draft',          bg: '#F3F4F6', color: '#6B7280' },
+  sent:          { label: 'Sent',           bg: '#DBEAFE', color: '#1E40AF' },
+  client_signed: { label: 'Client signed',  bg: '#EDE9FE', color: '#5B21B6' },
+  signed:        { label: 'Fully signed',   bg: '#D1FAE5', color: '#065F46' },
+  declined:      { label: 'Declined',       bg: '#FEE2E2', color: '#991B1B' },
+  voided:        { label: 'Voided',         bg: '#F3F4F6', color: '#6B7280' },
+};
+
+const fmtWhen = (iso) => (iso ? new Date(iso).toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' }) : '');
+
 // ── Saved contracts list ──────────────────────────────────────────────────────
-function SavedList({ onLoad }) {
+function SavedList({ onLoad, refreshKey }) {
   const [rows, setRows]       = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -124,7 +135,7 @@ function SavedList({ onLoad }) {
       .order('created_at', { ascending: false })
       .limit(20)
       .then(({ data }) => { setRows(data || []); setLoading(false); });
-  }, []);
+  }, [refreshKey]);
 
   if (loading) return <p className="text-xs text-center py-6" style={{ color: '#9CA3AF' }}>Loading…</p>;
   if (!rows.length) return <p className="text-xs text-center py-6" style={{ color: '#9CA3AF' }}>No contracts saved yet.</p>;
@@ -154,12 +165,9 @@ function SavedList({ onLoad }) {
           </div>
           <span
             className="shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full"
-            style={{
-              backgroundColor: r.status === 'signed' ? '#D1FAE5' : r.status === 'sent' ? '#DBEAFE' : '#F3F4F6',
-              color: r.status === 'signed' ? '#065F46' : r.status === 'sent' ? '#1E40AF' : '#6B7280',
-            }}
+            style={{ backgroundColor: (STATUS_BADGE[r.status] ?? STATUS_BADGE.draft).bg, color: (STATUS_BADGE[r.status] ?? STATUS_BADGE.draft).color }}
           >
-            {r.status || 'draft'}
+            {(STATUS_BADGE[r.status] ?? STATUS_BADGE.draft).label}
           </span>
         </button>
       ))}
@@ -198,6 +206,13 @@ export default function ContractBuilder() {
   const [activeTab,   setActiveTab]   = useState('form');
   const [saving,      setSaving]      = useState(false);
   const [contractId,  setContractId]  = useState(null);
+  // Sending / signing details of the loaded contract (migration 042).
+  const [status,      setStatus]      = useState('draft');
+  const [record,      setRecord]      = useState(null);
+  const [projects,    setProjects]    = useState([]);
+  const [listKey,     setListKey]     = useState(0);
+  const [csName,      setCsName]      = useState('');
+  const [csAgree,     setCsAgree]     = useState(false);
   const [toast,       setToast]       = useState({ msg: '', type: '' });
   const printRef = useRef();
 
@@ -205,6 +220,11 @@ export default function ContractBuilder() {
   useEffect(() => {
     if (projectState.contractDraft) dispatch({ type: 'CLEAR_CONTRACT_DRAFT' });
   }, [projectState.contractDraft, dispatch]);
+
+  useEffect(() => {
+    supabase.from('projects').select('id, project_name, managed_client_id').order('project_name')
+      .then(({ data }) => setProjects(data ?? []));
+  }, []);
 
   useEffect(() => {
     const el = document.createElement('style');
@@ -234,53 +254,117 @@ export default function ContractBuilder() {
     if (!confirm('Clear all fields and start a new contract?')) return;
     setValues(defaultValues);
     setContractId(null);
+    setStatus('draft');
+    setRecord(null);
     setLink(null);
     setActiveTab('form');
   }
 
-  async function handleSave() {
+  const locked = status === 'client_signed' || status === 'signed';
+  const missingRequired = CONTRACT_FIELDS.filter((f) => f.required && !values[f.key]?.toString().trim()).map((f) => f.label);
+
+  function handleProjectPick(projectId) {
+    const p = projects.find((x) => x.id === projectId);
+    setLink((prev) => ({ ...prev, projectId: p?.id ?? null, managedClientId: p?.managed_client_id ?? null }));
+  }
+
+  function applyRow(row) {
+    setContractId(row.id);
+    setStatus(row.status || 'draft');
+    setRecord(row);
+    setListKey((k) => k + 1);
+  }
+
+  function handleDuplicate() {
+    setContractId(null);
+    setStatus('draft');
+    setRecord(null);
+    setActiveTab('form');
+    showToast('Copied into a new draft. The signed contract stays unchanged.');
+  }
+
+  const ROW_COLS = 'id, status, sent_at, sent_snapshot, client_signatures, client_signed_at, contractor_signature, contractor_signed_at, declined_at, decline_reason';
+
+  // Inserts or updates the contract; `extra` adds status / sending columns.
+  async function persist(extra = {}) {
     setSaving(true);
-    try {
-      const payload = {
-        client_name:     values.client_name     || null,
-        project_address: values.project_address || null,
-        contract_date:   values.contract_date   || null,
-        status:          'draft',
-        form_data:       values,
-        ...(link && { project_id: link.projectId, managed_client_id: link.managedClientId }),
-      };
-      let err;
-      if (contractId) {
-        ({ error: err } = await supabase.from('contracts').update(payload).eq('id', contractId));
-      } else {
-        const { data, error } = await supabase.from('contracts').insert(payload).select('id').single();
-        err = error;
-        if (data) setContractId(data.id);
-      }
-      if (err) throw err;
-      showToast('Contract saved as draft.');
-    } catch (e) {
-      showToast(e.message || 'Save failed.', 'error');
-    } finally {
-      setSaving(false);
-    }
+    const payload = {
+      client_name:     values.client_name     || null,
+      project_address: values.project_address || null,
+      contract_date:   values.contract_date   || null,
+      status,
+      form_data:       values,
+      ...(link && { project_id: link.projectId, managed_client_id: link.managedClientId }),
+      ...extra,
+    };
+    const { data, error } = contractId
+      ? await supabase.from('contracts').update(payload).eq('id', contractId).select(ROW_COLS).single()
+      : await supabase.from('contracts').insert(payload).select(ROW_COLS).single();
+    setSaving(false);
+    if (error) { showToast(error.message || 'Save failed.', 'error'); return null; }
+    applyRow(data);
+    return data;
+  }
+
+  async function handleSave() {
+    const saved = await persist();
+    if (!saved) return;
+    showToast(saved.status === 'sent'
+      ? 'Saved. The client still sees the version you sent — click "Re-send to Client" to update it.'
+      : 'Contract saved as draft.');
+  }
+
+  async function handleSend() {
+    if (missingRequired.length) { showToast(`Fill in before sending: ${missingRequired.join(', ')}`, 'error'); setActiveTab('form'); return; }
+    if (!link?.projectId) { showToast('Pick the project (client portal) before sending.', 'error'); setActiveTab('form'); return; }
+    const again = status === 'sent' || status === 'declined';
+    if (!confirm(again
+      ? 'Send this updated version to the client? It replaces the version they can see now.'
+      : 'Send this contract to the client? They will see it in their portal and can sign it.')) return;
+    const saved = await persist({ status: 'sent', sent_at: new Date().toISOString(), sent_snapshot: { ...values, _prepared_on: todayISO() } });
+    if (saved) showToast('Sent. The client can review and sign it in their portal (Project PIN).');
+  }
+
+  async function handleWithdraw() {
+    if (!confirm('Withdraw this contract? The client will no longer see it in their portal.')) return;
+    const saved = await persist({ status: 'draft' });
+    if (saved) showToast('Withdrawn. The contract is a draft again.');
+  }
+
+  async function handleCountersign(e) {
+    e.preventDefault();
+    const name = (csName || values.contractor_name || '').trim();
+    if (!name) { showToast('Type your full name to countersign.', 'error'); return; }
+    if (!csAgree) { showToast('Check the box to agree to sign electronically.', 'error'); return; }
+    setSaving(true);
+    const { data, error } = await supabase.from('contracts')
+      .update({ status: 'signed', contractor_signature: { name, title: values.contractor_title || '' } })
+      .eq('id', contractId).select(ROW_COLS).single();
+    setSaving(false);
+    if (error) { showToast(error.message || 'Could not countersign.', 'error'); return; }
+    applyRow(data);
+    showToast('Countersigned. The contract is fully signed and locked.');
   }
 
   async function handleLoadById(id) {
     const { data, error } = await supabase.from('contracts').select('*').eq('id', id).single();
     if (error || !data) { showToast('Could not load contract.', 'error'); return; }
     setValues(data.form_data || {});
-    setContractId(data.id);
-    setLink(null);
-    setActiveTab('form');
-    showToast('Contract loaded.');
+    applyRow(data);
+    setLink(data.project_id ? { projectId: data.project_id, managedClientId: data.managed_client_id } : null);
+    setCsName(''); setCsAgree(false);
+    const isLocked = data.status === 'client_signed' || data.status === 'signed';
+    setActiveTab(isLocked ? 'preview' : 'form');
+    showToast(isLocked ? 'Signed contract loaded (read-only).' : 'Contract loaded.');
   }
 
   function handlePrint() {
     window.print();
   }
 
-  const contractText = buildContractText(values);
+  const contractText = locked && record?.sent_snapshot
+    ? buildContractText(record.sent_snapshot, { clients: record.client_signatures ?? [], contractor: record.contractor_signature })
+    : buildContractText(values);
   const sections     = [...new Set(CONTRACT_FIELDS.map((f) => f.section))];
 
   const tabStyle = (active) => ({
@@ -323,14 +407,22 @@ export default function ContractBuilder() {
             >
               New Contract
             </button>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="px-4 py-2 rounded-xl text-xs font-bold transition-colors duration-150"
-              style={{ backgroundColor: saving ? '#E5E3DF' : NAVY, color: saving ? '#9CA3AF' : GOLD }}
-            >
-              {saving ? 'Saving…' : contractId ? 'Update Draft' : 'Save Draft'}
-            </button>
+            {!locked && (
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="px-4 py-2 rounded-xl text-xs font-bold transition-colors duration-150"
+                style={{ backgroundColor: saving ? '#E5E3DF' : NAVY, color: saving ? '#9CA3AF' : GOLD }}
+              >
+                {saving ? 'Saving…' : contractId ? (status === 'draft' ? 'Update Draft' : 'Save Changes') : 'Save Draft'}
+              </button>
+            )}
+            {!locked && (
+              <button onClick={handleSend} disabled={saving} className="px-4 py-2 rounded-xl text-xs font-bold"
+                style={{ backgroundColor: '#059669', color: '#fff' }}>
+                {status === 'sent' || status === 'declined' ? 'Re-send to Client' : 'Send to Client'}
+              </button>
+            )}
             <button
               onClick={() => { setActiveTab('preview'); setTimeout(handlePrint, 300); }}
               className="px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors duration-150"
@@ -353,6 +445,50 @@ export default function ContractBuilder() {
           ))}
         </div>
 
+        {contractId && status !== 'draft' && (
+          <div role="status" className="mt-4 px-4 py-3 rounded-xl text-xs"
+            style={status === 'signed'
+              ? { backgroundColor: '#ECFDF5', border: '1px solid #6EE7B7', color: '#065F46' }
+              : status === 'client_signed'
+                ? { backgroundColor: '#F5F3FF', border: '1px solid #DDD6FE', color: '#5B21B6' }
+                : status === 'declined'
+                  ? { backgroundColor: '#FEF2F2', border: '1px solid #FECACA', color: '#991B1B' }
+                  : { backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE', color: '#1E40AF' }}>
+            <div className="flex flex-wrap items-center gap-3">
+              <p className="flex-1 min-w-[220px]">
+                {status === 'sent' && <><strong>Sent to the client</strong> on {fmtWhen(record?.sent_at)}. They can review and sign it in their portal. Edits here are not visible to them until you click <strong>Re-send to Client</strong>.</>}
+                {status === 'client_signed' && <><strong>Signed by the client</strong> ({(record?.client_signatures ?? []).map((x) => x.name).join(' and ')}) on {fmtWhen(record?.client_signed_at)}. Countersign below to complete the contract.</>}
+                {status === 'signed' && <><strong>Fully signed.</strong> Client: {(record?.client_signatures ?? []).map((x) => x.name).join(' and ')} ({fmtWhen(record?.client_signed_at)}). Orozco Homes: {record?.contractor_signature?.name} ({fmtWhen(record?.contractor_signed_at)}). This contract is locked.</>}
+                {status === 'declined' && <><strong>Declined by the client</strong> on {fmtWhen(record?.declined_at)}{record?.decline_reason ? <>: “{record.decline_reason}”</> : '.'} You can edit it and re-send.</>}
+              </p>
+              {status === 'sent' && (
+                <button onClick={handleWithdraw} disabled={saving} className="px-3 py-1.5 rounded-lg font-bold"
+                  style={{ backgroundColor: '#fff', border: '1px solid #BFDBFE', color: '#1E40AF' }}>Withdraw</button>
+              )}
+              {locked && (
+                <button onClick={handleDuplicate} className="px-3 py-1.5 rounded-lg font-bold"
+                  style={{ backgroundColor: '#fff', border: '1px solid #C4B5FD', color: '#5B21B6' }}>Duplicate as new draft</button>
+              )}
+            </div>
+            {status === 'client_signed' && (
+              <form onSubmit={handleCountersign} className="mt-3 pt-3 flex flex-wrap items-end gap-3" style={{ borderTop: '1px solid #DDD6FE' }}>
+                <label className="flex-1 min-w-[200px]">
+                  <span className="block font-bold mb-1">Your full name (Orozco Homes)</span>
+                  <input value={csName || values.contractor_name || ''} onChange={(e) => setCsName(e.target.value)} maxLength={100}
+                    aria-label="Countersigner name"
+                    className="w-full px-3 py-2 rounded-lg text-sm" style={{ border: '1.5px solid #DDD6FE', color: NAVY, backgroundColor: '#fff' }} />
+                </label>
+                <label className="flex items-start gap-2 flex-[2] min-w-[240px]">
+                  <input type="checkbox" checked={csAgree} onChange={(e) => setCsAgree(e.target.checked)} className="mt-0.5" />
+                  <span>I agree to sign this contract electronically for Orozco Homes LLC.</span>
+                </label>
+                <button type="submit" disabled={saving} className="px-4 py-2 rounded-lg text-sm font-bold disabled:opacity-60"
+                  style={{ backgroundColor: '#5B21B6', color: '#fff' }}>{saving ? 'Signing…' : 'Countersign'}</button>
+              </form>
+            )}
+          </div>
+        )}
+
         {link?.source && (
           <div role="status" className="mt-4 px-4 py-3 rounded-xl text-xs"
             style={{ backgroundColor: '#ECFDF5', border: '1px solid #A7F3D0', color: '#065F46' }}>
@@ -367,10 +503,20 @@ export default function ContractBuilder() {
       <div className="px-6 pb-16 max-w-5xl mx-auto">
 
         {activeTab === 'form' && (
-          <div
+          <fieldset
+            disabled={locked}
             className="rounded-2xl p-6 shadow-sm"
-            style={{ backgroundColor: CARD, border: `1px solid ${BORDER}` }}
+            style={{ backgroundColor: CARD, border: `1px solid ${BORDER}`, opacity: locked ? 0.7 : 1 }}
           >
+            <div className="mb-6">
+              <SectionHeading label="Project (Client Portal)" />
+              <Label required>Project — the client sees and signs the contract in this project's portal (PIN)</Label>
+              <select value={link?.projectId ?? ''} onChange={(e) => handleProjectPick(e.target.value)} aria-label="Project"
+                className="w-full sm:w-1/2" style={inputStyle(false)}>
+                <option value="">— Pick a project —</option>
+                {projects.map((p) => <option key={p.id} value={p.id}>{p.project_name}</option>)}
+              </select>
+            </div>
             {(() => {
               const required = CONTRACT_FIELDS.filter((f) => f.required);
               const filled   = required.filter((f) => values[f.key]?.toString().trim()).length;
@@ -412,14 +558,16 @@ export default function ContractBuilder() {
             })}
 
             <div className="mt-4 flex justify-end gap-3">
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="px-6 py-2.5 rounded-xl text-sm font-bold"
-                style={{ backgroundColor: saving ? '#E5E3DF' : NAVY, color: saving ? '#9CA3AF' : GOLD }}
-              >
-                {saving ? 'Saving…' : contractId ? 'Update Draft' : 'Save Draft'}
-              </button>
+              {!locked && (
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="px-6 py-2.5 rounded-xl text-sm font-bold"
+                  style={{ backgroundColor: saving ? '#E5E3DF' : NAVY, color: saving ? '#9CA3AF' : GOLD }}
+                >
+                  {saving ? 'Saving…' : contractId ? (status === 'draft' ? 'Update Draft' : 'Save Changes') : 'Save Draft'}
+                </button>
+              )}
               <button
                 onClick={() => setActiveTab('preview')}
                 className="px-6 py-2.5 rounded-xl text-sm font-bold"
@@ -428,14 +576,14 @@ export default function ContractBuilder() {
                 Preview Contract →
               </button>
             </div>
-          </div>
+          </fieldset>
         )}
 
         {activeTab === 'preview' && (
           <div>
             <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
               <p className="text-xs font-semibold" style={{ color: '#6B7280' }}>
-                Live preview — reflects current form values
+                {locked ? 'Signed copy — exactly what the client signed' : 'Live preview — reflects current form values'}
               </p>
               <div className="flex gap-2">
                 <button
@@ -530,7 +678,7 @@ export default function ContractBuilder() {
                 + New Contract
               </button>
             </div>
-            <SavedList onLoad={(id) => handleLoadById(id)} />
+            <SavedList onLoad={(id) => handleLoadById(id)} refreshKey={listKey} />
           </div>
         )}
       </div>

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import PortalProposals from '../components/PortalProposals';
+import { PortalProposals, PortalContracts } from '../components/PortalSignables';
 
 const STATUS_CFG = {
   'on-track': { label: 'On Track',       dot: '#10B981', bg: '#ECFDF5', text: '#065F46' },
@@ -283,6 +283,7 @@ export default function PinClientPortal() {
 
               {/* Proposals sent for review & signature */}
               <PortalProposals session={pinSession} Section={Section} />
+              <PortalContracts session={pinSession} Section={Section} />
 
               {/* Change orders */}
               {orders.length > 0 && (
