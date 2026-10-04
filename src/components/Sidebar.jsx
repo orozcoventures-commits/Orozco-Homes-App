@@ -257,12 +257,7 @@ export default function Sidebar({ isOpen, onClose }) {
           onClick={goHome}
           className="flex items-center gap-3 group focus:outline-none w-full"
         >
-          <div
-            className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 shadow-md transition-transform duration-150 group-hover:scale-105"
-            style={{ backgroundColor: '#D4AF37' }}
-          >
-            <span style={{ color: '#002147' }} className="font-extrabold text-xs tracking-wide">OH</span>
-          </div>
+          <img src="/orozco-homes-logo.png" alt="Orozco Homes" className="h-9 rounded-lg shadow-md transition-transform duration-150 group-hover:scale-105 w-auto shrink-0 object-contain" />
           <div className="leading-none text-left">
             <span className="block font-bold text-white" style={{ fontSize: '0.88rem', letterSpacing: '0.03em' }}>
               Orozco Homes

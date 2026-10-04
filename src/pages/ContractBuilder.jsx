@@ -467,12 +467,7 @@ export default function ContractBuilder() {
                 className="px-8 py-5 flex items-center gap-4"
                 style={{ backgroundColor: NAVY, borderBottom: `3px solid ${GOLD}` }}
               >
-                <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                  style={{ backgroundColor: GOLD }}
-                >
-                  <span className="font-extrabold text-xs" style={{ color: NAVY }}>OH</span>
-                </div>
+                <img src="/orozco-homes-logo.png" alt="Orozco Homes" className="h-10 rounded-xl w-auto shrink-0 object-contain" />
                 <div>
                   <p className="font-bold text-white text-base tracking-wide">Orozco Homes LLC</p>
                   <p className="text-xs" style={{ color: 'rgba(255,255,255,0.55)' }}>Licensed General Contractor · Commonwealth of Virginia</p>

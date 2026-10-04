@@ -97,12 +97,7 @@ function LoadingScreen() {
   return (
     <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#F5F4F0' }}>
       <div className="flex flex-col items-center gap-4">
-        <div
-          className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg"
-          style={{ backgroundColor: '#D4AF37' }}
-        >
-          <span className="font-extrabold text-base" style={{ color: '#002147' }}>OH</span>
-        </div>
+        <img src="/orozco-homes-logo.png" alt="Orozco Homes" className="h-12 rounded-2xl shadow-lg w-auto shrink-0 object-contain" />
         <svg className="animate-spin" width="20" height="20" viewBox="0 0 24 24" fill="none"
           stroke="#D4AF37" strokeWidth="2.5" strokeLinecap="round">
           <circle cx="12" cy="12" r="10" strokeOpacity="0.2" />

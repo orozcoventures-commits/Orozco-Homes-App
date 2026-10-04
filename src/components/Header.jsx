@@ -22,12 +22,7 @@ export default function Header({ onMenuToggle }) {
 
       {/* Brand title */}
       <div className="flex items-center gap-2.5 min-w-0">
-        <div
-          className="md:hidden w-7 h-7 rounded-md flex items-center justify-center shrink-0"
-          style={{ backgroundColor: '#D4AF37' }}
-        >
-          <span style={{ color: '#002147', fontSize: '0.65rem' }} className="font-extrabold tracking-wide">OH</span>
-        </div>
+        <img src="/orozco-homes-logo.png" alt="Orozco Homes" className="md:hidden h-7 w-auto shrink-0 object-contain" />
         <div className="min-w-0">
           <h1
             className="font-bold leading-none truncate"
