@@ -16,6 +16,7 @@ import AdminCreateProject from './pages/AdminCreateProject';
 import ManageClients from './pages/ManageClients';
 import PinClientPortal from './pages/PinClientPortal';
 import ContractBuilder from './pages/ContractBuilder';
+import Proposals from './pages/Proposals';
 import Subcontractors from './pages/Subcontractors';
 import NewHomeBudget from './pages/NewHomeBudget';
 import RemodelBudget from './pages/RemodelBudget';
@@ -159,6 +160,7 @@ function AppContent() {
           {page === 'weekly-updates'     && <WeeklyUpdates />}
           {page === 'create-project'     && <AdminCreateProject />}
           {page === 'manage-clients'     && <ManageClients />}
+          {page === 'proposals'          && <Proposals />}
           {page === 'contracts'          && <ContractBuilder />}
           {page === 'subcontractors'     && <Subcontractors />}
           {page === 'new-home-budget'    && <NewHomeBudget />}
@@ -167,7 +169,7 @@ function AppContent() {
           {page === 'designer-workspace' && <DesignerWorkspace />}
           {page === 'readme'             && <ReadMe />}
           {!['home','client-portal','photo-log','approvals','messages',
-              'weekly-updates','create-project','manage-clients','contracts','subcontractors',
+              'weekly-updates','create-project','manage-clients','proposals','contracts','subcontractors',
               'new-home-budget','remodel-budget','schedule','designer-workspace','readme'].includes(page) && (
             <div className="flex flex-col items-center justify-center py-32 px-6 text-center">
               <div

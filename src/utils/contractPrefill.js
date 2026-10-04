@@ -68,3 +68,53 @@ export function buildContractPrefill({ client, projectType, scope = [], changeOr
     CONTRACT_PREFILL_KEYS.filter((k) => values[k]).map((k) => [k, values[k]]),
   ));
 }
+
+// ── Proposal (Project Retainer Agreement) ─────────────────────────────────────
+// Same rules as the contract: only these keys can be filled from the budget,
+// and the only numbers are the client price range.
+export const PROPOSAL_PREFILL_KEYS = [
+  'client_name',
+  'client_email',
+  'client_phone',
+  'project_title',
+  'project_overview',
+  'scope_of_work',
+  'materials_included',
+  'investment_low',
+  'investment_high',
+];
+
+const roundTo = (n, step) => Math.round(n / step) * step;
+
+/**
+ * @param {object}   args
+ * @param {object}   args.client       { full_name, email, phone } (may be null)
+ * @param {string}   args.projectTitle project name
+ * @param {Array<{division: string, items: string[]}>} args.scope  work descriptions only
+ * @param {string[]} args.materials    approved selections, no amounts
+ * @param {number}   args.clientPrice  total client price; the range is −5% / +10%, rounded to $1,000
+ */
+export function buildProposalPrefill({ client, projectTitle, scope = [], materials = [], clientPrice }) {
+  const scopeLines = [];
+  for (const { division, items } of scope) {
+    if (!items.length) continue;
+    scopeLines.push(`## ${division}`, ...items.map((i) => `- ${i}`), '');
+  }
+  const price = Number(clientPrice);
+  const hasPrice = Number.isFinite(price) && price > 0;
+  const title = stripInternalLines(projectTitle);
+  const values = {
+    client_name:        clean(client?.full_name),
+    client_email:       clean(client?.email),
+    client_phone:       clean(client?.phone),
+    project_title:      title,
+    project_overview:   title ? `Orozco Homes will complete the ${title} under a coordinated construction schedule.` : '',
+    scope_of_work:      stripInternalLines(scopeLines.join('\n')),
+    materials_included: stripInternalLines([...materials, 'All required building materials'].join('\n')),
+    investment_low:     hasPrice ? String(roundTo(price * 0.95, 1000)) : '',
+    investment_high:    hasPrice ? String(roundTo(price * 1.10, 1000)) : '',
+  };
+  return Object.freeze(Object.fromEntries(
+    PROPOSAL_PREFILL_KEYS.filter((k) => values[k]).map((k) => [k, values[k]]),
+  ));
+}
