@@ -243,6 +243,9 @@ export default function Proposals() {
     : null));
   const [proposalId, setProposalId] = useState(null);
   const [status, setStatus] = useState('draft');
+  // Sending / signing details of the loaded proposal (migration 041).
+  const [record, setRecord] = useState(null);
+  const [projects, setProjects] = useState([]);
   const [activeTab, setActiveTab] = useState('form');
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState({ msg: '', type: '' });
@@ -251,6 +254,11 @@ export default function Proposals() {
   useEffect(() => {
     if (projectState.proposalDraft) dispatch({ type: 'CLEAR_PROPOSAL_DRAFT' });
   }, [projectState.proposalDraft, dispatch]);
+
+  useEffect(() => {
+    supabase.from('projects').select('id, project_name, managed_client_id').order('project_name')
+      .then(({ data }) => setProjects(data ?? []));
+  }, []);
 
   // Saved default template (migration 040). Applied to a new, untouched proposal.
   useEffect(() => {
@@ -325,8 +333,26 @@ export default function Proposals() {
     setValues(proposalDefaults(template));
     setProposalId(null);
     setStatus('draft');
+    setRecord(null);
     setLink(null);
     setActiveTab('form');
+  }
+
+  const locked = status === 'accepted';
+
+  function handleProjectPick(projectId) {
+    const p = projects.find((x) => x.id === projectId);
+    editedRef.current = true;
+    setLink((prev) => ({ ...prev, projectId: p?.id ?? null, managedClientId: p?.managed_client_id ?? null }));
+  }
+
+  function handleDuplicate() {
+    setProposalId(null);
+    setStatus('draft');
+    setRecord(null);
+    editedRef.current = true;
+    setActiveTab('form');
+    showToast('Copied into a new draft. The signed proposal stays unchanged.');
   }
 
   const missing = PROPOSAL_FIELDS.filter((f) => f.required && !String(values[f.key] ?? '').trim()).map((f) => f.label);
@@ -335,9 +361,11 @@ export default function Proposals() {
   const rangeError = values.investment_low && values.investment_high && low > high
     ? 'The low estimate is higher than the high estimate.' : '';
 
-  async function handleSave() {
-    if (!values.client_name?.trim()) { showToast('Enter the client name before saving.', 'error'); return; }
-    if (rangeError) { showToast(rangeError, 'error'); return; }
+  // Inserts or updates the proposal; `extra` adds status / sending columns.
+  // Returns the saved row (id + status fields), or null on error.
+  async function persist(extra = {}) {
+    if (!values.client_name?.trim()) { showToast('Enter the client name before saving.', 'error'); return null; }
+    if (rangeError) { showToast(rangeError, 'error'); return null; }
     setSaving(true);
     const payload = {
       client_name:     values.client_name.trim(),
@@ -347,21 +375,50 @@ export default function Proposals() {
       status,
       form_data:       values,
       ...(link && { project_id: link.projectId, managed_client_id: link.managedClientId }),
+      ...extra,
     };
+    const cols = 'id, status, sent_at, sent_snapshot, signatures, accepted_at, declined_at, decline_reason';
     const { data, error } = proposalId
-      ? await supabase.from('proposals').update(payload).eq('id', proposalId).select('id').single()
-      : await supabase.from('proposals').insert(payload).select('id').single();
+      ? await supabase.from('proposals').update(payload).eq('id', proposalId).select(cols).single()
+      : await supabase.from('proposals').insert(payload).select(cols).single();
     setSaving(false);
     if (error) {
-      showToast(error.code === 'PGRST116' || error.code === '42501'
+      showToast(error.code === 'PGRST116'
         ? 'You need to be signed in as an admin to save proposals.'
         : error.code === '42P01' ? 'The proposals table is missing. Run the Supabase SQL step first.'
         : error.message || 'Save failed.', 'error');
-      return;
+      return null;
     }
     setProposalId(data.id);
+    setStatus(data.status);
+    setRecord(data);
     setListKey((k) => k + 1);
-    showToast(proposalId ? 'Proposal updated.' : 'Proposal saved as draft.');
+    return data;
+  }
+
+  async function handleSave() {
+    const saved = await persist();
+    if (!saved) return;
+    showToast(saved.status === 'sent'
+      ? `Saved. The client still sees the version sent on ${fmtLongDate(saved.sent_at.slice(0, 10))} — click "Re-send" to update it.`
+      : proposalId ? 'Proposal updated.' : 'Proposal saved as draft.');
+  }
+
+  async function handleSend() {
+    if (missing.length) { showToast(`Fill in before sending: ${missing.join(', ')}`, 'error'); setActiveTab('form'); return; }
+    if (!link?.projectId) { showToast('Pick the project (client portal) before sending.', 'error'); setActiveTab('form'); return; }
+    const again = status === 'sent' || status === 'declined';
+    if (!confirm(again
+      ? 'Send this updated version to the client? It replaces the version they can see now.'
+      : 'Send this proposal to the client? They will see it in their portal and can accept and sign it.')) return;
+    const saved = await persist({ status: 'sent', sent_at: new Date().toISOString(), sent_snapshot: values });
+    if (saved) showToast('Sent. The client can review and sign it in their portal (Project PIN).');
+  }
+
+  async function handleWithdraw() {
+    if (!confirm('Withdraw this proposal? The client will no longer see it in their portal.')) return;
+    const saved = await persist({ status: 'draft' });
+    if (saved) showToast('Withdrawn. The proposal is a draft again.');
   }
 
   async function handleLoad(id) {
@@ -371,9 +428,10 @@ export default function Proposals() {
     setValues(normalizeProposal(data.form_data, template));
     setProposalId(data.id);
     setStatus(data.status || 'draft');
-    setLink(null);
-    setActiveTab('form');
-    showToast('Proposal loaded.');
+    setRecord(data);
+    setLink(data.project_id ? { projectId: data.project_id, managedClientId: data.managed_client_id } : null);
+    setActiveTab(data.status === 'accepted' ? 'preview' : 'form');
+    showToast(data.status === 'accepted' ? 'Signed proposal loaded (read-only).' : 'Proposal loaded.');
   }
 
   function handlePrint() {
@@ -410,10 +468,18 @@ export default function Proposals() {
               style={{ border: `1.5px solid ${BORDER}`, backgroundColor: '#fff', color: '#6B7280' }}>
               New Proposal
             </button>
-            <button onClick={handleSave} disabled={saving} className="px-4 py-2 rounded-xl text-xs font-bold"
-              style={{ backgroundColor: saving ? '#E5E3DF' : NAVY, color: saving ? '#9CA3AF' : GOLD }}>
-              {saving ? 'Saving…' : proposalId ? 'Update Draft' : 'Save Draft'}
-            </button>
+            {!locked && (
+              <button onClick={handleSave} disabled={saving} className="px-4 py-2 rounded-xl text-xs font-bold"
+                style={{ backgroundColor: saving ? '#E5E3DF' : NAVY, color: saving ? '#9CA3AF' : GOLD }}>
+                {saving ? 'Saving…' : proposalId ? (status === 'draft' ? 'Update Draft' : 'Save Changes') : 'Save Draft'}
+              </button>
+            )}
+            {!locked && (
+              <button onClick={handleSend} disabled={saving} className="px-4 py-2 rounded-xl text-xs font-bold"
+                style={{ backgroundColor: '#059669', color: '#fff' }}>
+                {status === 'sent' || status === 'declined' ? 'Re-send to Client' : 'Send to Client'}
+              </button>
+            )}
             <button onClick={handlePrint} className="px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5"
               style={{ backgroundColor: GOLD, color: NAVY }}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -430,6 +496,43 @@ export default function Proposals() {
           ))}
         </div>
 
+        {proposalId && status !== 'draft' && (
+          <div role="status" className="mt-4 px-4 py-3 rounded-xl text-xs flex flex-wrap items-center gap-3"
+            style={status === 'accepted'
+              ? { backgroundColor: '#ECFDF5', border: '1px solid #6EE7B7', color: '#065F46' }
+              : status === 'declined'
+                ? { backgroundColor: '#FEF2F2', border: '1px solid #FECACA', color: '#991B1B' }
+                : { backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE', color: '#1E40AF' }}>
+            <p className="flex-1 min-w-[220px]">
+              {status === 'sent' && <>
+                <strong>Sent to the client</strong> on {fmtLongDate(record?.sent_at?.slice(0, 10))}. They can review and sign it in their portal.
+                Edits you make here are not visible to them until you click <strong>Re-send to Client</strong>.
+              </>}
+              {status === 'accepted' && <>
+                <strong>Accepted &amp; signed</strong> by {(record?.signatures ?? []).map((x) => x.name).join(' and ')} on{' '}
+                {record?.accepted_at ? new Date(record.accepted_at).toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' }) : ''}.
+                This proposal is locked; the Preview shows the signed copy.
+              </>}
+              {status === 'declined' && <>
+                <strong>Declined by the client</strong> on {fmtLongDate(record?.declined_at?.slice(0, 10))}
+                {record?.decline_reason ? <>: “{record.decline_reason}”</> : '.'} You can edit it and re-send.
+              </>}
+            </p>
+            {status === 'sent' && (
+              <button onClick={handleWithdraw} disabled={saving} className="px-3 py-1.5 rounded-lg font-bold"
+                style={{ backgroundColor: '#fff', border: '1px solid #BFDBFE', color: '#1E40AF' }}>
+                Withdraw
+              </button>
+            )}
+            {locked && (
+              <button onClick={handleDuplicate} className="px-3 py-1.5 rounded-lg font-bold"
+                style={{ backgroundColor: '#fff', border: '1px solid #6EE7B7', color: '#065F46' }}>
+                Duplicate as new draft
+              </button>
+            )}
+          </div>
+        )}
+
         {link?.source && activeTab === 'form' && (
           <div role="note" className="mt-4 px-4 py-3 rounded-xl text-xs"
             style={{ backgroundColor: '#ECFDF5', border: '1px solid #A7F3D0', color: '#065F46' }}>
@@ -443,7 +546,19 @@ export default function Proposals() {
 
       <div className="px-6 pb-16 max-w-5xl mx-auto">
         {activeTab === 'form' && (
-          <div className="rounded-2xl p-6" style={{ backgroundColor: '#fff', border: `1.5px solid ${BORDER}` }}>
+          <fieldset disabled={locked} className="rounded-2xl p-6" style={{ backgroundColor: '#fff', border: `1.5px solid ${BORDER}`, opacity: locked ? 0.7 : 1 }}>
+            <div className="mb-6">
+              <SectionHeading label="Project (Client Portal)" />
+              <label htmlFor="pf-project" className="block text-xs font-bold mb-1.5" style={{ color: '#374151' }}>
+                Project <span style={{ color: '#EF4444' }}>*</span>
+                <span className="font-normal" style={{ color: '#9CA3AF' }}> — the client sees and signs the proposal in this project's portal (PIN)</span>
+              </label>
+              <select id="pf-project" value={link?.projectId ?? ''} onChange={(e) => handleProjectPick(e.target.value)}
+                className="w-full sm:w-1/2" style={{ border: `1.5px solid ${BORDER}`, borderRadius: '10px', padding: '0.55rem 0.85rem', fontSize: '0.82rem', color: NAVY, backgroundColor: '#fff' }}>
+                <option value="">— Pick a project —</option>
+                {projects.map((p) => <option key={p.id} value={p.id}>{p.project_name}</option>)}
+              </select>
+            </div>
             {sections.map((sec) => (
               <div key={sec} className="mb-6">
                 <SectionHeading label={PROPOSAL_SECTIONS[sec]} />
@@ -478,12 +593,14 @@ export default function Proposals() {
                 Preview Proposal →
               </button>
             </div>
-          </div>
+          </fieldset>
         )}
 
         {activeTab === 'preview' && (
           <div className="rounded-2xl overflow-hidden" style={{ border: `1.5px solid ${BORDER}`, boxShadow: '0 4px 24px rgba(0,33,71,0.08)' }}>
-            <ProposalDocument v={values} id="oh-proposal-print" />
+            {locked && record?.sent_snapshot
+              ? <ProposalDocument v={record.sent_snapshot} signatures={record.signatures ?? []} id="oh-proposal-print" />
+              : <ProposalDocument v={values} id="oh-proposal-print" />}
           </div>
         )}
 

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import PortalProposals from '../components/PortalProposals';
 
 const STATUS_CFG = {
   'on-track': { label: 'On Track',       dot: '#10B981', bg: '#ECFDF5', text: '#065F46' },
@@ -279,6 +280,9 @@ export default function PinClientPortal() {
                   </>
                 )}
               </div>
+
+              {/* Proposals sent for review & signature */}
+              <PortalProposals session={pinSession} Section={Section} />
 
               {/* Change orders */}
               {orders.length > 0 && (
