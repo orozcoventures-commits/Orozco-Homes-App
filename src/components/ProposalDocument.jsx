@@ -89,23 +89,32 @@ function InvestmentBlock({ v }) {
   );
 }
 
-function SignatureLines({ label }) {
-  const row = (text) => (
+const fmtSignedAt = (iso) => new Date(iso).toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+
+// `signed` = { name, signed_at } when the client signed electronically.
+function SignatureLines({ label, signed }) {
+  const row = (text, value, script) => (
     <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', margin: '18px 0 0' }}>
       <span style={{ whiteSpace: 'nowrap' }}>{text}</span>
-      <span style={{ flex: 1, borderBottom: '1px solid #374151', height: '1px' }} />
+      <span style={{ flex: 1, borderBottom: '1px solid #374151', minHeight: '1.2em', paddingLeft: '6px',
+        fontFamily: script ? '"Brush Script MT", "Segoe Script", cursive' : 'inherit', fontSize: script ? '20px' : 'inherit',
+        color: script ? NAVY : 'inherit', lineHeight: 1.1 }}>
+        {value || ''}
+      </span>
     </div>
   );
   return (
     <div style={{ breakInside: 'avoid', marginBottom: '14px' }}>
-      {row(label)}
-      {row('Name Printed:')}
-      <div style={{ width: '50%' }}>{row('Date:')}</div>
+      {row(label, signed?.name, true)}
+      {row('Name Printed:', signed?.name)}
+      <div style={{ width: signed ? '100%' : '50%' }}>{row('Date:', signed ? fmtSignedAt(signed.signed_at) : '')}</div>
+      {signed && <div style={{ fontSize: '10.5px', color: '#059669', marginTop: '4px' }}>✓ Signed electronically</div>}
     </div>
   );
 }
 
-export default function ProposalDocument({ v, id }) {
+// `signatures`: [{ name, signed_at }] typed by the client in the portal.
+export default function ProposalDocument({ v, id, signatures = [] }) {
   const sections = v.sections ?? [];
   const numbers = sectionNumbers(sections);
 
@@ -137,8 +146,8 @@ export default function ProposalDocument({ v, id }) {
           )}
           {s.kind === 'signatures' && (
             <>
-              <SignatureLines label="Client Signature:" />
-              <SignatureLines label="Client Signature:" />
+              <SignatureLines label="Client Signature:" signed={signatures[0]} />
+              {(signatures.length !== 1) && <SignatureLines label="Client Signature:" signed={signatures[1]} />}
               <SignatureLines label="Orozco Homes Representative:" />
             </>
           )}
