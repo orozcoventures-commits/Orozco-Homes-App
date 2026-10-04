@@ -118,7 +118,7 @@ export function buildContractText(v, signing = {}) {
 OROZCO HOMES LLC
 Licensed General Contractor — Commonwealth of Virginia
 License No.: ${v.contractor_license || '[LICENSE #]'}
-Phone: (571) 234-5678  |  Email: orozcoventures@gmail.com
+Phone: 757-513-2593  |  Email: orozcoventures@gmail.com
 
 ════════════════════════════════════════════════════════════════
 
