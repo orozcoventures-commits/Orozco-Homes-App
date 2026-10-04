@@ -6,6 +6,7 @@ const initialState = {
   activeDbProject: null,  // real Supabase projects row
   activePage:      'home',
   contractDraft:   null,  // client-safe values handed from Remodel Budget to Contracts
+  proposalDraft:   null,  // client-safe values handed from Remodel Budget to Proposals
 };
 
 function reducer(state, action) {
@@ -22,6 +23,10 @@ function reducer(state, action) {
       return { ...state, contractDraft: action.draft, activePage: 'contracts' };
     case 'CLEAR_CONTRACT_DRAFT':
       return { ...state, contractDraft: null };
+    case 'OPEN_PROPOSAL_DRAFT':
+      return { ...state, proposalDraft: action.draft, activePage: 'proposals' };
+    case 'CLEAR_PROPOSAL_DRAFT':
+      return { ...state, proposalDraft: null };
     case 'CLEAR_DB_PROJECT':
       return { ...state, activeDbProject: null };
     default:
