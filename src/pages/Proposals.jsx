@@ -123,7 +123,8 @@ function SavedList({ onLoad, refreshKey }) {
   );
 }
 
-const PROPOSAL_COLS = 'id, status, sent_at, sent_snapshot, signatures, accepted_at, declined_at, decline_reason, signed_file_path, signed_on_paper';
+// '*' so saving keeps working whichever signing migrations (041, 043) have run.
+const PROPOSAL_COLS = '*';
 
 const iconBtn = { width: 30, height: 30, borderRadius: 8, fontSize: 13, fontWeight: 700, border: `1px solid ${BORDER}`, backgroundColor: '#fff', color: NAVY };
 
@@ -422,7 +423,8 @@ export default function Proposals() {
   async function attachPaperCopy(path) {
     const { data, error } = await supabase.from('proposals')
       .update({ status: 'accepted', signed_file_path: path }).eq('id', proposalId).select(PROPOSAL_COLS).single();
-    if (error) return error.message || 'Could not save the signed copy.';
+    if (error) return error.code === '42703' || error.code === 'PGRST204'
+      ? 'The signed-copy columns are missing in the database. Run the step 3 SQL in Supabase first.' : error.message || 'Could not save the signed copy.';
     setStatus(data.status);
     setRecord(data);
     setListKey((k) => k + 1);
