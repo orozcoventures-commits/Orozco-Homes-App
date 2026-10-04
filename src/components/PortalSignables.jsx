@@ -45,7 +45,9 @@ const KINDS = {
     status: { sent: AWAITING, accepted: SIGNED, declined: DECLINED },
     title: (d) => d.snapshot?.project_title || 'Project Retainer Agreement',
     detail: (d) => { const r = investmentRange(d.snapshot ?? {}); return r ? `Estimated ${r}` : ''; },
-    signedNote: (d) => `✓ Signed by ${(d.signatures ?? []).map((s) => s.name).join(' and ')} on ${fmtLongDate(d.accepted_at?.slice(0, 10))}.`,
+    signedNote: (d) => ((d.signatures ?? []).length
+      ? `✓ Signed by ${d.signatures.map((s) => s.name).join(' and ')} on ${fmtLongDate(d.accepted_at?.slice(0, 10))}.`
+      : `✓ Signed on paper${d.accepted_at ? ` on ${fmtLongDate(d.accepted_at.slice(0, 10))}` : ''}.`),
     render: (d, id) => <ProposalDocument v={d.snapshot ?? {}} signatures={d.signatures ?? []} id={id} />,
   },
   contract: {
@@ -60,8 +62,11 @@ const KINDS = {
     },
     title: (d) => d.snapshot?.project_type || 'Residential Remodeling Contract',
     detail: (d) => (d.snapshot?.total_cost ? `Contract price ${fmtDollars(d.snapshot.total_cost)}` : ''),
-    signedNote: (d) => `✓ Signed by ${(d.signatures ?? []).map((s) => s.name).join(' and ')} on ${fmtLongDate(d.accepted_at?.slice(0, 10))}.` +
-      (d.contractor_signature ? ` Countersigned by ${d.contractor_signature.name} for Orozco Homes.` : ' Orozco Homes will countersign next.'),
+    signedNote: (d) => (!(d.signatures ?? []).length
+      ? '✓ Signed on paper. Orozco Homes keeps the signed copy on file.'
+      : `✓ Signed by ${d.signatures.map((s) => s.name).join(' and ')} on ${fmtLongDate(d.accepted_at?.slice(0, 10))}.` +
+        (d.contractor_signature ? ` Countersigned by ${d.contractor_signature.name} for Orozco Homes.`
+          : d.status === 'signed' ? ' Countersigned on paper by Orozco Homes.' : ' Orozco Homes will countersign next.')),
     render: (d, id) => <ContractDocument doc={d} id={id} />,
   },
 };

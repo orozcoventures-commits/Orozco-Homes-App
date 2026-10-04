@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useProject } from '../context/ProjectContext';
+import PaperCopyPanel from '../components/PaperCopyPanel';
 import { CONTRACT_PREFILL_KEYS } from '../utils/contractPrefill';
 import { supabase } from '../lib/supabase';
 import {
@@ -283,7 +284,17 @@ export default function ContractBuilder() {
     showToast('Copied into a new draft. The signed contract stays unchanged.');
   }
 
-  const ROW_COLS = 'id, status, sent_at, sent_snapshot, client_signatures, client_signed_at, contractor_signature, contractor_signed_at, declined_at, decline_reason';
+  const ROW_COLS = 'id, status, sent_at, sent_snapshot, client_signatures, client_signed_at, contractor_signature, contractor_signed_at, declined_at, decline_reason, signed_file_path, signed_on_paper';
+
+  // Signed on paper: mark fully signed with the uploaded copy (migration 043).
+  async function attachPaperCopy(path) {
+    const { data, error } = await supabase.from('contracts')
+      .update({ status: 'signed', signed_file_path: path }).eq('id', contractId).select(ROW_COLS).single();
+    if (error) return error.message || 'Could not save the signed copy.';
+    applyRow(data);
+    showToast('Signed copy uploaded. The contract is marked fully signed and locked.');
+    return null;
+  }
 
   // Inserts or updates the contract; `extra` adds status / sending columns.
   async function persist(extra = {}) {
@@ -458,7 +469,9 @@ export default function ContractBuilder() {
               <p className="flex-1 min-w-[220px]">
                 {status === 'sent' && <><strong>Sent to the client</strong> on {fmtWhen(record?.sent_at)}. They can review and sign it in their portal. Edits here are not visible to them until you click <strong>Re-send to Client</strong>.</>}
                 {status === 'client_signed' && <><strong>Signed by the client</strong> ({(record?.client_signatures ?? []).map((x) => x.name).join(' and ')}) on {fmtWhen(record?.client_signed_at)}. Countersign below to complete the contract.</>}
-                {status === 'signed' && <><strong>Fully signed.</strong> Client: {(record?.client_signatures ?? []).map((x) => x.name).join(' and ')} ({fmtWhen(record?.client_signed_at)}). Orozco Homes: {record?.contractor_signature?.name} ({fmtWhen(record?.contractor_signed_at)}). This contract is locked.</>}
+                {status === 'signed' && (record?.signed_on_paper
+                  ? <><strong>Fully signed on paper</strong> — signed copy uploaded on {fmtWhen(record?.contractor_signed_at)}. This contract is locked.</>
+                  : <><strong>Fully signed.</strong> Client: {(record?.client_signatures ?? []).map((x) => x.name).join(' and ')} ({fmtWhen(record?.client_signed_at)}). Orozco Homes: {record?.contractor_signature?.name} ({fmtWhen(record?.contractor_signed_at)}). This contract is locked.</>)}
                 {status === 'declined' && <><strong>Declined by the client</strong> on {fmtWhen(record?.declined_at)}{record?.decline_reason ? <>: “{record.decline_reason}”</> : '.'} You can edit it and re-send.</>}
               </p>
               {status === 'sent' && (
@@ -488,6 +501,14 @@ export default function ContractBuilder() {
             )}
           </div>
         )}
+
+        <PaperCopyPanel
+          kind="contracts" docLabel="contract" docId={contractId}
+          filePath={record?.signed_file_path}
+          canUpload={status !== 'signed'}
+          onAttach={attachPaperCopy}
+          onMessage={showToast}
+        />
 
         {link?.source && (
           <div role="status" className="mt-4 px-4 py-3 rounded-xl text-xs"

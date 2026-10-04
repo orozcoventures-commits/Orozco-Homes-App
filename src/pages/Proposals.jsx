@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useProject } from '../context/ProjectContext';
 import { supabase } from '../lib/supabase';
 import ProposalDocument from '../components/ProposalDocument';
+import PaperCopyPanel from '../components/PaperCopyPanel';
 import { PROPOSAL_PREFILL_KEYS } from '../utils/contractPrefill';
 import {
   PROPOSAL_FIELDS, PROPOSAL_SECTIONS, PROPOSAL_TITLE, TEMPLATE_FIELD_KEYS, TOKENS, SECTION_MARKUP_HELP, SECTION_KINDS,
@@ -121,6 +122,8 @@ function SavedList({ onLoad, refreshKey }) {
     </div>
   );
 }
+
+const PROPOSAL_COLS = 'id, status, sent_at, sent_snapshot, signatures, accepted_at, declined_at, decline_reason, signed_file_path, signed_on_paper';
 
 const iconBtn = { width: 30, height: 30, borderRadius: 8, fontSize: 13, fontWeight: 700, border: `1px solid ${BORDER}`, backgroundColor: '#fff', color: NAVY };
 
@@ -377,7 +380,7 @@ export default function Proposals() {
       ...(link && { project_id: link.projectId, managed_client_id: link.managedClientId }),
       ...extra,
     };
-    const cols = 'id, status, sent_at, sent_snapshot, signatures, accepted_at, declined_at, decline_reason';
+    const cols = PROPOSAL_COLS;
     const { data, error } = proposalId
       ? await supabase.from('proposals').update(payload).eq('id', proposalId).select(cols).single()
       : await supabase.from('proposals').insert(payload).select(cols).single();
@@ -413,6 +416,18 @@ export default function Proposals() {
       : 'Send this proposal to the client? They will see it in their portal and can accept and sign it.')) return;
     const saved = await persist({ status: 'sent', sent_at: new Date().toISOString(), sent_snapshot: values });
     if (saved) showToast('Sent. The client can review and sign it in their portal (Project PIN).');
+  }
+
+  // Signed on paper: mark accepted with the uploaded copy (migration 043).
+  async function attachPaperCopy(path) {
+    const { data, error } = await supabase.from('proposals')
+      .update({ status: 'accepted', signed_file_path: path }).eq('id', proposalId).select(PROPOSAL_COLS).single();
+    if (error) return error.message || 'Could not save the signed copy.';
+    setStatus(data.status);
+    setRecord(data);
+    setListKey((k) => k + 1);
+    showToast('Signed copy uploaded. The proposal is marked accepted and locked.');
+    return null;
   }
 
   async function handleWithdraw() {
@@ -508,11 +523,15 @@ export default function Proposals() {
                 <strong>Sent to the client</strong> on {fmtLongDate(record?.sent_at?.slice(0, 10))}. They can review and sign it in their portal.
                 Edits you make here are not visible to them until you click <strong>Re-send to Client</strong>.
               </>}
-              {status === 'accepted' && <>
+              {status === 'accepted' && (record?.signed_on_paper ? <>
+                <strong>Signed on paper</strong> — signed copy uploaded on{' '}
+                {record?.accepted_at ? new Date(record.accepted_at).toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' }) : ''}.
+                This proposal is locked.
+              </> : <>
                 <strong>Accepted &amp; signed</strong> by {(record?.signatures ?? []).map((x) => x.name).join(' and ')} on{' '}
                 {record?.accepted_at ? new Date(record.accepted_at).toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' }) : ''}.
                 This proposal is locked; the Preview shows the signed copy.
-              </>}
+              </>)}
               {status === 'declined' && <>
                 <strong>Declined by the client</strong> on {fmtLongDate(record?.declined_at?.slice(0, 10))}
                 {record?.decline_reason ? <>: “{record.decline_reason}”</> : '.'} You can edit it and re-send.
@@ -532,6 +551,14 @@ export default function Proposals() {
             )}
           </div>
         )}
+
+        <PaperCopyPanel
+          kind="proposals" docLabel="proposal" docId={proposalId}
+          filePath={record?.signed_file_path}
+          canUpload={status !== 'accepted'}
+          onAttach={attachPaperCopy}
+          onMessage={showToast}
+        />
 
         {link?.source && activeTab === 'form' && (
           <div role="note" className="mt-4 px-4 py-3 rounded-xl text-xs"
