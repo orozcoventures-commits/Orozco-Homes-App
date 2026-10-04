@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { PortalProposals, PortalContracts } from '../components/PortalSignables';
+import { messagePhotoUrl } from '../lib/messagePhotos';
 
 const STATUS_CFG = {
   'on-track': { label: 'On Track',       dot: '#10B981', bg: '#ECFDF5', text: '#065F46' },
@@ -70,6 +71,8 @@ export default function PinClientPortal() {
   const [msgInput, setMsgInput]   = useState('');
   const [sending, setSending]     = useState(false);
   const [localMsgs, setLocalMsgs] = useState([]);
+  const [msgPhotos, setMsgPhotos] = useState({}); // message id → photo path
+  const photoCheckedIds = useRef(new Set());
   const msgEndRef = useRef(null);
 
   useEffect(() => {
@@ -111,6 +114,21 @@ export default function PinClientPortal() {
     const timer = setInterval(poll, 5000);
     return () => clearInterval(timer);
   }, [pinSession, data, localMsgs]);
+
+  // Look up photos whenever messages we have not checked yet arrive.
+  useEffect(() => {
+    if (!pinSession) return;
+    const unchecked = localMsgs.filter((m) => !String(m.id).startsWith('tmp-') && !photoCheckedIds.current.has(m.id));
+    if (unchecked.length === 0) return;
+    unchecked.forEach((m) => photoCheckedIds.current.add(m.id));
+    supabase.rpc('get_pin_message_photos', {
+      p_project_id: pinSession.projectId,
+      p_pin:        pinSession.pin,
+    }).then(({ data: map, error: err }) => {
+      // Before migration 045 the function is missing; messages still show as text.
+      if (!err && map && typeof map === 'object') setMsgPhotos(map);
+    });
+  }, [pinSession, localMsgs]);
 
   async function fetchData() {
     setLoading(true);
@@ -376,7 +394,14 @@ export default function PinClientPortal() {
                                   ? { backgroundColor: '#002147', color: '#fff', borderBottomRightRadius: '4px' }
                                   : { backgroundColor: '#F5F4F0', color: '#002147', borderBottomLeftRadius: '4px' }
                                 }>
-                                {m.content}
+                                {msgPhotos[m.id] && (
+                                  <button type="button" onClick={() => setLightbox({ image_url: messagePhotoUrl(msgPhotos[m.id]), caption: m.content })}
+                                    className="block mb-1.5" aria-label="Open photo">
+                                    <img src={messagePhotoUrl(msgPhotos[m.id])} alt="Photo from your contractor" loading="lazy"
+                                      className="rounded-xl max-h-56 max-w-full object-cover" />
+                                  </button>
+                                )}
+                                {m.content && <span className="whitespace-pre-wrap">{m.content}</span>}
                               </div>
                               <p className="text-xs mt-1 px-1"
                                 style={{ color: '#9CA3AF', textAlign: isClient ? 'right' : 'left' }}>

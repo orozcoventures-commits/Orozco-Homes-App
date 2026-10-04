@@ -1,8 +1,9 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { getAvatarColour, getInitials } from '../lib/utils';
 import { supabase } from '../lib/supabase';
 import { useMessages } from '../hooks/useMessages';
+import { MESSAGE_PHOTO_ACCEPT, checkMessagePhoto, uploadMessagePhoto, removeMessagePhoto, messagePhotoUrl } from '../lib/messagePhotos';
 
 function Avatar({ name, projectId, size = 'md' }) {
   const dim = size === 'sm' ? '32px' : '40px';
@@ -84,7 +85,13 @@ function MessageBubble({ msg, prevMsg, clientName, projectId, isNew }) {
             borderBottomLeftRadius:  isContractor ? '16px' : '4px',
           }}
         >
-          <p className="text-sm leading-relaxed">{msg.content}</p>
+          {msg.attachment_path && (
+            <a href={messagePhotoUrl(msg.attachment_path)} target="_blank" rel="noopener noreferrer" className="block mb-1.5">
+              <img src={messagePhotoUrl(msg.attachment_path)} alt="Photo" loading="lazy"
+                className="rounded-xl max-h-64 max-w-full sm:max-w-[280px] object-cover" />
+            </a>
+          )}
+          {msg.content && <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>}
           <p
             className="text-xs mt-1"
             style={{
@@ -110,8 +117,15 @@ export default function MessageCenter() {
   const [showList, setShowList]           = useState(true);
   const [input, setInput]                 = useState('');
   const [sending, setSending]             = useState(false);
+  const [photo, setPhoto]                 = useState(null); // File waiting to be sent
+  const [photoError, setPhotoError]       = useState('');
 
   const bottomRef = useRef(null);
+  const photoInputRef = useRef(null);
+
+  // Preview link for the chosen photo, released when it changes
+  const photoPreview = useMemo(() => (photo ? URL.createObjectURL(photo) : null), [photo]);
+  useEffect(() => () => { if (photoPreview) URL.revokeObjectURL(photoPreview); }, [photoPreview]);
 
   // The hook handles fetching + Realtime for the active project
   const { messages, loading: loadingMessages, sendMessage, realtimeIds } = useMessages(
@@ -145,13 +159,41 @@ export default function MessageCenter() {
       });
   }, [user, authLoading]);
 
+  function clearPhoto() {
+    setPhoto(null);
+    if (photoInputRef.current) photoInputRef.current.value = '';
+  }
+
+  function handlePhotoChosen(e) {
+    const file = e.target.files?.[0] ?? null;
+    const problem = file ? checkMessagePhoto(file) : null;
+    setPhotoError(problem ?? '');
+    if (problem) { clearPhoto(); return; }
+    setPhoto(file);
+  }
+
   async function handleSend() {
     const text = input.trim();
-    if (!text || sending) return;
-    setInput('');
+    if ((!text && !photo) || sending) return;
     setSending(true);
-    const { error } = await sendMessage(text);
-    if (error) setInput(text); // restore on failure
+    setPhotoError('');
+    let path = null;
+    if (photo) {
+      const up = await uploadMessagePhoto(activeId, photo);
+      if (up.error) { setPhotoError(up.error); setSending(false); return; }
+      path = up.path;
+    }
+    setInput('');
+    const { error } = await sendMessage(text, path);
+    if (error) {
+      setInput(text); // restore on failure
+      if (path) {
+        await removeMessagePhoto(path);
+        setPhotoError('The photo could not be sent. Please try again.');
+      }
+    } else {
+      clearPhoto();
+    }
     setSending(false);
   }
 
@@ -161,6 +203,8 @@ export default function MessageCenter() {
 
   function selectProject(id) {
     setActiveId(id);
+    clearPhoto();
+    setPhotoError('');
     setShowList(false);
   }
 
@@ -274,7 +318,38 @@ export default function MessageCenter() {
               className="px-4 sm:px-6 py-3 border-t shrink-0"
               style={{ backgroundColor: '#fff', borderColor: '#E8E6E1' }}
             >
+              {(photoPreview || photoError) && (
+                <div className="flex items-center gap-3 mb-2">
+                  {photoPreview && (
+                    <div className="relative">
+                      <img src={photoPreview} alt="Photo to send" className="h-16 w-16 rounded-lg object-cover" style={{ border: '1.5px solid #E8E6E1' }} />
+                      <button onClick={clearPhoto} aria-label="Remove photo"
+                        className="absolute -top-2 -right-2 w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center"
+                        style={{ backgroundColor: '#002147', color: '#fff' }}>×</button>
+                    </div>
+                  )}
+                  {photoError && <p role="alert" className="text-xs font-semibold" style={{ color: '#DC2626' }}>{photoError}</p>}
+                </div>
+              )}
               <div className="flex items-end gap-3">
+                {isAdmin && (
+                  <>
+                    <input ref={photoInputRef} type="file" accept={MESSAGE_PHOTO_ACCEPT} onChange={handlePhotoChosen}
+                      className="hidden" aria-label="Photo to attach" />
+                    <button
+                      onClick={() => photoInputRef.current?.click()}
+                      disabled={sending}
+                      title="Attach a photo"
+                      aria-label="Attach a photo"
+                      className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 focus:outline-none"
+                      style={{ backgroundColor: '#F0EEE9', color: '#002147' }}
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" />
+                      </svg>
+                    </button>
+                  </>
+                )}
                 <textarea
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
@@ -291,11 +366,12 @@ export default function MessageCenter() {
                 />
                 <button
                   onClick={handleSend}
-                  disabled={!input.trim() || sending}
+                  disabled={(!input.trim() && !photo) || sending}
+                  aria-label="Send message"
                   className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-all duration-150 focus:outline-none"
                   style={{
-                    backgroundColor: input.trim() && !sending ? '#002147' : '#E8E6E1',
-                    color:           input.trim() && !sending ? '#D4AF37' : '#9CA3AF',
+                    backgroundColor: (input.trim() || photo) && !sending ? '#002147' : '#E8E6E1',
+                    color:           (input.trim() || photo) && !sending ? '#D4AF37' : '#9CA3AF',
                   }}
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
