@@ -188,10 +188,7 @@ export default function PinClientPortal() {
         <div className="sticky top-0 z-30 flex items-center justify-between px-4 sm:px-6 py-4"
           style={{ backgroundColor: '#002147', boxShadow: '0 2px 12px rgba(0,0,0,0.18)' }}>
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-              style={{ backgroundColor: '#D4AF37' }}>
-              <span className="font-extrabold text-xs" style={{ color: '#002147' }}>OH</span>
-            </div>
+            <img src="/orozco-homes-logo.png" alt="Orozco Homes" className="h-8 rounded-lg w-auto shrink-0 object-contain" />
             <div>
               <p className="text-xs font-bold text-white leading-none">{pinSession?.projectName ?? 'My Project'}</p>
               <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.45)' }}>

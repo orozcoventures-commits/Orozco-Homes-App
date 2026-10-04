@@ -492,12 +492,7 @@ export default function Login() {
         <div style={{ height: '3px', backgroundColor: '#D4AF37', borderRadius: '2px', width: '48px' }} />
 
         <div>
-          <div
-            className="w-14 h-14 rounded-2xl flex items-center justify-center mb-8 shadow-lg"
-            style={{ backgroundColor: '#D4AF37' }}
-          >
-            <span className="font-extrabold text-xl" style={{ color: '#002147' }}>OH</span>
-          </div>
+          <img src="/orozco-homes-logo.png" alt="Orozco Homes" className="h-14 rounded-2xl shadow-lg mb-8 w-auto shrink-0 object-contain" />
 
           <h1 className="text-3xl font-bold text-white mb-3" style={{ letterSpacing: '0.02em' }}>
             Orozco Homes
@@ -540,12 +535,7 @@ export default function Login() {
 
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-3 mb-10">
-            <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center shadow"
-              style={{ backgroundColor: '#D4AF37' }}
-            >
-              <span className="font-extrabold text-sm" style={{ color: '#002147' }}>OH</span>
-            </div>
+            <img src="/orozco-homes-logo.png" alt="Orozco Homes" className="h-10 rounded-xl shadow w-auto shrink-0 object-contain" />
             <span className="font-bold text-lg" style={{ color: '#002147', letterSpacing: '0.03em' }}>
               Orozco Homes
             </span>
