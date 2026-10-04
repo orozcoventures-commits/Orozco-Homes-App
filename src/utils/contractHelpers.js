@@ -43,7 +43,7 @@ export const CONTRACT_FIELDS = [
 
   // ── Section 10: Signatures ─────────────────────────────────────────────────
   { key: 'contractor_name',        label: 'Contractor Signatory Name', section: 'signatures', type: 'text',   required: true,
-    defaultValue: 'Carlos Orozco' },
+    defaultValue: 'Mary-Blake Orozco' },
   { key: 'contractor_title',       label: 'Contractor Title',          section: 'signatures', type: 'text',   required: false,
     defaultValue: 'Owner, Orozco Homes LLC' },
   { key: 'contractor_license',     label: 'VA Contractor License #',   section: 'signatures', type: 'text',   required: false },
@@ -128,7 +128,7 @@ This Residential Remodeling Contract ("Agreement") is entered into as of ${fmtDa
 
 CONTRACTOR:
   Orozco Homes LLC
-  ${v.contractor_name || 'Carlos Orozco'}, ${v.contractor_title || 'Owner'}
+  ${v.contractor_name || 'Mary-Blake Orozco'}, ${v.contractor_title || 'Owner'}
   Licensed General Contractor, Commonwealth of Virginia
 
 CLIENT:
@@ -307,7 +307,7 @@ CONTRACTOR — OROZCO HOMES LLC
 ─────────────────────────────────────────────────────────────
 ${sigLine(signing.contractor)}
 
-Printed Name: ${v.contractor_name || 'Carlos Orozco'}
+Printed Name: ${v.contractor_name || 'Mary-Blake Orozco'}
 Title:        ${v.contractor_title || 'Owner, Orozco Homes LLC'}
 VA License #: ${v.contractor_license || '_______________'}
 
