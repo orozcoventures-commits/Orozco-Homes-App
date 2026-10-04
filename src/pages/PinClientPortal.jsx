@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { PortalProposals, PortalContracts } from '../components/PortalSignables';
-import { messagePhotoUrl } from '../lib/messagePhotos';
+import { MESSAGE_PHOTO_ACCEPT, checkMessagePhoto, uploadPinMessagePhoto, messagePhotoUrl } from '../lib/messagePhotos';
 
 const STATUS_CFG = {
   'on-track': { label: 'On Track',       dot: '#10B981', bg: '#ECFDF5', text: '#065F46' },
@@ -74,6 +74,11 @@ export default function PinClientPortal() {
   const [msgPhotos, setMsgPhotos] = useState({}); // message id → photo path
   const photoCheckedIds = useRef(new Set());
   const msgEndRef = useRef(null);
+  const [photo, setPhoto]           = useState(null); // File waiting to be sent
+  const [photoError, setPhotoError] = useState('');
+  const photoInputRef = useRef(null);
+  const photoPreview = useMemo(() => (photo ? URL.createObjectURL(photo) : null), [photo]);
+  useEffect(() => () => { if (photoPreview) URL.revokeObjectURL(photoPreview); }, [photoPreview]);
 
   useEffect(() => {
     if (!pinSession) return;
@@ -106,7 +111,14 @@ export default function PinClientPortal() {
         setLocalMsgs((prev) => {
           const existingIds = new Set(prev.map((m) => m.id));
           const added = fresh.filter((m) => !existingIds.has(m.id));
-          return added.length > 0 ? [...prev, ...added] : prev;
+          if (added.length === 0) return prev;
+          // Replace our own optimistic copies with the saved messages.
+          let kept = prev;
+          added.filter((m) => m.sender_role === 'client').forEach((m) => {
+            const i = kept.findIndex((t) => String(t.id).startsWith('tmp-') && t.content === m.content);
+            if (i >= 0) kept = kept.filter((_, j) => j !== i);
+          });
+          return [...kept, ...added];
         });
       }
     };
@@ -164,9 +176,56 @@ export default function PinClientPortal() {
     setLocalMsgs(result.messages ?? []);
   }
 
+  function clearPhoto() {
+    setPhoto(null);
+    if (photoInputRef.current) photoInputRef.current.value = '';
+  }
+
+  function handlePhotoChosen(e) {
+    const file = e.target.files?.[0] ?? null;
+    const problem = file ? checkMessagePhoto(file) : null;
+    setPhotoError(problem ?? '');
+    if (problem) { clearPhoto(); return; }
+    setPhoto(file);
+  }
+
+  async function handleSendPhoto() {
+    const file = photo;
+    const input = msgInput.trim();
+    setSending(true);
+    setPhotoError('');
+    const up = await uploadPinMessagePhoto(pinSession, file);
+    if (up.error) { setPhotoError(up.error); setSending(false); return; }
+    const optimistic = {
+      id: `tmp-${Date.now()}`,
+      sender_role: 'client',
+      content: input,
+      created_at: new Date().toISOString(),
+      localPhoto: URL.createObjectURL(file),
+    };
+    setLocalMsgs((prev) => [...prev, optimistic]);
+    setMsgInput('');
+    clearPhoto();
+    const { data: ok } = await supabase.rpc('send_pin_photo_message', {
+      p_project_id: pinSession.projectId,
+      p_pin:        pinSession.pin,
+      p_content:    input,
+      p_path:       up.path,
+    });
+    if (!ok) {
+      setLocalMsgs((prev) => prev.filter((m) => m.id !== optimistic.id));
+      setMsgInput(input);
+      setPhoto(file);
+      setPhotoError('The photo could not be sent. Please try again.');
+    }
+    setSending(false);
+  }
+
   async function handleSend(e) {
     e.preventDefault();
-    if (!msgInput.trim() || sending) return;
+    if (sending) return;
+    if (photo) { await handleSendPhoto(); return; }
+    if (!msgInput.trim()) return;
     setSending(true);
     const optimistic = {
       id: `tmp-${Date.now()}`,
@@ -394,10 +453,10 @@ export default function PinClientPortal() {
                                   ? { backgroundColor: '#002147', color: '#fff', borderBottomRightRadius: '4px' }
                                   : { backgroundColor: '#F5F4F0', color: '#002147', borderBottomLeftRadius: '4px' }
                                 }>
-                                {msgPhotos[m.id] && (
-                                  <button type="button" onClick={() => setLightbox({ image_url: messagePhotoUrl(msgPhotos[m.id]), caption: m.content })}
+                                {(m.localPhoto || msgPhotos[m.id]) && (
+                                  <button type="button" onClick={() => setLightbox({ image_url: m.localPhoto || messagePhotoUrl(msgPhotos[m.id]), caption: m.content })}
                                     className="block mb-1.5" aria-label="Open photo">
-                                    <img src={messagePhotoUrl(msgPhotos[m.id])} alt="Photo from your contractor" loading="lazy"
+                                    <img src={m.localPhoto || messagePhotoUrl(msgPhotos[m.id])} alt={isClient ? 'Your photo' : 'Photo from your contractor'} loading="lazy"
                                       className="rounded-xl max-h-56 max-w-full object-cover" />
                                   </button>
                                 )}
@@ -416,23 +475,46 @@ export default function PinClientPortal() {
                   </div>
 
                   {/* Message input */}
+                  {(photoPreview || photoError) && (
+                    <div className="flex items-center gap-3 px-3 pt-3" style={{ borderTop: '1px solid #F3F2EE' }}>
+                      {photoPreview && (
+                        <div className="relative shrink-0">
+                          <img src={photoPreview} alt="Photo to send" className="h-14 w-14 rounded-lg object-cover" style={{ border: '1.5px solid #E8E6E1' }} />
+                          <button type="button" onClick={clearPhoto} aria-label="Remove photo"
+                            className="absolute -top-2 -right-2 w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center"
+                            style={{ backgroundColor: '#002147', color: '#fff' }}>×</button>
+                        </div>
+                      )}
+                      {photoError && <p role="alert" className="text-xs font-semibold" style={{ color: '#DC2626' }}>{photoError}</p>}
+                    </div>
+                  )}
                   <form onSubmit={handleSend} className="flex gap-2 p-3"
-                    style={{ borderTop: '1px solid #F3F2EE' }}>
+                    style={{ borderTop: photoPreview || photoError ? 'none' : '1px solid #F3F2EE' }}>
+                    <input ref={photoInputRef} type="file" accept={MESSAGE_PHOTO_ACCEPT} onChange={handlePhotoChosen}
+                      className="hidden" aria-label="Photo to attach" />
+                    <button type="button" onClick={() => photoInputRef.current?.click()} disabled={sending}
+                      title="Attach a photo" aria-label="Attach a photo"
+                      className="w-10 shrink-0 rounded-xl flex items-center justify-center"
+                      style={{ backgroundColor: '#F0EEE9', color: '#002147' }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" />
+                      </svg>
+                    </button>
                     <input
                       type="text"
                       value={msgInput}
                       onChange={(e) => setMsgInput(e.target.value)}
                       placeholder="Type a message…"
-                      className="flex-1 text-sm rounded-xl px-3 py-2 focus:outline-none"
+                      className="flex-1 min-w-0 text-sm rounded-xl px-3 py-2 focus:outline-none"
                       style={{ border: '1.5px solid #E8E6E1', color: '#002147', backgroundColor: '#F9F8F6' }}
                       onFocus={(e) => { e.target.style.borderColor = '#D4AF37'; }}
                       onBlur={(e)  => { e.target.style.borderColor = '#E8E6E1'; }}
                     />
-                    <button type="submit" disabled={!msgInput.trim() || sending}
+                    <button type="submit" disabled={(!msgInput.trim() && !photo) || sending}
                       className="px-4 py-2 rounded-xl text-sm font-bold transition-all duration-150"
                       style={{
-                        backgroundColor: msgInput.trim() && !sending ? '#002147' : '#E5E3DF',
-                        color: msgInput.trim() && !sending ? '#D4AF37' : '#9CA3AF',
+                        backgroundColor: (msgInput.trim() || photo) && !sending ? '#002147' : '#E5E3DF',
+                        color: (msgInput.trim() || photo) && !sending ? '#D4AF37' : '#9CA3AF',
                       }}>
                       {sending ? '…' : 'Send'}
                     </button>
