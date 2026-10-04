@@ -257,3 +257,65 @@ export function sectionNumbers(sections) {
   let n = 0;
   return Object.fromEntries(sections.filter((s) => s.numbered).map((s) => [s.id, ++n]));
 }
+
+// ── Proposal → Construction Agreement ───────────────────────────────────────
+// Section ids whose text belongs to the retainer agreement only (fees,
+// buyout, cancellation, risk disclosure) and must not be copied into the
+// contract, which has its own terms.
+const RETAINER_ONLY_SECTIONS = new Set([
+  'intro', 'deposit', 'preconstruction', 'retainer', 'work-product', 'transition', 'cancellation', 'unforeseen',
+]);
+
+// Section body → plain contract text: headings stay as lines, bullets become
+// "•", sub-bullets "◦", **bold** markers are removed and {{tokens}} filled.
+function sectionToPlainText(body, v) {
+  const unbold = (t) => t.replace(/\*\*([^*]+)\*\*/g, '$1');
+  const out = [];
+  for (const b of parseBody(fillTokens(body, v))) {
+    if (b.type === 'heading') out.push('', unbold(b.text));
+    else if (b.type === 'para') out.push(unbold(b.text));
+    else for (const it of b.items) {
+      out.push(`• ${unbold(it.text)}`);
+      for (const c of it.children) out.push(`    ◦ ${unbold(c)}`);
+    }
+  }
+  return out.join('\n').replace(/^\n+/, '').trim();
+}
+
+// Values for the Contracts form from a signed proposal (its frozen copy).
+// Numbers (price, deposit, payments, dates) are left for the admin.
+export function proposalToContractValues(v) {
+  const sections = v.sections ?? [];
+  const byId = (id) => sections.find((s) => s.id === id && s.kind === 'text');
+  const address = [v.client_address_1, v.client_address_2].map((x) => (x || '').trim()).filter(Boolean).join(', ');
+
+  const scopeParts = [];
+  const overview = byId('overview');
+  if (overview?.body) scopeParts.push(sectionToPlainText(overview.body, v));
+  const scope = byId('scope');
+  if (scope?.body) scopeParts.push(sectionToPlainText(scope.body, v));
+  // Sections the admin added to this proposal (Permits, Exclusions, …).
+  for (const s of sections) {
+    if (s.kind !== 'text' || !s.body || RETAINER_ONLY_SECTIONS.has(s.id) || ['overview', 'scope', 'materials'].includes(s.id)) continue;
+    const text = sectionToPlainText(s.body, v);
+    if (text) scopeParts.push(s.title ? `${s.title.toUpperCase()}\n${text}` : text);
+  }
+
+  const materials = byId('materials');
+  return {
+    client_name:     (v.client_name || '').trim(),
+    client_email:    (v.client_email || '').trim(),
+    client_phone:    (v.client_phone || '').trim(),
+    client_address:  address,
+    project_address: address,
+    project_type:    (v.project_title || '').trim(),
+    scope_of_work:   scopeParts.filter(Boolean).join('\n\n'),
+    materials_spec:  materials?.body ? sectionToPlainText(materials.body, v) : '',
+  };
+}
+
+// Keys a proposal may fill on the contract (no prices or dates).
+export const PROPOSAL_TO_CONTRACT_KEYS = [
+  'client_name', 'client_email', 'client_phone', 'client_address', 'project_address',
+  'project_type', 'scope_of_work', 'materials_spec',
+];

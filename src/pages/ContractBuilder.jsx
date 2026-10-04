@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useProject } from '../context/ProjectContext';
 import PaperCopyPanel from '../components/PaperCopyPanel';
 import { CONTRACT_PREFILL_KEYS } from '../utils/contractPrefill';
+import { PROPOSAL_TO_CONTRACT_KEYS } from '../utils/proposalTemplate';
 import { supabase } from '../lib/supabase';
 import {
   CONTRACT_FIELDS,
@@ -191,18 +192,23 @@ export default function ContractBuilder() {
     return acc;
   }, {});
 
-  // A draft handed over by "Generate Contract" in the Remodel Budget. Only the
-  // allowlisted client-facing keys are accepted, whatever the draft contains.
+  // A draft handed over by "Generate Contract" in the Remodel Budget or by
+  // "Create Contract from this proposal". Only the allowlisted client-facing
+  // keys are accepted, whatever the draft contains.
   const [draft] = useState(() => projectState.contractDraft);
   const [values,      setValues]      = useState(() => {
     if (!draft) return defaultValues;
+    const keys = draft.kind === 'proposal' ? PROPOSAL_TO_CONTRACT_KEYS : CONTRACT_PREFILL_KEYS;
     const allowed = Object.fromEntries(
-      CONTRACT_PREFILL_KEYS.filter((k) => draft.values?.[k]).map((k) => [k, String(draft.values[k])]),
+      keys.filter((k) => draft.values?.[k]).map((k) => [k, String(draft.values[k])]),
     );
     return { ...defaultValues, ...allowed, contract_date: todayISO() };
   });
   const [link,        setLink]        = useState(() => (draft
-    ? { projectId: draft.projectId ?? null, managedClientId: draft.managedClientId ?? null, source: draft.source }
+    ? {
+      projectId: draft.projectId ?? null, managedClientId: draft.managedClientId ?? null, source: draft.source,
+      kind: draft.kind ?? 'budget', proposalId: draft.proposalId ?? null, reminders: draft.reminders ?? null,
+    }
     : null));
   const [activeTab,   setActiveTab]   = useState('form');
   const [saving,      setSaving]      = useState(false);
@@ -308,11 +314,19 @@ export default function ContractBuilder() {
       status,
       form_data:       values,
       ...(link && { project_id: link.projectId, managed_client_id: link.managedClientId }),
+      ...(link?.proposalId && { proposal_id: link.proposalId }),
       ...extra,
     };
-    const { data, error } = contractId
-      ? await supabase.from('contracts').update(payload).eq('id', contractId).select(ROW_COLS).single()
-      : await supabase.from('contracts').insert(payload).select(ROW_COLS).single();
+    const write = (body) => (contractId
+      ? supabase.from('contracts').update(body).eq('id', contractId).select(ROW_COLS).single()
+      : supabase.from('contracts').insert(body).select(ROW_COLS).single());
+    let { data, error } = await write(payload);
+    // Before migration 044 there is no proposal_id column: save without the link.
+    if (error && payload.proposal_id && /proposal_id/.test(error.message || '')) {
+      const rest = { ...payload };
+      delete rest.proposal_id;
+      ({ data, error } = await write(rest));
+    }
     setSaving(false);
     if (error) { showToast(error.message || 'Save failed.', 'error'); return null; }
     applyRow(data);
@@ -364,7 +378,9 @@ export default function ContractBuilder() {
     if (error || !data) { showToast('Could not load contract.', 'error'); return; }
     setValues(data.form_data || {});
     applyRow(data);
-    setLink(data.project_id ? { projectId: data.project_id, managedClientId: data.managed_client_id } : null);
+    setLink(data.project_id || data.proposal_id
+      ? { projectId: data.project_id ?? null, managedClientId: data.managed_client_id ?? null, proposalId: data.proposal_id ?? null }
+      : null);
     setCsName(''); setCsAgree(false);
     const isLocked = data.status === 'client_signed' || data.status === 'signed';
     setActiveTab(isLocked ? 'preview' : 'form');
@@ -512,7 +528,24 @@ export default function ContractBuilder() {
           onMessage={showToast}
         />
 
-        {link?.source && (
+        {link?.source && link.kind === 'proposal' && (
+          <div role="status" className="mt-4 px-4 py-3 rounded-xl text-xs space-y-1"
+            style={{ backgroundColor: '#ECFDF5', border: '1px solid #A7F3D0', color: '#065F46' }}>
+            <p>
+              <strong>Filled from the signed proposal for {link.source}:</strong> client name, email, phone and address,
+              project, scope of work (with the overview and any sections you added) and materials. The proposal's
+              retainer terms and signatures are not copied; the client signs this contract separately.
+            </p>
+            <p><strong>Still to fill in (numbers):</strong> contract price, deposit, payment schedule, start and completion dates{values.contractor_license ? '' : ', and your VA license #'}.</p>
+            <ul className="list-disc pl-5">
+              {link.reminders?.range && <li>Accepted estimated range: <strong>{link.reminders.range}</strong></li>}
+              {link.reminders?.timeline && <li>Proposal timeline: <strong>{link.reminders.timeline}</strong></li>}
+              {link.reminders?.retainer && <li>Retainer of <strong>{link.reminders.retainer}</strong> is credited on the <strong>second construction payment</strong> (per the retainer agreement).</li>}
+            </ul>
+          </div>
+        )}
+
+        {link?.source && link.kind !== 'proposal' && (
           <div role="status" className="mt-4 px-4 py-3 rounded-xl text-xs"
             style={{ backgroundColor: '#ECFDF5', border: '1px solid #A7F3D0', color: '#065F46' }}>
             <strong>Filled from the Remodel Budget for {link.source}:</strong> client name, email and phone,

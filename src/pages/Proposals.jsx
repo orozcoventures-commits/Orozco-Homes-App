@@ -9,7 +9,7 @@ import { PROPOSAL_PREFILL_KEYS } from '../utils/contractPrefill';
 import {
   PROPOSAL_FIELDS, PROPOSAL_SECTIONS, PROPOSAL_TITLE, TEMPLATE_FIELD_KEYS, TOKENS, SECTION_MARKUP_HELP, SECTION_KINDS,
   BUILT_IN_SECTIONS, proposalDefaults, applyPrefillToSections, normalizeProposal, sectionNumbers, newSectionId,
-  fmtWhole, fmtLongDate,
+  fmtWhole, fmtLongDate, investmentRange, proposalToContractValues,
 } from '../utils/proposalTemplate';
 
 const NAVY = '#002147';
@@ -350,6 +350,28 @@ export default function Proposals() {
     setLink((prev) => ({ ...prev, projectId: p?.id ?? null, managedClientId: p?.managed_client_id ?? null }));
   }
 
+  // Opens the Contracts page filled from the signed copy (or the saved form
+  // when it was signed on paper without being sent). Numbers stay blank.
+  function handleCreateContract() {
+    const signed = record?.sent_snapshot ?? values;
+    dispatch({
+      type: 'OPEN_CONTRACT_DRAFT',
+      draft: {
+        kind: 'proposal',
+        values: proposalToContractValues(signed),
+        source: signed.project_title || signed.client_name || 'the signed proposal',
+        projectId: link?.projectId ?? null,
+        managedClientId: link?.managedClientId ?? null,
+        proposalId,
+        reminders: {
+          range: investmentRange(signed),
+          timeline: signed.estimated_timeline || '',
+          retainer: fmtWhole(signed.retainer_amount),
+        },
+      },
+    });
+  }
+
   function handleDuplicate() {
     setProposalId(null);
     setStatus('draft');
@@ -543,6 +565,12 @@ export default function Proposals() {
               <button onClick={handleWithdraw} disabled={saving} className="px-3 py-1.5 rounded-lg font-bold"
                 style={{ backgroundColor: '#fff', border: '1px solid #BFDBFE', color: '#1E40AF' }}>
                 Withdraw
+              </button>
+            )}
+            {locked && (
+              <button onClick={handleCreateContract} className="px-3 py-1.5 rounded-lg font-bold"
+                style={{ backgroundColor: '#065F46', color: '#fff' }}>
+                Create Contract from this proposal →
               </button>
             )}
             {locked && (
