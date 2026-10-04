@@ -284,13 +284,15 @@ export default function ContractBuilder() {
     showToast('Copied into a new draft. The signed contract stays unchanged.');
   }
 
-  const ROW_COLS = 'id, status, sent_at, sent_snapshot, client_signatures, client_signed_at, contractor_signature, contractor_signed_at, declined_at, decline_reason, signed_file_path, signed_on_paper';
+  // '*' so saving keeps working whichever signing migrations (042, 043) have run.
+  const ROW_COLS = '*';
 
   // Signed on paper: mark fully signed with the uploaded copy (migration 043).
   async function attachPaperCopy(path) {
     const { data, error } = await supabase.from('contracts')
       .update({ status: 'signed', signed_file_path: path }).eq('id', contractId).select(ROW_COLS).single();
-    if (error) return error.message || 'Could not save the signed copy.';
+    if (error) return error.code === '42703' || error.code === 'PGRST204'
+      ? 'The signed-copy columns are missing in the database. Run the step 3 SQL in Supabase first.' : error.message || 'Could not save the signed copy.';
     applyRow(data);
     showToast('Signed copy uploaded. The contract is marked fully signed and locked.');
     return null;
