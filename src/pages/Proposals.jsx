@@ -1,12 +1,14 @@
 // src/pages/Proposals.jsx — Orozco Homes proposals (Project Retainer Agreements)
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useProject } from '../context/ProjectContext';
 import { supabase } from '../lib/supabase';
 import ProposalDocument from '../components/ProposalDocument';
 import { PROPOSAL_PREFILL_KEYS } from '../utils/contractPrefill';
 import {
-  PROPOSAL_FIELDS, PROPOSAL_SECTIONS, PROPOSAL_TITLE, proposalDefaults, fmtWhole, fmtLongDate,
+  PROPOSAL_FIELDS, PROPOSAL_SECTIONS, PROPOSAL_TITLE, TEMPLATE_FIELD_KEYS, TOKENS, SECTION_MARKUP_HELP, SECTION_KINDS,
+  BUILT_IN_SECTIONS, proposalDefaults, applyPrefillToSections, normalizeProposal, sectionNumbers, newSectionId,
+  fmtWhole, fmtLongDate,
 } from '../utils/proposalTemplate';
 
 const NAVY = '#002147';
@@ -120,6 +122,101 @@ function SavedList({ onLoad, refreshKey }) {
   );
 }
 
+const iconBtn = { width: 30, height: 30, borderRadius: 8, fontSize: 13, fontWeight: 700, border: `1px solid ${BORDER}`, backgroundColor: '#fff', color: NAVY };
+
+// Edit, add, remove and reorder the proposal's sections.
+function SectionsEditor({ sections, onChange, onSaveTemplate, onResetTemplate, onRestoreOriginal, hasTemplate, savingTemplate }) {
+  const numbers = sectionNumbers(sections);
+  const update = (id, patch) => onChange(sections.map((s) => (s.id === id ? { ...s, ...patch } : s)));
+  const move = (i, dir) => {
+    const j = i + dir;
+    if (j < 0 || j >= sections.length) return;
+    const next = [...sections];
+    [next[i], next[j]] = [next[j], next[i]];
+    onChange(next);
+  };
+  const insertAfter = (i) => {
+    const next = [...sections];
+    next.splice(i + 1, 0, { id: newSectionId(), kind: 'text', title: 'New Section', body: '', numbered: true });
+    onChange(next);
+  };
+  const remove = (s) => {
+    if (!confirm(`Remove the section "${s.title || SECTION_KINDS[s.kind]}" from this proposal?`)) return;
+    onChange(sections.filter((x) => x.id !== s.id));
+  };
+  const bodyLabel = { text: 'Text', client: 'Extra text under the client information (optional)',
+    investment: 'Text under the timeline & investment boxes', signatures: 'Text above the signature lines (optional)' };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+        <p className="text-xs" style={{ color: '#6B7280', maxWidth: 560 }}>
+          Edit any section, add new ones, remove what you don't need and move them up or down. Numbers update automatically.
+        </p>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button type="button" onClick={onResetTemplate} className="text-xs font-semibold underline" style={{ color: '#6B7280' }}>
+            {hasTemplate ? 'Reset to my default template' : 'Reset to original template'}
+          </button>
+          {hasTemplate && (
+            <button type="button" onClick={onRestoreOriginal} className="text-xs font-semibold underline" style={{ color: '#6B7280' }}>
+              Original template
+            </button>
+          )}
+          <button type="button" onClick={onSaveTemplate} disabled={savingTemplate}
+            className="px-3 py-1.5 rounded-lg text-xs font-bold disabled:opacity-60"
+            style={{ backgroundColor: '#F5F4F0', color: NAVY, border: `1px solid ${BORDER}` }}>
+            {savingTemplate ? 'Saving…' : 'Save as my default template'}
+          </button>
+        </div>
+      </div>
+
+      <details className="mb-4 text-xs rounded-lg px-3 py-2" style={{ backgroundColor: '#F9F8F6', color: '#6B7280' }}>
+        <summary className="cursor-pointer font-semibold" style={{ color: NAVY }}>How to format text and insert details</summary>
+        <p className="mt-2">{SECTION_MARKUP_HELP}</p>
+        <p className="mt-1">These words are replaced with the form details: {TOKENS.map((t) => `${t.token} (${t.label})`).join(', ')}.</p>
+      </details>
+
+      <ol className="space-y-3">
+        {sections.map((s, i) => (
+          <li key={s.id} className="rounded-xl p-3" style={{ border: `1.5px solid ${s.kind === 'text' ? BORDER : '#FDE68A'}`, backgroundColor: s.kind === 'text' ? '#fff' : '#FFFDF5' }}>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-bold w-8 text-center shrink-0" style={{ color: GOLD }}>{numbers[s.id] ? `${numbers[s.id]}.` : '—'}</span>
+              <input value={s.title} onChange={(e) => update(s.id, { title: e.target.value })}
+                aria-label={`Section ${i + 1} title`} placeholder="(no heading)"
+                className="flex-1 min-w-[160px] px-3 py-2 rounded-lg text-sm font-semibold focus:outline-none"
+                style={{ border: `1.5px solid ${BORDER}`, color: NAVY }} />
+              <label className="flex items-center gap-1.5 text-xs" style={{ color: '#6B7280' }}>
+                <input type="checkbox" checked={!!s.numbered} onChange={(e) => update(s.id, { numbered: e.target.checked })} />
+                Numbered
+              </label>
+              <button type="button" style={iconBtn} onClick={() => move(i, -1)} disabled={i === 0} aria-label={`Move ${s.title || 'section'} up`}>↑</button>
+              <button type="button" style={iconBtn} onClick={() => move(i, 1)} disabled={i === sections.length - 1} aria-label={`Move ${s.title || 'section'} down`}>↓</button>
+              <button type="button" style={iconBtn} onClick={() => insertAfter(i)} aria-label={`Add a section after ${s.title || 'this section'}`} title="Add a section below">＋</button>
+              <button type="button" style={{ ...iconBtn, color: '#DC2626', backgroundColor: '#FEF2F2', borderColor: '#FECACA' }}
+                onClick={() => remove(s)} aria-label={`Remove ${s.title || 'section'}`}>✕</button>
+            </div>
+            {s.kind !== 'text' && (
+              <p className="text-xs mt-2 ml-10" style={{ color: '#92400E' }}>{SECTION_KINDS[s.kind]} — filled from the form above.</p>
+            )}
+            <div className="mt-2 ml-10">
+              <label className="block text-xs font-semibold mb-1" style={{ color: '#6B7280' }} htmlFor={`sec-body-${s.id}`}>{bodyLabel[s.kind]}</label>
+              <textarea id={`sec-body-${s.id}`} value={s.body} onChange={(e) => update(s.id, { body: e.target.value })}
+                rows={Math.min(16, Math.max(s.kind === 'text' ? 4 : 2, s.body.split('\n').length + 1))}
+                className="w-full px-3 py-2 rounded-lg text-sm focus:outline-none"
+                style={{ border: `1.5px solid ${BORDER}`, color: '#1F2937', resize: 'vertical' }} />
+            </div>
+          </li>
+        ))}
+      </ol>
+      <button type="button" onClick={() => insertAfter(sections.length - 1)}
+        className="mt-3 w-full px-4 py-3 rounded-xl text-xs font-bold"
+        style={{ border: `1.5px dashed ${GOLD}`, color: NAVY, backgroundColor: 'transparent' }}>
+        + Add section
+      </button>
+    </div>
+  );
+}
+
 export default function Proposals() {
   const { isAdmin } = useAuth();
   const { state: projectState, dispatch } = useProject();
@@ -127,14 +224,20 @@ export default function Proposals() {
   // Draft handed over by "Generate Proposal" in the Remodel Budget; only the
   // allowlisted client-facing keys are accepted.
   const [draft] = useState(() => projectState.proposalDraft);
-  const [values, setValues] = useState(() => {
-    const base = proposalDefaults();
-    if (!draft) return base;
+  // New proposal: defaults (or the saved default template) plus the budget draft.
+  const buildInitial = (template, fromDraft) => {
+    const base = proposalDefaults(template);
+    if (!fromDraft) return base;
     const allowed = Object.fromEntries(
-      PROPOSAL_PREFILL_KEYS.filter((k) => draft.values?.[k]).map((k) => [k, String(draft.values[k])]),
+      PROPOSAL_PREFILL_KEYS.filter((k) => fromDraft.values?.[k]).map((k) => [k, String(fromDraft.values[k])]),
     );
-    return { ...base, ...allowed };
-  });
+    const { project_overview, scope_of_work, materials_included, ...fields } = allowed;
+    return { ...base, ...fields, sections: applyPrefillToSections(base.sections, { project_overview, scope_of_work, materials_included }) };
+  };
+  const [values, setValues] = useState(() => buildInitial(null, draft));
+  const [template, setTemplate] = useState(null);       // saved default template, if any
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const editedRef = useRef(false);                        // true once the admin changes anything
   const [link, setLink] = useState(() => (draft
     ? { projectId: draft.projectId ?? null, managedClientId: draft.managedClientId ?? null, source: draft.source, budgetPrice: draft.budgetPrice }
     : null));
@@ -148,6 +251,17 @@ export default function Proposals() {
   useEffect(() => {
     if (projectState.proposalDraft) dispatch({ type: 'CLEAR_PROPOSAL_DRAFT' });
   }, [projectState.proposalDraft, dispatch]);
+
+  // Saved default template (migration 040). Applied to a new, untouched proposal.
+  useEffect(() => {
+    supabase.from('proposal_templates').select('fields, sections').eq('id', 'default').maybeSingle()
+      .then(({ data, error }) => {
+        if (error || !data) return;
+        setTemplate(data);
+        if (!editedRef.current) setValues(buildInitial(data, draft));
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const el = document.createElement('style');
@@ -170,12 +284,45 @@ export default function Proposals() {
   }
 
   function handleChange(key, val) {
+    editedRef.current = true;
     setValues((prev) => ({ ...prev, [key]: val }));
+  }
+
+  function handleSectionsChange(sections) {
+    editedRef.current = true;
+    setValues((prev) => ({ ...prev, sections }));
+  }
+
+  function resetSections(useOriginal) {
+    const label = useOriginal || !template ? 'the original template' : 'your default template';
+    if (!confirm(`Replace this proposal's sections with ${label}? Your section edits on this proposal will be lost.`)) return;
+    handleSectionsChange(proposalDefaults(useOriginal ? null : template).sections);
+  }
+
+  async function handleSaveTemplate() {
+    if (!confirm('Save these sections, company details and retainer terms as your default for new proposals?')) return;
+    setSavingTemplate(true);
+    const row = {
+      id: 'default',
+      fields: Object.fromEntries(TEMPLATE_FIELD_KEYS.map((k) => [k, values[k] ?? ''])),
+      sections: values.sections,
+    };
+    const { error } = await supabase.from('proposal_templates').upsert(row, { onConflict: 'id' });
+    setSavingTemplate(false);
+    if (error) {
+      showToast(error.code === '42P01' || error.code === 'PGRST205'
+        ? 'The template table is missing. Run the Supabase SQL step first.'
+        : error.message || 'Could not save the template.', 'error');
+      return;
+    }
+    setTemplate({ fields: row.fields, sections: row.sections });
+    showToast('Saved as your default template. New proposals will start from it.');
   }
 
   function handleNew() {
     if (!confirm('Clear all fields and start a new proposal?')) return;
-    setValues(proposalDefaults());
+    editedRef.current = false;
+    setValues(proposalDefaults(template));
     setProposalId(null);
     setStatus('draft');
     setLink(null);
@@ -220,7 +367,8 @@ export default function Proposals() {
   async function handleLoad(id) {
     const { data, error } = await supabase.from('proposals').select('*').eq('id', id).single();
     if (error || !data) { showToast('Could not load the proposal.', 'error'); return; }
-    setValues({ ...proposalDefaults(), ...(data.form_data || {}) });
+    editedRef.current = true;
+    setValues(normalizeProposal(data.form_data, template));
     setProposalId(data.id);
     setStatus(data.status || 'draft');
     setLink(null);
@@ -309,6 +457,18 @@ export default function Proposals() {
                 )}
               </div>
             ))}
+            <div className="mb-6">
+              <SectionHeading label="Proposal Sections" />
+              <SectionsEditor
+                sections={values.sections ?? BUILT_IN_SECTIONS}
+                onChange={handleSectionsChange}
+                onSaveTemplate={handleSaveTemplate}
+                onResetTemplate={() => resetSections(false)}
+                onRestoreOriginal={() => resetSections(true)}
+                hasTemplate={!!template}
+                savingTemplate={savingTemplate}
+              />
+            </div>
             <div className="flex items-center justify-between flex-wrap gap-3 pt-4" style={{ borderTop: `1px solid ${BORDER}` }}>
               <p className="text-xs" style={{ color: missing.length ? '#B45309' : '#059669' }}>
                 {missing.length ? `Still to fill in: ${missing.join(', ')}` : 'All required fields are filled in.'}
