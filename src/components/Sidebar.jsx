@@ -33,6 +33,19 @@ const CONTRACTOR_TOOLS = [
     ),
   },
   {
+    label: 'Questionnaires',
+    page: 'questionnaires',
+    adminOnly: true,
+    badge: null,
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9 4H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2" />
+        <rect x="9" y="2" width="6" height="4" rx="1" />
+        <line x1="9" y1="11" x2="15" y2="11" /><line x1="9" y1="15" x2="15" y2="15" />
+      </svg>
+    ),
+  },
+  {
     label: 'Proposals',
     page: 'proposals',
     adminOnly: true,
