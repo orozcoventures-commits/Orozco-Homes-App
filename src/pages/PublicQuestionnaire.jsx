@@ -4,22 +4,13 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import QuestionnaireForm from '../components/QuestionnaireForm';
+import QuestionnairePhotoUploader from '../components/QuestionnairePhotoUploader';
 import { normalizeQuestionnaire, validateAnswers, cleanAnswers } from '../utils/questionnaireTemplate';
 
 const NAVY = '#002147';
 const GOLD = '#D4AF37';
 const BG = '#F5F4F0';
 const PHONE = '757-513-2593';
-
-// Photo questions arrive in step 3; until then they are left out.
-function withoutPhotos(q) {
-  return {
-    ...q,
-    sections: q.sections
-      .map((s) => ({ ...s, questions: s.questions.filter((x) => x.type !== 'photos') }))
-      .filter((s) => s.questions.length > 0),
-  };
-}
 
 function Shell({ children }) {
   return (
@@ -51,6 +42,7 @@ export default function PublicQuestionnaire({ route }) {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [website, setWebsite] = useState(''); // hidden field only bots fill in
+  const [uploading, setUploading] = useState(0);
 
   useEffect(() => {
     document.title = 'Pre-Consultation Questionnaire · Orozco Homes';
@@ -65,17 +57,17 @@ export default function PublicQuestionnaire({ route }) {
         const q = normalizeQuestionnaire(data.questionnaire);
         const p = data.prefill ?? {};
         setAnswers(Object.fromEntries(Object.entries({ full_name: p.full_name, email: p.email, phone: p.phone }).filter(([, v]) => v)));
-        setState({ phase: 'form', questionnaire: withoutPhotos(q) });
+        setState({ phase: 'form', questionnaire: q });
       } else {
         if (!data) { setState({ phase: 'unavailable' }); return; }
-        setState({ phase: 'form', questionnaire: withoutPhotos(normalizeQuestionnaire(data)) });
+        setState({ phase: 'form', questionnaire: normalizeQuestionnaire(data) });
       }
     });
   }, [route.mode, route.token]);
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (submitting) return;
+    if (submitting || uploading > 0) return;
     const q = state.questionnaire;
     const errs = validateAnswers(q, answers);
     setErrors(errs);
@@ -129,6 +121,11 @@ export default function PublicQuestionnaire({ route }) {
     <Shell>
       <form onSubmit={handleSubmit} noValidate>
         <QuestionnaireForm questionnaire={state.questionnaire} answers={answers} onChange={setAnswers} errors={errors}
+          photoSlot={(q) => (
+            <QuestionnairePhotoUploader q={q} value={answers[q.id]} token={route.mode === 'link' ? route.token : null}
+              update={(fn) => setAnswers((a) => ({ ...a, [q.id]: fn(Array.isArray(a[q.id]) ? a[q.id] : []) }))}
+              onBusyChange={(d) => setUploading((n) => n + d)} />
+          )}
           footer={(
             <div className="pb-2">
               <div aria-hidden="true" style={{ position: 'absolute', left: '-10000px', width: 1, height: 1, overflow: 'hidden' }}>
@@ -137,10 +134,10 @@ export default function PublicQuestionnaire({ route }) {
               {submitError && (
                 <p role="alert" className="text-sm font-semibold mb-3 text-center" style={{ color: '#DC2626' }}>{submitError}</p>
               )}
-              <button type="submit" disabled={submitting}
+              <button type="submit" disabled={submitting || uploading > 0}
                 className="w-full py-3.5 rounded-xl text-base font-bold disabled:opacity-60"
                 style={{ backgroundColor: NAVY, color: GOLD }}>
-                {submitting ? 'Submitting…' : 'Submit Questionnaire'}
+                {submitting ? 'Submitting…' : uploading > 0 ? 'Uploading photos…' : 'Submit Questionnaire'}
               </button>
             </div>
           )} />
