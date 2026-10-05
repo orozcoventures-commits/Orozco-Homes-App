@@ -213,3 +213,15 @@ export function contactFromAnswers(answers) {
     project_address:  s('project_address'),
   };
 }
+
+// Which customer questionnaire an address is for (/q/<link code> or the
+// website link /questionnaire), or null when it isn't one.
+export function questionnaireRoute(pathname) {
+  const m = pathname.match(/^\/q\/([0-9a-f]{64})\/?$/i);
+  if (m) return { mode: 'link', token: m[1].toLowerCase() };
+  if (/^\/questionnaire\/?$/i.test(pathname)) return { mode: 'public' };
+  return null;
+}
+
+export const questionnaireLinkUrl = (token) => `${window.location.origin}/q/${token}`;
+export const websiteQuestionnaireUrl = () => `${window.location.origin}/questionnaire`;
