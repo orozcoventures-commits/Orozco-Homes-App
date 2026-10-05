@@ -6,7 +6,10 @@ import QuestionnaireAnswers from '../components/QuestionnaireAnswers';
 import {
   BUILT_IN_QUESTIONNAIRE, QUESTION_TYPES, CORE_QUESTIONS, normalizeQuestionnaire, newId,
   validateAnswers, cleanAnswers, contactFromAnswers, formatAnswer, allQuestions,
+  questionnaireLinkUrl, websiteQuestionnaireUrl,
 } from '../utils/questionnaireTemplate';
+
+const COMPANY_PHONE = '757-513-2593';
 
 const NAVY = '#002147';
 const GOLD = '#D4AF37';
@@ -194,6 +197,117 @@ function QuestionsEditor({ value, onChange }) {
   );
 }
 
+// ── Sending ─────────────────────────────────────────────────────────────────
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; } catch { return false; }
+}
+
+function inviteMessage(name, url) {
+  const first = (name || '').trim().split(/\s+/)[0];
+  return `Hi${first ? ` ${first}` : ''},\n\nThank you for your interest in Orozco Homes! Before our consultation, please take a few minutes to fill out our Pre-Consultation Questionnaire:\n\n${url}\n\nThank you,\nOrozco Homes\n${COMPANY_PHONE}`;
+}
+
+function LinkPanel({ record, showToast }) {
+  const url = questionnaireLinkUrl(record.access_token);
+  const body = inviteMessage(record.respondent_name, url);
+  const mailto = `mailto:${encodeURIComponent(record.respondent_email || '')}?subject=${encodeURIComponent('Orozco Homes – Pre-Consultation Questionnaire')}&body=${encodeURIComponent(body)}`;
+  const sms = `sms:${(record.respondent_phone || '').replace(/[^\d+]/g, '')}?&body=${encodeURIComponent(body)}`;
+  const btn = { backgroundColor: '#fff', border: '1px solid #BFDBFE', color: '#1E40AF' };
+  return (
+    <div role="status" className="rounded-2xl p-4 mb-4" style={{ backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE', color: '#1E40AF' }}>
+      <p className="text-sm font-bold mb-1">Waiting for {record.respondent_name || 'the customer'} to fill it out</p>
+      <p className="text-xs mb-3">Send them this private link. It works once — after they submit, their answers show up here as <strong>New</strong>.</p>
+      <div className="flex items-center gap-2 flex-wrap">
+        <input readOnly value={url} aria-label="Questionnaire link" onFocus={(e) => e.target.select()}
+          className="flex-1 min-w-[240px] px-3 py-2 rounded-lg text-xs font-mono focus:outline-none" style={{ border: '1px solid #BFDBFE', backgroundColor: '#fff', color: NAVY }} />
+        <button onClick={async () => showToast(await copyText(url) ? 'Link copied.' : 'Could not copy — select the link and copy it.', 'success')}
+          className="px-3 py-2 rounded-lg text-xs font-bold" style={{ backgroundColor: NAVY, color: GOLD }}>Copy link</button>
+        <a href={mailto} className="px-3 py-2 rounded-lg text-xs font-bold" style={btn}>Email…</a>
+        <a href={sms} className="px-3 py-2 rounded-lg text-xs font-bold" style={btn}>Text…</a>
+      </div>
+      <p className="text-xs mt-2" style={{ color: '#3B82F6' }}>“Email…” opens your email app with a ready-to-send message; “Text…” works from your phone.</p>
+    </div>
+  );
+}
+
+function SendDialog({ questionnaire, onClose, onCreated, showToast }) {
+  const [f, setF] = useState({ name: '', email: '', phone: '' });
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const set = (k) => (e) => { setF((p) => ({ ...p, [k]: e.target.value })); setError(''); };
+
+  async function handleCreate(e) {
+    e.preventDefault();
+    if (!f.name.trim()) { setError('Enter the customer’s name.'); return; }
+    if (f.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email.trim())) { setError('That email address doesn’t look right.'); return; }
+    setBusy(true);
+    const { data, error: err } = await supabase.from('questionnaires').insert({
+      status: 'sent', source: 'link', questionnaire,
+      respondent_name: f.name.trim(), respondent_email: f.email.trim(), respondent_phone: f.phone.trim(),
+    }).select('*').single();
+    setBusy(false);
+    if (err) { setError(friendlyError(err)); return; }
+    if (!data?.access_token) { setError('Run migration 048 in Supabase to turn on questionnaire links.'); return; }
+    onCreated(data);
+    showToast('Link created.');
+  }
+
+  const field = (k, label, type, extra) => (
+    <div>
+      <label htmlFor={`sd-${k}`} className="block text-xs font-bold mb-1" style={{ color: '#374151' }}>{label}</label>
+      <input id={`sd-${k}`} type={type} value={f[k]} onChange={set(k)} className={`w-full ${inputCls}`} style={inputSty} {...extra} />
+    </div>
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{ backgroundColor: 'rgba(0,33,71,0.45)' }}
+      role="dialog" aria-modal="true" aria-labelledby="sd-title" onClick={onClose}>
+      <form onSubmit={handleCreate} onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-2xl p-6 space-y-4"
+        style={{ backgroundColor: '#fff', boxShadow: '0 20px 60px rgba(0,0,0,0.25)' }}>
+        <div>
+          <p id="sd-title" className="text-lg font-bold" style={{ color: NAVY }}>Send questionnaire</p>
+          <p className="text-xs mt-1" style={{ color: '#6B7280' }}>Creates a private link for this customer. Their name, email and phone are filled in for them.</p>
+        </div>
+        {field('name', 'Customer name *', 'text', { autoFocus: true, maxLength: 300 })}
+        {field('email', 'Email (optional)', 'email', { maxLength: 300 })}
+        {field('phone', 'Phone (optional)', 'tel', { maxLength: 50 })}
+        {error && <p role="alert" className="text-xs font-semibold" style={{ color: '#DC2626' }}>{error}</p>}
+        <div className="flex justify-end gap-2 pt-2">
+          <button type="button" onClick={onClose} className="px-4 py-2 rounded-xl text-xs font-bold" style={{ border: `1.5px solid ${BORDER}`, color: '#6B7280' }}>Cancel</button>
+          <button type="submit" disabled={busy} className="px-4 py-2 rounded-xl text-xs font-bold" style={{ backgroundColor: NAVY, color: GOLD }}>
+            {busy ? 'Creating…' : 'Create link'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function WebsiteLinkCard({ enabled, onToggle, busy, showToast }) {
+  const url = websiteQuestionnaireUrl();
+  return (
+    <div className="rounded-2xl p-4 mb-4 flex items-center gap-3 flex-wrap" style={{ backgroundColor: '#fff', border: `1.5px solid ${BORDER}` }}>
+      <div className="flex-1 min-w-[240px]">
+        <p className="text-sm font-bold" style={{ color: NAVY }}>Website link {enabled ? <span style={{ color: '#059669' }}>· On</span> : <span style={{ color: '#9CA3AF' }}>· Off</span>}</p>
+        <p className="text-xs" style={{ color: '#6B7280' }}>
+          {enabled
+            ? 'Anyone with this link can fill out the questionnaire — put it on your website or social media.'
+            : 'Turn on to get one link anyone can use (for your website or social media), without sending it first.'}
+        </p>
+        {enabled && <p className="text-xs font-mono mt-1 break-all" style={{ color: NAVY }}>{url}</p>}
+      </div>
+      {enabled && (
+        <button onClick={async () => showToast(await copyText(url) ? 'Website link copied.' : 'Could not copy — select the link and copy it.')}
+          className="px-3 py-2 rounded-lg text-xs font-bold" style={{ backgroundColor: NAVY, color: GOLD }}>Copy link</button>
+      )}
+      <button onClick={onToggle} disabled={busy} className="px-3 py-2 rounded-lg text-xs font-bold disabled:opacity-50"
+        style={enabled ? { border: `1px solid ${BORDER}`, color: '#6B7280', backgroundColor: '#fff' } : { backgroundColor: '#059669', color: '#fff' }}>
+        {enabled ? 'Turn off' : 'Turn on'}
+      </button>
+    </div>
+  );
+}
+
 // ── Responses ───────────────────────────────────────────────────────────────
 function ResponseList({ rows, onOpen, filter, setFilter }) {
   const counts = rows.reduce((m, r) => ({ ...m, [r.status]: (m[r.status] ?? 0) + 1 }), {});
@@ -227,7 +341,8 @@ function ResponseList({ rows, onOpen, filter, setFilter }) {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-bold truncate" style={{ color: NAVY }}>{r.respondent_name || 'Unnamed customer'}</p>
                   <p className="text-xs truncate" style={{ color: '#6B7280' }}>
-                    {[projectType, r.project_address, r.submitted_at ? `Submitted ${fmtDate(r.submitted_at)}` : `Created ${fmtDate(r.created_at)}`].filter(Boolean).join(' · ')}
+                    {[projectType, r.project_address, r.submitted_at ? `Submitted ${fmtDate(r.submitted_at)}` : `Link created ${fmtDate(r.created_at)}`,
+                      { public: 'from website link', admin: 'entered by you' }[r.source]].filter(Boolean).join(' · ')}
                   </p>
                 </div>
                 <span className="shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: st.bg, color: st.color }}>{st.label}</span>
@@ -277,15 +392,19 @@ function ResponseDetail({ record, onBack, onChanged, onDeleted, showToast }) {
               {reviewed ? 'Mark as new' : '✓ Mark as reviewed'}
             </button>
           )}
-          <button onClick={() => window.print()} className="px-4 py-2 rounded-xl text-xs font-bold" style={{ backgroundColor: GOLD, color: NAVY }}>
-            Print / PDF
-          </button>
+          {record.status !== 'sent' && (
+            <button onClick={() => window.print()} className="px-4 py-2 rounded-xl text-xs font-bold" style={{ backgroundColor: GOLD, color: NAVY }}>
+              Print / PDF
+            </button>
+          )}
           <button onClick={handleDelete} disabled={busy} className="px-4 py-2 rounded-xl text-xs font-bold"
             style={{ backgroundColor: '#FEF2F2', color: '#DC2626', border: '1px solid #FECACA' }}>
             Delete
           </button>
         </div>
       </div>
+
+      {record.status === 'sent' && record.access_token && <LinkPanel record={record} showToast={showToast} />}
 
       <div className="rounded-2xl p-4 mb-4" style={{ backgroundColor: '#fff', border: `1.5px solid ${BORDER}` }}>
         <label htmlFor="q-notes" className="block text-xs font-bold mb-1" style={{ color: '#374151' }}>
@@ -301,9 +420,11 @@ function ResponseDetail({ record, onBack, onChanged, onDeleted, showToast }) {
         </div>
       </div>
 
-      <div className="rounded-2xl overflow-hidden" style={{ border: `1.5px solid ${BORDER}`, boxShadow: '0 4px 24px rgba(0,33,71,0.08)' }}>
-        <QuestionnaireAnswers record={record} id="oh-questionnaire-print" />
-      </div>
+      {record.status !== 'sent' && (
+        <div className="rounded-2xl overflow-hidden" style={{ border: `1.5px solid ${BORDER}`, boxShadow: '0 4px 24px rgba(0,33,71,0.08)' }}>
+          <QuestionnaireAnswers record={record} id="oh-questionnaire-print" />
+        </div>
+      )}
     </div>
   );
 }
@@ -355,6 +476,9 @@ function ManualEntry({ questionnaire, onCancel, onSaved, showToast }) {
 export default function Questionnaires() {
   const [activeTab, setActiveTab] = useState('responses');
   const [saved, setSaved] = useState(null);          // saved default questionnaire, or null
+  const [publicEnabled, setPublicEnabled] = useState(false);
+  const [togglingPublic, setTogglingPublic] = useState(false);
+  const [sending, setSending] = useState(false);
   const [draft, setDraft] = useState(() => normalizeQuestionnaire(BUILT_IN_QUESTIONNAIRE));
   const [dirty, setDirty] = useState(false);
   const [savingTpl, setSavingTpl] = useState(false);
@@ -373,8 +497,9 @@ export default function Questionnaires() {
   }, []);
 
   useEffect(() => {
-    supabase.from('questionnaire_templates').select('questionnaire').eq('id', 'default').maybeSingle()
+    supabase.from('questionnaire_templates').select('*').eq('id', 'default').maybeSingle()
       .then(({ data }) => {
+        setPublicEnabled(!!data?.public_enabled);
         if (data?.questionnaire) {
           const q = normalizeQuestionnaire(data.questionnaire);
           setSaved(q);
@@ -406,6 +531,19 @@ export default function Questionnaires() {
     showToast('Questions saved. New questionnaires will use them.');
   }
 
+  async function handleTogglePublic() {
+    const next = !publicEnabled;
+    if (next && !confirm('Turn on the website link? Anyone with the link will be able to fill out the questionnaire.')) return;
+    setTogglingPublic(true);
+    // Saves the current questions too, so the website link has them.
+    const { error } = await supabase.from('questionnaire_templates').upsert({ id: 'default', questionnaire: current, public_enabled: next });
+    setTogglingPublic(false);
+    if (error) { showToast(/public_enabled/.test(error.message) ? 'Run migration 048 in Supabase to turn on the website link.' : friendlyError(error), 'error'); return; }
+    if (!saved) setSaved(current);
+    setPublicEnabled(next);
+    showToast(next ? 'Website link is on.' : 'Website link is off.');
+  }
+
   function handleResetOriginal() {
     if (!confirm('Replace your questions with the original Orozco Homes questionnaire? Click Save afterwards to keep it.')) return;
     editDraft(normalizeQuestionnaire(BUILT_IN_QUESTIONNAIRE));
@@ -424,6 +562,10 @@ export default function Questionnaires() {
   return (
     <div className="min-h-screen" style={{ backgroundColor: BG }}>
       <style>{PRINT_CSS}</style>
+      {sending && (
+        <SendDialog questionnaire={current} onClose={() => setSending(false)} showToast={showToast}
+          onCreated={(r) => { setSending(false); setRows((p) => [r, ...(p ?? [])]); setOpenRecord(r); setActiveTab('responses'); }} />
+      )}
       {toast.msg && (
         <div role="status" className="fixed bottom-6 right-6 z-50 px-5 py-3 rounded-xl text-sm font-semibold shadow-lg"
           style={toast.type === 'error'
@@ -441,9 +583,15 @@ export default function Questionnaires() {
             <p className="text-sm mt-0.5" style={{ color: '#6B7280' }}>Review what customers tell you before the consultation meeting.</p>
           </div>
           {activeTab === 'responses' && !entering && !openRecord && (
-            <button onClick={() => setEntering(true)} className="px-4 py-2 rounded-xl text-xs font-bold" style={{ backgroundColor: NAVY, color: GOLD }}>
-              + Enter answers for a customer
-            </button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button onClick={() => setEntering(true)} className="px-4 py-2 rounded-xl text-xs font-bold"
+                style={{ border: `1.5px solid ${BORDER}`, backgroundColor: '#fff', color: NAVY }}>
+                + Enter answers for a customer
+              </button>
+              <button onClick={() => setSending(true)} className="px-4 py-2 rounded-xl text-xs font-bold" style={{ backgroundColor: NAVY, color: GOLD }}>
+                Send questionnaire
+              </button>
+            </div>
           )}
         </div>
         <div className="flex p-1 rounded-xl w-fit" style={{ backgroundColor: '#EDEBE6' }}>
@@ -463,10 +611,13 @@ export default function Questionnaires() {
               onChanged={(r) => { setOpenRecord(r); setRows((p) => p.map((x) => (x.id === r.id ? r : x))); }}
               onDeleted={(id) => { setOpenRecord(null); setRows((p) => p.filter((x) => x.id !== id)); }} />
           ) : (
+            <div>
+            <WebsiteLinkCard enabled={publicEnabled} onToggle={handleTogglePublic} busy={togglingPublic} showToast={showToast} />
             <div className="rounded-2xl p-6" style={{ backgroundColor: '#fff', border: `1.5px solid ${BORDER}` }}>
               {loadError && <p role="alert" className="text-xs font-semibold mb-4" style={{ color: '#DC2626' }}>{loadError}</p>}
               {rows ? <ResponseList rows={rows} onOpen={setOpenRecord} filter={filter} setFilter={setFilter} />
                 : <p className="text-xs text-center py-6" style={{ color: '#9CA3AF' }}>Loading…</p>}
+            </div>
             </div>
           )
         )}

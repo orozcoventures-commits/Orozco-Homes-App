@@ -18,6 +18,8 @@ import PinClientPortal from './pages/PinClientPortal';
 import ContractBuilder from './pages/ContractBuilder';
 import Proposals from './pages/Proposals';
 import Questionnaires from './pages/Questionnaires';
+import PublicQuestionnaire from './pages/PublicQuestionnaire';
+import { questionnaireRoute } from './utils/questionnaireTemplate';
 import Subcontractors from './pages/Subcontractors';
 import NewHomeBudget from './pages/NewHomeBudget';
 import RemodelBudget from './pages/RemodelBudget';
@@ -205,6 +207,10 @@ function AppContent() {
 export default function App() {
   // Surface missing env vars immediately instead of a blank screen
   if (supabaseConfigError) return <EnvErrorScreen />;
+
+  // Customer questionnaire links work without logging in.
+  const qRoute = questionnaireRoute(window.location.pathname);
+  if (qRoute) return <ErrorBoundary><PublicQuestionnaire route={qRoute} /></ErrorBoundary>;
 
   return (
     <ErrorBoundary>
