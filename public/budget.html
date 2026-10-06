@@ -6,6 +6,7 @@
   <title>Home Budget Tracker</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
+    [hidden] { display: none !important; }
     .bar-track { transition: width 0.4s ease; }
     input[type=number]::-webkit-inner-spin-button { opacity: 0.4; }
   </style>
@@ -20,11 +21,18 @@
       <div class="flex items-center gap-2">
         <label for="monthPicker" class="text-sm text-slate-300">Month</label>
         <input id="monthPicker" type="month" class="rounded-md bg-slate-800 border border-slate-700 px-3 py-1.5 text-sm text-white" />
-        <button id="exportBtn" class="rounded-md bg-slate-700 hover:bg-slate-600 px-3 py-1.5 text-sm">Export CSV</button>
-        <button id="resetBtn" class="rounded-md bg-red-600 hover:bg-red-500 px-3 py-1.5 text-sm">Reset All</button>
+        <button id="exportBtn" type="button" class="rounded-md bg-slate-700 hover:bg-slate-600 px-3 py-1.5 text-sm">Export CSV</button>
+        <button id="resetBtn" type="button" class="rounded-md bg-red-600 hover:bg-red-500 px-3 py-1.5 text-sm">Reset All</button>
       </div>
     </div>
   </header>
+
+  <div id="storageWarn" hidden class="bg-amber-100 border-b border-amber-300 text-amber-900 text-sm">
+    <div class="max-w-7xl mx-auto px-4 py-2">
+      This viewer isn't letting the page save, so your entries will be lost when you close it.
+      Download the file and open it in Chrome, Safari or Edge to keep your data.
+    </div>
+  </div>
 
   <main class="max-w-7xl mx-auto px-4 py-6 space-y-6">
     <!-- Summary cards -->
@@ -74,34 +82,34 @@
           </div>
           <p class="mt-2 text-xs text-slate-400">Changes here apply to this month only. Highlighted amounts differ from your defaults.</p>
 
-          <form id="addCategoryForm" class="mt-4 flex gap-2">
-            <input id="newCategoryName" type="text" placeholder="New category" maxlength="40" required
+          <div id="addCategoryForm" class="mt-4 flex gap-2">
+            <input id="newCategoryName" type="text" placeholder="New category" maxlength="40"
                    class="flex-1 min-w-0 rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
             <input id="newCategoryBudget" type="number" min="0" step="0.01" placeholder="0.00"
                    class="w-24 rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-            <button class="rounded-md bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 text-sm font-medium">Add</button>
-          </form>
+            <button id="addCategoryBtn" type="button" class="rounded-md bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 text-sm font-medium">Add</button>
+          </div>
         </section>
 
         <!-- 2. Expense Logger -->
         <section class="bg-white rounded-xl shadow-sm p-5">
           <h2 class="text-lg font-semibold mb-4">2. Log an Expense</h2>
-          <form id="expenseForm" class="space-y-3">
+          <div id="expenseForm" class="space-y-3">
             <div class="grid grid-cols-2 gap-3">
               <div>
                 <label class="block text-sm font-medium text-slate-600 mb-1" for="expDate">Date</label>
-                <input id="expDate" type="date" required
+                <input id="expDate" type="date"
                        class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               </div>
               <div>
                 <label class="block text-sm font-medium text-slate-600 mb-1" for="expAmount">Amount ($)</label>
-                <input id="expAmount" type="number" min="0.01" step="0.01" required placeholder="0.00"
+                <input id="expAmount" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="0.00"
                        class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               </div>
             </div>
             <div>
               <label class="block text-sm font-medium text-slate-600 mb-1" for="expCategory">Category</label>
-              <select id="expCategory" required
+              <select id="expCategory"
                       class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"></select>
             </div>
             <div>
@@ -109,8 +117,9 @@
               <input id="expDesc" type="text" maxlength="80" placeholder="e.g. Weekly groceries"
                      class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
             </div>
-            <button class="w-full rounded-md bg-emerald-600 hover:bg-emerald-500 text-white py-2 font-medium">Add Expense</button>
-          </form>
+            <button id="addExpenseBtn" type="button" class="w-full rounded-md bg-emerald-600 hover:bg-emerald-500 text-white py-2 font-medium">Add Expense</button>
+            <p id="expMsg" class="text-sm min-h-[1.25rem]" aria-live="polite"></p>
+          </div>
         </section>
       </div>
 
@@ -118,7 +127,8 @@
       <div class="lg:col-span-2 space-y-6">
         <!-- 3. Budget vs Actual -->
         <section class="bg-white rounded-xl shadow-sm p-5">
-          <h2 class="text-lg font-semibold mb-4">3. Budget vs. Actual <span id="monthLabel" class="text-sm font-normal text-slate-500"></span></h2>
+          <h2 class="text-lg font-semibold">3. Budget vs. Actual <span id="monthLabel" class="text-sm font-normal text-slate-500"></span></h2>
+          <p class="text-sm text-slate-500 mb-4">Actual is the total of the expenses you log. Use <span class="font-medium text-emerald-700">+ Add</span> to record spending in a category.</p>
           <div class="overflow-x-auto">
             <table class="w-full text-sm">
               <thead>
@@ -126,7 +136,8 @@
                   <th class="py-2 pr-2 font-medium">Category</th>
                   <th class="py-2 px-2 font-medium text-right">Budgeted</th>
                   <th class="py-2 px-2 font-medium text-right">Actual</th>
-                  <th class="py-2 pl-2 font-medium text-right">Variance</th>
+                  <th class="py-2 px-2 font-medium text-right">Variance</th>
+                  <th class="py-2 pl-2"><span class="sr-only">Add spending</span></th>
                 </tr>
               </thead>
               <tbody id="summaryBody"></tbody>
@@ -173,6 +184,17 @@
     </div>
   </main>
 
+  <div id="confirmBox" hidden class="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center px-4">
+    <div role="dialog" aria-modal="true" aria-labelledby="confirmMsg" class="bg-white rounded-xl shadow-xl max-w-sm w-full p-5">
+      <p id="confirmMsg" class="text-slate-800"></p>
+      <div class="mt-5 flex justify-end gap-2">
+        <button id="confirmCancel" type="button" class="rounded-md border border-slate-300 hover:bg-slate-50 px-3 py-1.5 text-sm">Cancel</button>
+        <button id="confirmOk" type="button" class="rounded-md bg-red-600 hover:bg-red-500 text-white px-3 py-1.5 text-sm font-medium">OK</button>
+      </div>
+    </div>
+  </div>
+  <div id="toast" hidden class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 rounded-md bg-slate-900 text-white text-sm px-4 py-2 shadow-lg"></div>
+
   <script>
     (function () {
       const STORAGE_KEY = 'homeBudgetTracker.v1';
@@ -197,6 +219,7 @@
       let state = load();
       let selectedMonth = today().slice(0, 7);
       let editingId = null;
+      let quickAddId = null;
 
       // `income` and each category's `budget` are the defaults. `monthIncome[YYYY-MM]` and
       // `monthBudgets[YYYY-MM][categoryId]` override them for a single month.
@@ -258,6 +281,46 @@
         $('incomeInput').classList.toggle('bg-indigo-50', hasIncomeOverride());
       }
 
+      // In-page confirmation. Browser confirm() dialogs are blocked in many viewers.
+      function askConfirm(message, okLabel = 'OK') {
+        return new Promise((resolve) => {
+          const box = $('confirmBox');
+          $('confirmMsg').textContent = message;
+          $('confirmOk').textContent = okLabel;
+          box.hidden = false;
+          $('confirmOk').focus();
+          const done = (answer) => {
+            box.hidden = true;
+            $('confirmOk').onclick = $('confirmCancel').onclick = box.onkeydown = null;
+            resolve(answer);
+          };
+          $('confirmOk').onclick = () => done(true);
+          $('confirmCancel').onclick = () => done(false);
+          box.onkeydown = (e) => { if (e.key === 'Escape') done(false); };
+        });
+      }
+
+      let toastTimer;
+      function toast(message) {
+        $('toast').textContent = message;
+        $('toast').hidden = false;
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => { $('toast').hidden = true; }, 2500);
+      }
+
+      function storageWorks() {
+        try {
+          localStorage.setItem(STORAGE_KEY + '.test', '1');
+          localStorage.removeItem(STORAGE_KEY + '.test');
+          return true;
+        } catch (e) {
+          return false;
+        }
+      }
+
+      // Date for spending added from the summary table: today if viewing this month, else the 1st.
+      const quickAddDate = () => (today().slice(0, 7) === selectedMonth ? today() : selectedMonth + '-01');
+
       // ---------- Rendering ----------
       function renderCategorySetup() {
         $('categoryList').innerHTML = state.categories.map((c) => `
@@ -314,19 +377,30 @@
         $('summaryBody').innerHTML = rows.map((r) => {
           const v = r.budget - r.actual;
           const rowBg = v < -0.005 ? 'bg-red-50' : '';
+          const canAdd = r.id !== '_orphan';
+          const action = !canAdd ? '' : r.id === quickAddId
+            ? `<div class="flex items-center justify-end gap-1" data-quick="${r.id}">
+                 <input type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="0.00" aria-label="Amount spent on ${escapeHtml(r.name)}"
+                        class="w-24 rounded-md border border-slate-300 px-2 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                 <button type="button" data-quick-save="${r.id}" class="rounded-md bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-2 py-1">Add</button>
+                 <button type="button" data-quick-cancel="1" class="text-slate-400 hover:text-slate-600 text-xs px-1" aria-label="Cancel">&times;</button>
+               </div>`
+            : `<button type="button" data-quick-open="${r.id}" class="rounded-md border border-emerald-600 text-emerald-700 hover:bg-emerald-50 text-xs px-2 py-1 whitespace-nowrap">+ Add</button>`;
           return `<tr class="border-b border-slate-100 ${rowBg}">
             <td class="py-2 pr-2">${escapeHtml(r.name)}</td>
             <td class="py-2 px-2 text-right tabular-nums">${fmt.format(r.budget)}</td>
             <td class="py-2 px-2 text-right tabular-nums">${fmt.format(r.actual)}</td>
-            <td class="py-2 pl-2 text-right tabular-nums">${varianceCell(v)}</td>
+            <td class="py-2 px-2 text-right tabular-nums">${varianceCell(v)}</td>
+            <td class="py-2 pl-2 text-right">${action}</td>
           </tr>`;
-        }).join('') || `<tr><td colspan="4" class="py-4 text-center text-slate-400">Add a category to get started.</td></tr>`;
+        }).join('') || `<tr><td colspan="5" class="py-4 text-center text-slate-400">Add a category to get started.</td></tr>`;
 
         $('summaryFoot').innerHTML = `<tr class="font-semibold border-t-2 border-slate-300">
           <td class="py-2 pr-2">Total</td>
           <td class="py-2 px-2 text-right tabular-nums">${fmt.format(totalBudget)}</td>
           <td class="py-2 px-2 text-right tabular-nums">${fmt.format(totalActual)}</td>
-          <td class="py-2 pl-2 text-right tabular-nums">${varianceCell(totalBudget - totalActual)}</td>
+          <td class="py-2 px-2 text-right tabular-nums">${varianceCell(totalBudget - totalActual)}</td>
+          <td></td>
         </tr>`;
 
         // Chart
@@ -417,6 +491,7 @@
 
       function switchMonth(ym) {
         selectedMonth = ym;
+        quickAddId = null;
         $('monthPicker').value = ym;
         renderAll();
       }
@@ -459,7 +534,7 @@
         refresh();
       });
 
-      $('categoryList').addEventListener('click', (e) => {
+      $('categoryList').addEventListener('click', async (e) => {
         if (e.target.dataset.action !== 'remove') return;
         const id = e.target.closest('[data-id]').dataset.id;
         const cat = state.categories.find((c) => c.id === id);
@@ -467,7 +542,7 @@
         const msg = count
           ? `Remove "${cat.name}"? Its ${count} expense(s) will be kept as "Uncategorized".`
           : `Remove "${cat.name}"?`;
-        if (!confirm(msg)) return;
+        if (!(await askConfirm(msg, 'Remove'))) return;
         state.categories = state.categories.filter((c) => c.id !== id);
         Object.keys(state.monthBudgets).forEach((m) => {
           delete state.monthBudgets[m][id];
@@ -477,35 +552,80 @@
         renderAll();
       });
 
-      $('addCategoryForm').addEventListener('submit', (e) => {
-        e.preventDefault();
+      function addCategory() {
         const name = $('newCategoryName').value.trim();
-        if (!name) return;
+        if (!name) { $('newCategoryName').focus(); return; }
         state.categories.push({ id: uid(), name, budget: toNum($('newCategoryBudget').value) });
-        e.target.reset();
+        $('newCategoryName').value = '';
+        $('newCategoryBudget').value = '';
         save();
         renderAll();
-      });
+        toast(`Added ${name}`);
+      }
+      $('addCategoryBtn').addEventListener('click', addCategory);
+      $('addCategoryForm').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addCategory(); } });
 
-      $('expenseForm').addEventListener('submit', (e) => {
-        e.preventDefault();
+      function expMsg(text, ok) {
+        $('expMsg').textContent = text;
+        $('expMsg').className = 'text-sm min-h-[1.25rem] ' + (ok ? 'text-emerald-700' : 'text-red-600');
+      }
+
+      function logExpense(categoryId, amount, date, description) {
+        state.expenses.push({ id: uid(), date, categoryId, amount, description, createdAt: Date.now() });
+        save();
+      }
+
+      function addExpense() {
         const amount = toNum($('expAmount').value);
         const categoryId = $('expCategory').value;
-        if (!amount || !categoryId) return;
+        if (!categoryId) { expMsg('Add a category first, then log the expense.', false); return; }
+        if (!amount) { expMsg('Enter an amount greater than $0.', false); $('expAmount').focus(); return; }
         const date = $('expDate').value || today();
-        state.expenses.push({
-          id: uid(), date, categoryId, amount,
-          description: $('expDesc').value.trim(), createdAt: Date.now(),
-        });
+        logExpense(categoryId, amount, date, $('expDesc').value.trim());
         $('expAmount').value = '';
         $('expDesc').value = '';
-        save();
+        expMsg(`Added ${fmt.format(amount)} to ${categoryName(categoryId)}.`, true);
         // Jump to the month of the logged expense so it's visible
         if (date.slice(0, 7) !== selectedMonth) switchMonth(date.slice(0, 7)); else refresh();
         $('expAmount').focus();
+      }
+      $('addExpenseBtn').addEventListener('click', addExpense);
+      $('expenseForm').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && e.target.tagName !== 'SELECT') { e.preventDefault(); addExpense(); }
       });
 
-      $('ledgerBody').addEventListener('click', (e) => {
+      // Quick add from the Budget vs. Actual table
+      function quickAdd(categoryId) {
+        const input = document.querySelector(`[data-quick="${CSS.escape(categoryId)}"] input`);
+        const amount = input ? toNum(input.value) : 0;
+        if (!amount) { if (input) { input.focus(); input.classList.add('ring-2', 'ring-red-500'); } return; }
+        logExpense(categoryId, amount, quickAddDate(), '');
+        quickAddId = null;
+        refresh();
+        toast(`Added ${fmt.format(amount)} to ${categoryName(categoryId)}`);
+      }
+      $('summaryBody').addEventListener('click', (e) => {
+        const d = e.target.dataset;
+        if (d.quickOpen) {
+          quickAddId = d.quickOpen;
+          renderDashboard();
+          const input = document.querySelector('[data-quick] input');
+          if (input) input.focus();
+        } else if (d.quickSave) {
+          quickAdd(d.quickSave);
+        } else if (d.quickCancel) {
+          quickAddId = null;
+          renderDashboard();
+        }
+      });
+      $('summaryBody').addEventListener('keydown', (e) => {
+        const wrap = e.target.closest('[data-quick]');
+        if (!wrap) return;
+        if (e.key === 'Enter') { e.preventDefault(); quickAdd(wrap.dataset.quick); }
+        if (e.key === 'Escape') { quickAddId = null; renderDashboard(); }
+      });
+
+      $('ledgerBody').addEventListener('click', async (e) => {
         const d = e.target.dataset;
         if (d.edit) {
           editingId = d.edit;
@@ -518,7 +638,7 @@
           editingId = null;
           renderLedger();
         } else if (d.del) {
-          if (!confirm('Delete this expense?')) return;
+          if (!(await askConfirm('Delete this expense?', 'Delete'))) return;
           state.expenses = state.expenses.filter((x) => x.id !== d.del);
           if (editingId === d.del) editingId = null;
           refresh();
@@ -540,8 +660,8 @@
         switchMonth(e.target.value);
       });
 
-      $('saveDefaultBtn').addEventListener('click', () => {
-        if (!confirm(`Use ${monthName(selectedMonth)}'s income and budgets as the default for every month you haven't customized?`)) return;
+      $('saveDefaultBtn').addEventListener('click', async () => {
+        if (!(await askConfirm(`Use ${monthName(selectedMonth)}'s income and budgets as the default for every month you haven't customized?`, 'Save as default'))) return;
         state.income = effectiveIncome();
         state.categories.forEach((c) => { c.budget = effectiveBudget(c); });
         // This month now matches the defaults, so its overrides are redundant
@@ -558,8 +678,8 @@
         renderAll();
       });
 
-      $('resetBtn').addEventListener('click', () => {
-        if (!confirm('Erase all income, categories and expenses and restore defaults?')) return;
+      $('resetBtn').addEventListener('click', async () => {
+        if (!(await askConfirm('Erase all income, categories and expenses and restore defaults?', 'Erase everything'))) return;
         state = freshState();
         save();
         renderAll();
@@ -571,7 +691,11 @@
         state.expenses.slice().sort((a, b) => a.date.localeCompare(b.date)).forEach((e) => {
           lines.push([e.date, q(categoryName(e.categoryId)), q(e.description || ''), e.amount.toFixed(2)].join(','));
         });
-        const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+        const csv = lines.join('\n');
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(csv).then(() => toast('Expenses copied. Paste into a spreadsheet, or check your downloads.'), () => {});
+        }
+        const blob = new Blob([csv], { type: 'text/csv' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
         a.download = 'budget-expenses.csv';
@@ -580,6 +704,7 @@
       });
 
       // ---------- Init ----------
+      $('storageWarn').hidden = storageWorks();
       $('monthPicker').value = selectedMonth;
       $('expDate').value = today();
       renderAll();
