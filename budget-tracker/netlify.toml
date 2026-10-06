@@ -1,7 +1,12 @@
 # Netlify settings for the standalone Home Budget Tracker project.
 # In that Netlify project, set Base directory to "budget-tracker".
+# Needs VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in the project's
+# environment variables for cross-device sync.
 [build]
   publish = "."
-  command = ""
+  command = "node build-config.mjs"
   # Only redeploy when something in this folder changed
   ignore  = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- ."
+
+[build.environment]
+  NODE_VERSION = "20"

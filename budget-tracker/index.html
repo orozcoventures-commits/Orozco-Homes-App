@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Home Budget Tracker</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- config.js is generated at deploy time (build-config.mjs) with the Supabase settings -->
+  <script src="config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.105.4/dist/umd/supabase.js"></script>
   <style>
     [hidden] { display: none !important; }
     .bar-track { transition: width 0.4s ease; }
@@ -16,9 +19,14 @@
     <div class="max-w-7xl mx-auto px-4 py-5 flex flex-wrap items-center justify-between gap-3">
       <div>
         <h1 class="text-2xl font-bold tracking-tight">Home Budget Tracker</h1>
-        <p class="text-slate-400 text-sm">Plan it, log it, compare it. Data is saved in this browser.</p>
+        <p class="text-sm flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span id="syncStatus" class="text-slate-400" aria-live="polite">Saved on this device only</span>
+          <span id="acctEmail" class="text-slate-400" hidden></span>
+          <button id="signInOpenBtn" type="button" hidden class="underline text-sky-300 hover:text-sky-200">Sign in to sync</button>
+          <button id="signOutBtn" type="button" hidden class="underline text-slate-300 hover:text-white">Sign out</button>
+        </p>
       </div>
-      <div class="flex items-center gap-2">
+      <div class="flex flex-wrap items-center gap-2">
         <label for="monthPicker" class="text-sm text-slate-300">Month</label>
         <input id="monthPicker" type="month" class="rounded-md bg-slate-800 border border-slate-700 px-3 py-1.5 text-sm text-white" />
         <button id="exportBtn" type="button" class="rounded-md bg-slate-700 hover:bg-slate-600 px-3 py-1.5 text-sm">Export CSV</button>
@@ -29,12 +37,33 @@
 
   <div id="storageWarn" hidden class="bg-amber-100 border-b border-amber-300 text-amber-900 text-sm">
     <div class="max-w-7xl mx-auto px-4 py-2">
-      This viewer isn't letting the page save, so your entries will be lost when you close it.
-      Download the file and open it in Chrome, Safari or Edge to keep your data.
+      This viewer isn't letting the page save on this device, so your entries will be lost when you close it.
+      Sign in to save online, or open the page in Chrome, Safari or Edge.
     </div>
   </div>
 
   <main class="max-w-7xl mx-auto px-4 py-6 space-y-6">
+    <!-- Sign in (shown when online saving is available and nobody is signed in) -->
+    <section id="authPanel" hidden class="bg-white rounded-xl shadow-sm p-5 border-2 border-sky-500">
+      <h2 class="text-lg font-semibold">Sign in to save your budget online</h2>
+      <p class="text-sm text-slate-600 mt-1">Use your Orozco Homes email and password. Once you sign in, your budget is saved online and shows up on every computer and phone where you sign in.</p>
+      <div id="authForm" class="mt-4 grid sm:grid-cols-[1fr_1fr_auto] gap-3 items-end">
+        <div>
+          <label for="authEmail" class="block text-sm font-medium text-slate-600 mb-1">Email</label>
+          <input id="authEmail" type="email" autocomplete="username" inputmode="email"
+                 class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500" />
+        </div>
+        <div>
+          <label for="authPassword" class="block text-sm font-medium text-slate-600 mb-1">Password</label>
+          <input id="authPassword" type="password" autocomplete="current-password"
+                 class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500" />
+        </div>
+        <button id="signInBtn" type="button" class="rounded-md bg-sky-600 hover:bg-sky-500 text-white px-5 py-2 font-medium">Sign in</button>
+      </div>
+      <p id="authMsg" class="text-sm mt-2 min-h-[1.25rem] text-red-600" aria-live="polite"></p>
+      <button id="authSkipBtn" type="button" class="text-sm text-slate-500 underline hover:text-slate-700">Not now, keep it on this device only</button>
+    </section>
+
     <!-- Summary cards -->
     <section class="grid grid-cols-2 lg:grid-cols-4 gap-4">
       <div class="bg-white rounded-xl shadow-sm p-4">
@@ -215,6 +244,7 @@
       const isObj = (v) => v && typeof v === 'object' && !Array.isArray(v);
 
       // ---------- State ----------
+      let hadLocalData = (() => { try { return !!localStorage.getItem(STORAGE_KEY); } catch (e) { return false; } })();
       let state = load();
       let selectedMonth = today().slice(0, 7);
       let editingId = null;
@@ -236,8 +266,15 @@
       function load() {
         try {
           const raw = localStorage.getItem(STORAGE_KEY);
-          if (!raw) return freshState();
-          const data = JSON.parse(raw);
+          return raw ? parseState(JSON.parse(raw)) : freshState();
+        } catch (e) {
+          return freshState();
+        }
+      }
+
+      // Validates saved data (from this device or from the online copy)
+      function parseState(data) {
+        try {
           if (!data || !Array.isArray(data.categories) || !Array.isArray(data.expenses)) return freshState();
           return {
             income: toNum(data.income),
@@ -252,8 +289,19 @@
         }
       }
 
-      function save() {
+      function saveLocal() {
         try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { /* storage unavailable */ }
+      }
+
+      // Every edit saves on this device right away and, when signed in, online shortly after.
+      function save() {
+        saveLocal();
+        hadLocalData = true;   // the person has typed something on this device
+        if (user) {
+          dirty = true;
+          writeMeta({ owner: user.id, dirty: true });
+          schedulePush();
+        }
       }
 
       const monthExpenses = () => state.expenses.filter((e) => e.date && e.date.slice(0, 7) === selectedMonth);
@@ -296,11 +344,13 @@
       }
 
       // In-page confirmation. Browser confirm() dialogs are blocked in many viewers.
-      function askConfirm(message, okLabel = 'OK') {
+      function askConfirm(message, okLabel = 'OK', cancelLabel = 'Cancel', okClass = 'bg-red-600 hover:bg-red-500') {
         return new Promise((resolve) => {
           const box = $('confirmBox');
           $('confirmMsg').textContent = message;
           $('confirmOk').textContent = okLabel;
+          $('confirmCancel').textContent = cancelLabel;
+          $('confirmOk').className = 'rounded-md text-white px-3 py-1.5 text-sm font-medium ' + okClass;
           box.hidden = false;
           $('confirmOk').focus();
           const done = (answer) => {
@@ -330,6 +380,186 @@
         } catch (e) {
           return false;
         }
+      }
+
+      // ---------- Online saving (Supabase) ----------
+      const META_KEY = STORAGE_KEY + '.sync';   // { owner: userId, dirty: bool } for this device's copy
+      const cfg = window.BUDGET_CONFIG || {};
+      const sb = cfg.supabaseUrl && cfg.supabaseAnonKey && window.supabase
+        ? window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey)
+        : null;
+      let user = null;
+      let remoteLoaded = false;   // never push until the online copy has been read, so it can't be overwritten blindly
+      let dirty = false;
+      let pushTimer = null;
+      let retryTimer = null;
+
+      function readMeta() { try { return JSON.parse(localStorage.getItem(META_KEY)) || {}; } catch (e) { return {}; } }
+      function writeMeta(m) { try { localStorage.setItem(META_KEY, JSON.stringify(m)); } catch (e) { /* storage unavailable */ } }
+
+      function setSync(status) {
+        const text = {
+          local: 'Saved on this device only',
+          loading: 'Loading your online budget…',
+          saving: 'Saving…',
+          saved: 'Saved online \u2713',
+          error: 'Couldn\u2019t save online. Retrying. Your numbers are kept on this device.',
+          offline: 'Offline. Will save online when you reconnect.',
+        }[status];
+        const color = { saved: 'text-emerald-300', error: 'text-amber-300', offline: 'text-amber-300' }[status] || 'text-slate-400';
+        $('syncStatus').textContent = text;
+        $('syncStatus').className = color;
+      }
+
+      function showAccount() {
+        $('acctEmail').hidden = !user;
+        $('acctEmail').textContent = user ? '\u00b7 ' + user.email : '';
+        $('signOutBtn').hidden = !user;
+        $('signInOpenBtn').hidden = !sb || !!user || !$('authPanel').hidden;
+        $('storageWarn').hidden = !!user || storageWorks();
+      }
+
+      function showAuth(visible) {
+        $('authPanel').hidden = !visible;
+        showAccount();
+        if (visible) $('authEmail').focus();
+      }
+
+      function schedulePush() {
+        if (!user || !remoteLoaded) return;
+        clearTimeout(pushTimer);
+        setSync('saving');
+        pushTimer = setTimeout(push, 700);
+      }
+
+      async function push() {
+        clearTimeout(pushTimer);
+        pushTimer = null;
+        if (!user || !remoteLoaded) return;
+        const snapshot = JSON.stringify(state);
+        const { error } = await sb.from('home_budgets')
+          .upsert({ user_id: user.id, data: JSON.parse(snapshot) }, { onConflict: 'user_id' });
+        if (error) {
+          setSync(navigator.onLine === false ? 'offline' : 'error');
+          clearTimeout(retryTimer);
+          retryTimer = setTimeout(push, 15000);
+          return;
+        }
+        // Only clear the flag if nothing changed while the save was in flight
+        if (JSON.stringify(state) === snapshot) {
+          dirty = false;
+          writeMeta({ owner: user.id, dirty: false });
+          setSync('saved');
+        } else {
+          schedulePush();
+        }
+      }
+
+      async function fetchRemote() {
+        const { data, error } = await sb.from('home_budgets').select('data').eq('user_id', user.id).maybeSingle();
+        if (error) throw error;
+        return data ? data.data : null;
+      }
+
+      // Picks up changes made on another device when you come back to this page
+      async function pull() {
+        if (!user || !remoteLoaded || dirty || pushTimer) return;
+        try {
+          const remote = await fetchRemote();
+          if (!remote || dirty) return;
+          if (JSON.stringify(parseState(remote)) === JSON.stringify(state)) return;
+          state = parseState(remote);
+          editingId = null;
+          saveLocal();
+          renderAll();
+        } catch (e) { /* keep showing this device's copy */ }
+      }
+
+      async function onSignedIn(u) {
+        user = u;
+        remoteLoaded = false;
+        showAuth(false);
+        setSync('loading');
+        let remote;
+        try {
+          remote = await fetchRemote();
+        } catch (e) {
+          setSync(navigator.onLine === false ? 'offline' : 'error');
+          toast('Couldn\u2019t load your online budget. Showing this device\u2019s copy; it will retry.');
+          clearTimeout(retryTimer);
+          retryTimer = setTimeout(() => { if (user && !remoteLoaded) onSignedIn(user); }, 15000);
+          return;
+        }
+        const meta = readMeta();
+        const localBelongsToOther = meta.owner && meta.owner !== u.id;
+        // Numbers typed on this device that were never saved online (before sign-in, or while offline)
+        const localUnsaved = hadLocalData && !localBelongsToOther && (meta.owner !== u.id || meta.dirty);
+        let pushLocal = false;
+        if (localBelongsToOther) {
+          state = remote ? parseState(remote) : freshState();
+          pushLocal = !remote;
+        } else if (!remote) {
+          pushLocal = true;   // first sign-in: upload this device's numbers
+        } else if (localUnsaved && JSON.stringify(parseState(remote)) !== JSON.stringify(state)) {
+          if (meta.owner === u.id) {
+            pushLocal = true;   // your own edits made while offline
+          } else {
+            pushLocal = await askConfirm(
+              'This device has budget numbers that aren\u2019t in your online budget. Which do you want to keep? The other copy will be replaced.',
+              'Keep this device\u2019s numbers', 'Keep online budget', 'bg-sky-600 hover:bg-sky-500');
+            if (!pushLocal) state = parseState(remote);
+          }
+        } else {
+          state = parseState(remote);
+        }
+        remoteLoaded = true;
+        hadLocalData = true;
+        editingId = null;
+        saveLocal();
+        writeMeta({ owner: u.id, dirty: pushLocal });
+        renderAll();
+        if (pushLocal) { dirty = true; await push(); } else { dirty = false; setSync('saved'); }
+      }
+
+      async function signIn() {
+        const email = $('authEmail').value.trim();
+        const password = $('authPassword').value;
+        if (!email || !password) { $('authMsg').textContent = 'Enter your email and password.'; return; }
+        $('signInBtn').disabled = true;
+        $('authMsg').textContent = '';
+        try {
+          const { data, error } = await sb.auth.signInWithPassword({ email, password });
+          if (error) {
+            $('authMsg').textContent = /invalid/i.test(error.message)
+              ? 'That email and password don\u2019t match. Use the same login as the Orozco Homes app.'
+              : 'Couldn\u2019t sign in: ' + error.message;
+            return;
+          }
+          $('authPassword').value = '';
+          await onSignedIn(data.user);
+          toast('Signed in. Your budget now saves online.');
+        } catch (e) {
+          $('authMsg').textContent = 'Couldn\u2019t reach the server. Check your connection and try again.';
+        } finally {
+          $('signInBtn').disabled = false;
+        }
+      }
+
+      async function signOut() {
+        if (dirty) await push();
+        if (dirty && !(await askConfirm('Some changes haven\u2019t saved online yet. Sign out anyway and lose them?', 'Sign out'))) return;
+        try { await sb.auth.signOut(); } catch (e) { /* still clear this device */ }
+        user = null;
+        remoteLoaded = false;
+        dirty = false;
+        // Remove the copy from this device so the next person can't see it
+        try { localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(META_KEY); } catch (e) { /* storage unavailable */ }
+        hadLocalData = false;
+        state = freshState();
+        editingId = null;
+        renderAll();
+        setSync('local');
+        showAuth(true);
       }
 
       // ---------- Rendering ----------
@@ -715,7 +945,8 @@
       });
 
       $('resetBtn').addEventListener('click', async () => {
-        if (!(await askConfirm('Erase all income, categories and expenses and restore defaults?', 'Erase everything'))) return;
+        const where = user ? ' This erases your online budget on every device.' : '';
+        if (!(await askConfirm('Erase all income, categories and expenses and restore defaults?' + where, 'Erase everything'))) return;
         state = freshState();
         save();
         renderAll();
@@ -745,11 +976,29 @@
         URL.revokeObjectURL(a.href);
       });
 
+      $('signInBtn').addEventListener('click', signIn);
+      $('authForm').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); signIn(); } });
+      $('authSkipBtn').addEventListener('click', () => showAuth(false));
+      $('signInOpenBtn').addEventListener('click', () => showAuth(true));
+      $('signOutBtn').addEventListener('click', signOut);
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') pull();
+        else if (dirty) push();
+      });
+      window.addEventListener('online', () => { if (dirty) push(); });
+
       // ---------- Init ----------
-      $('storageWarn').hidden = storageWorks();
       $('monthPicker').value = selectedMonth;
       $('expDate').value = today();
       renderAll();
+      setSync('local');
+      showAccount();
+      if (sb) {
+        sb.auth.getSession().then(({ data }) => {
+          if (data && data.session) onSignedIn(data.session.user);
+          else showAuth(true);
+        }).catch(() => showAuth(true));
+      }
     })();
   </script>
 </body>
