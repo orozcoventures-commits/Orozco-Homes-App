@@ -128,7 +128,7 @@
         <!-- 3. Budget vs Actual -->
         <section class="bg-white rounded-xl shadow-sm p-5">
           <h2 class="text-lg font-semibold">3. Budget vs. Actual <span id="monthLabel" class="text-sm font-normal text-slate-500"></span></h2>
-          <p class="text-sm text-slate-500 mb-4">Actual is the total of the expenses you log. Use <span class="font-medium text-emerald-700">+ Add</span> to record spending in a category.</p>
+          <p class="text-sm text-slate-500 mb-4">Type what you actually spent in each <span class="font-medium text-slate-700">Actual</span> box. Expenses you log below are added in automatically.</p>
           <div class="overflow-x-auto">
             <table class="w-full text-sm">
               <thead>
@@ -136,8 +136,7 @@
                   <th class="py-2 pr-2 font-medium">Category</th>
                   <th class="py-2 px-2 font-medium text-right">Budgeted</th>
                   <th class="py-2 px-2 font-medium text-right">Actual</th>
-                  <th class="py-2 px-2 font-medium text-right">Variance</th>
-                  <th class="py-2 pl-2"><span class="sr-only">Add spending</span></th>
+                  <th class="py-2 pl-2 font-medium text-right">Variance</th>
                 </tr>
               </thead>
               <tbody id="summaryBody"></tbody>
@@ -219,7 +218,7 @@
       let state = load();
       let selectedMonth = today().slice(0, 7);
       let editingId = null;
-      let quickAddId = null;
+      let highlightId = null;
 
       // `income` and each category's `budget` are the defaults. `monthIncome[YYYY-MM]` and
       // `monthBudgets[YYYY-MM][categoryId]` override them for a single month.
@@ -230,6 +229,7 @@
           expenses: [],
           monthIncome: {},
           monthBudgets: {},
+          monthActuals: {},
         };
       }
 
@@ -245,6 +245,7 @@
             expenses: data.expenses,
             monthIncome: isObj(data.monthIncome) ? data.monthIncome : {},
             monthBudgets: isObj(data.monthBudgets) ? data.monthBudgets : {},
+            monthActuals: isObj(data.monthActuals) ? data.monthActuals : {},
           };
         } catch (e) {
           return freshState();
@@ -274,6 +275,19 @@
       function setIncomeOverride(value) {
         if (value === toNum(state.income)) delete state.monthIncome[selectedMonth];
         else state.monthIncome[selectedMonth] = value;
+      }
+
+      // Actual = amount typed into the Actual column + expenses logged in the ledger.
+      const typedActual = (id) => toNum((state.monthActuals[selectedMonth] || {})[id]);
+      function loggedTotals() {
+        const t = {};
+        monthExpenses().forEach((e) => { t[e.categoryId] = (t[e.categoryId] || 0) + e.amount; });
+        return t;
+      }
+      function setTypedActual(id, value) {
+        const month = state.monthActuals[selectedMonth] || (state.monthActuals[selectedMonth] = {});
+        if (value > 0) month[id] = value; else delete month[id];
+        if (!Object.keys(month).length) delete state.monthActuals[selectedMonth];
       }
 
       function renderCustomBadge() {
@@ -318,9 +332,6 @@
         }
       }
 
-      // Date for spending added from the summary table: today if viewing this month, else the 1st.
-      const quickAddDate = () => (today().slice(0, 7) === selectedMonth ? today() : selectedMonth + '-01');
-
       // ---------- Rendering ----------
       function renderCategorySetup() {
         $('categoryList').innerHTML = state.categories.map((c) => `
@@ -350,15 +361,16 @@
       }
 
       function computeRows() {
-        const actuals = {};
-        monthExpenses().forEach((e) => { actuals[e.categoryId] = (actuals[e.categoryId] || 0) + e.amount; });
-        const rows = state.categories.map((c) => ({
-          id: c.id, name: c.name, budget: effectiveBudget(c), actual: actuals[c.id] || 0,
-        }));
+        const logged = loggedTotals();
+        const rows = state.categories.map((c) => {
+          const typed = typedActual(c.id);
+          const fromLedger = logged[c.id] || 0;
+          return { id: c.id, name: c.name, budget: effectiveBudget(c), typed, logged: fromLedger, actual: typed + fromLedger };
+        });
         // Expenses whose category was deleted
-        const orphan = Object.keys(actuals).filter((id) => !state.categories.some((c) => c.id === id))
-          .reduce((s, id) => s + actuals[id], 0);
-        if (orphan > 0) rows.push({ id: '_orphan', name: 'Uncategorized', budget: 0, actual: orphan });
+        const orphan = Object.keys(logged).filter((id) => !state.categories.some((c) => c.id === id))
+          .reduce((s, id) => s + logged[id], 0);
+        if (orphan > 0) rows.push({ id: '_orphan', name: 'Uncategorized', budget: 0, typed: 0, logged: orphan, actual: orphan });
         return rows;
       }
 
@@ -369,38 +381,51 @@
           : `<span class="text-red-600 font-medium">${fmt.format(-v)} over</span>`;
       }
 
-      function renderDashboard() {
-        const rows = computeRows();
-        const totalBudget = rows.reduce((s, r) => s + r.budget, 0);
-        const totalActual = rows.reduce((s, r) => s + r.actual, 0);
+      const rowClass = (r) => {
+        const over = r.budget - r.actual < -0.005;
+        return 'border-b border-slate-100 ' + (r.id === highlightId ? 'bg-amber-50' : over ? 'bg-red-50' : '');
+      };
+      const loggedNote = (r) => (r.logged > 0 && r.id !== '_orphan'
+        ? `includes ${fmt.format(r.logged)} from expense log` : '');
 
-        $('summaryBody').innerHTML = rows.map((r) => {
-          const v = r.budget - r.actual;
-          const rowBg = v < -0.005 ? 'bg-red-50' : '';
-          const canAdd = r.id !== '_orphan';
-          const action = !canAdd ? '' : r.id === quickAddId
-            ? `<div class="flex items-center justify-end gap-1" data-quick="${r.id}">
-                 <input type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="0.00" aria-label="Amount spent on ${escapeHtml(r.name)}"
-                        class="w-24 rounded-md border border-slate-300 px-2 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-                 <button type="button" data-quick-save="${r.id}" class="rounded-md bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-2 py-1">Add</button>
-                 <button type="button" data-quick-cancel="1" class="text-slate-400 hover:text-slate-600 text-xs px-1" aria-label="Cancel">&times;</button>
-               </div>`
-            : `<button type="button" data-quick-open="${r.id}" class="rounded-md border border-emerald-600 text-emerald-700 hover:bg-emerald-50 text-xs px-2 py-1 whitespace-nowrap">+ Add</button>`;
-          return `<tr class="border-b border-slate-100 ${rowBg}">
+      function actualCell(r) {
+        if (r.id === '_orphan') return `<span class="tabular-nums">${fmt.format(r.actual)}</span>`;
+        return `<div class="flex flex-col items-end gap-0.5">
+            <div class="relative">
+              <span class="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+              <input type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00"
+                     data-actual="${r.id}" value="${r.actual ? r.actual : ''}" aria-label="Actual spent on ${escapeHtml(r.name)}"
+                     class="w-28 rounded-md border border-slate-300 pl-5 pr-2 py-1 text-sm text-right tabular-nums focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+            </div>
+            <span class="text-[11px] text-slate-400" data-note="${r.id}">${loggedNote(r)}</span>
+          </div>`;
+      }
+
+      function renderSummaryBody(rows) {
+        $('summaryBody').innerHTML = rows.map((r) => `<tr class="${rowClass(r)}" data-row="${r.id}">
             <td class="py-2 pr-2">${escapeHtml(r.name)}</td>
             <td class="py-2 px-2 text-right tabular-nums">${fmt.format(r.budget)}</td>
-            <td class="py-2 px-2 text-right tabular-nums">${fmt.format(r.actual)}</td>
-            <td class="py-2 px-2 text-right tabular-nums">${varianceCell(v)}</td>
-            <td class="py-2 pl-2 text-right">${action}</td>
-          </tr>`;
-        }).join('') || `<tr><td colspan="5" class="py-4 text-center text-slate-400">Add a category to get started.</td></tr>`;
+            <td class="py-2 px-2 text-right">${actualCell(r)}</td>
+            <td class="py-2 pl-2 text-right tabular-nums" data-var="${r.id}">${varianceCell(r.budget - r.actual)}</td>
+          </tr>`).join('') || `<tr><td colspan="4" class="py-4 text-center text-slate-400">Add a category to get started.</td></tr>`;
+      }
+
+      function renderDashboard() {
+        const rows = computeRows();
+        renderSummaryBody(rows);
+        renderTotals(rows);
+      }
+
+      // Everything except the table rows, so typing in an Actual box keeps focus.
+      function renderTotals(rows) {
+        const totalBudget = rows.reduce((s, r) => s + r.budget, 0);
+        const totalActual = rows.reduce((s, r) => s + r.actual, 0);
 
         $('summaryFoot').innerHTML = `<tr class="font-semibold border-t-2 border-slate-300">
           <td class="py-2 pr-2">Total</td>
           <td class="py-2 px-2 text-right tabular-nums">${fmt.format(totalBudget)}</td>
           <td class="py-2 px-2 text-right tabular-nums">${fmt.format(totalActual)}</td>
-          <td class="py-2 px-2 text-right tabular-nums">${varianceCell(totalBudget - totalActual)}</td>
-          <td></td>
+          <td class="py-2 pl-2 text-right tabular-nums">${varianceCell(totalBudget - totalActual)}</td>
         </tr>`;
 
         // Chart
@@ -491,7 +516,6 @@
 
       function switchMonth(ym) {
         selectedMonth = ym;
-        quickAddId = null;
         $('monthPicker').value = ym;
         renderAll();
       }
@@ -544,9 +568,11 @@
           : `Remove "${cat.name}"?`;
         if (!(await askConfirm(msg, 'Remove'))) return;
         state.categories = state.categories.filter((c) => c.id !== id);
-        Object.keys(state.monthBudgets).forEach((m) => {
-          delete state.monthBudgets[m][id];
-          if (!Object.keys(state.monthBudgets[m]).length) delete state.monthBudgets[m];
+        ['monthBudgets', 'monthActuals'].forEach((key) => {
+          Object.keys(state[key]).forEach((m) => {
+            delete state[key][m][id];
+            if (!Object.keys(state[key][m]).length) delete state[key][m];
+          });
         });
         save();
         renderAll();
@@ -556,11 +582,21 @@
         const name = $('newCategoryName').value.trim();
         if (!name) { $('newCategoryName').focus(); return; }
         state.categories.push({ id: uid(), name, budget: toNum($('newCategoryBudget').value) });
+        const id = state.categories[state.categories.length - 1].id;
         $('newCategoryName').value = '';
         $('newCategoryBudget').value = '';
         save();
+        highlightId = id;
         renderAll();
-        toast(`Added ${name}`);
+        toast(`Added ${name} to Budget vs. Actual`);
+        const row = document.querySelector(`[data-row="${CSS.escape(id)}"]`);
+        if (row) row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        setTimeout(() => {
+          highlightId = null;
+          const r = computeRows().find((x) => x.id === id);
+          const el = document.querySelector(`[data-row="${CSS.escape(id)}"]`);
+          if (el && r) el.className = rowClass(r);
+        }, 3000);
       }
       $('addCategoryBtn').addEventListener('click', addCategory);
       $('addCategoryForm').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addCategory(); } });
@@ -594,35 +630,35 @@
         if (e.key === 'Enter' && e.target.tagName !== 'SELECT') { e.preventDefault(); addExpense(); }
       });
 
-      // Quick add from the Budget vs. Actual table
-      function quickAdd(categoryId) {
-        const input = document.querySelector(`[data-quick="${CSS.escape(categoryId)}"] input`);
-        const amount = input ? toNum(input.value) : 0;
-        if (!amount) { if (input) { input.focus(); input.classList.add('ring-2', 'ring-red-500'); } return; }
-        logExpense(categoryId, amount, quickAddDate(), '');
-        quickAddId = null;
-        refresh();
-        toast(`Added ${fmt.format(amount)} to ${categoryName(categoryId)}`);
+      // Typing in an Actual box
+      function readActualBox(input) {
+        const id = input.dataset.actual;
+        const logged = loggedTotals()[id] || 0;
+        const total = toNum(input.value);
+        setTypedActual(id, Math.max(0, Math.round((total - logged) * 100) / 100));
+        return { id, logged, total };
       }
-      $('summaryBody').addEventListener('click', (e) => {
-        const d = e.target.dataset;
-        if (d.quickOpen) {
-          quickAddId = d.quickOpen;
-          renderDashboard();
-          const input = document.querySelector('[data-quick] input');
-          if (input) input.focus();
-        } else if (d.quickSave) {
-          quickAdd(d.quickSave);
-        } else if (d.quickCancel) {
-          quickAddId = null;
-          renderDashboard();
-        }
+
+      $('summaryBody').addEventListener('input', (e) => {
+        if (!e.target.dataset.actual) return;
+        const { id, logged, total } = readActualBox(e.target);
+        save();
+        const rows = computeRows();
+        const r = rows.find((x) => x.id === id);
+        e.target.closest('tr').className = rowClass(r);
+        document.querySelector(`[data-var="${CSS.escape(id)}"]`).innerHTML = varianceCell(r.budget - r.actual);
+        document.querySelector(`[data-note="${CSS.escape(id)}"]`).textContent = total < logged - 0.005
+          ? `Logged expenses already total ${fmt.format(logged)}. Edit them in the log to go lower.`
+          : loggedNote(r);
+        renderTotals(rows);
+      });
+
+      // On leaving the box, show the real total (never below what's logged)
+      $('summaryBody').addEventListener('change', (e) => {
+        if (e.target.dataset.actual) renderDashboard();
       });
       $('summaryBody').addEventListener('keydown', (e) => {
-        const wrap = e.target.closest('[data-quick]');
-        if (!wrap) return;
-        if (e.key === 'Enter') { e.preventDefault(); quickAdd(wrap.dataset.quick); }
-        if (e.key === 'Escape') { quickAddId = null; renderDashboard(); }
+        if (e.target.dataset.actual && e.key === 'Enter') { e.preventDefault(); e.target.blur(); }
       });
 
       $('ledgerBody').addEventListener('click', async (e) => {
@@ -688,8 +724,14 @@
       $('exportBtn').addEventListener('click', () => {
         const q = (s) => `"${String(s).replace(/"/g, '""')}"`;
         const lines = [['Date', 'Category', 'Description', 'Amount'].join(',')];
-        state.expenses.slice().sort((a, b) => a.date.localeCompare(b.date)).forEach((e) => {
-          lines.push([e.date, q(categoryName(e.categoryId)), q(e.description || ''), e.amount.toFixed(2)].join(','));
+        const rowsOut = state.expenses.map((e) => [e.date, categoryName(e.categoryId), e.description || '', e.amount]);
+        Object.keys(state.monthActuals).forEach((m) => {
+          Object.keys(state.monthActuals[m]).forEach((id) => {
+            rowsOut.push([m + '-01', categoryName(id), 'Entered in Actual column (' + monthName(m) + ')', toNum(state.monthActuals[m][id])]);
+          });
+        });
+        rowsOut.sort((a, b) => a[0].localeCompare(b[0])).forEach(([d, c, desc, amt]) => {
+          lines.push([d, q(c), q(desc), amt.toFixed(2)].join(','));
         });
         const csv = lines.join('\n');
         if (navigator.clipboard) {
