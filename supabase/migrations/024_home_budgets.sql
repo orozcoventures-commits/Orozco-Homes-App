@@ -13,7 +13,18 @@ CREATE TABLE IF NOT EXISTS public.home_budgets (
 
 ALTER TABLE public.home_budgets ENABLE ROW LEVEL SECURITY;
 
--- Auto-update updated_at on every write (reuses existing set_updated_at())
+-- Auto-update updated_at on every write. set_updated_at() is identical to the one
+-- in 001_initial_schema.sql; redefined here so this file also runs on a new project.
+CREATE OR REPLACE FUNCTION public.set_updated_at()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$;
+
 DROP TRIGGER IF EXISTS home_budgets_set_updated_at ON public.home_budgets;
 CREATE TRIGGER home_budgets_set_updated_at
   BEFORE UPDATE ON public.home_budgets
