@@ -279,10 +279,17 @@ export const REMODEL_CONFIGS = {
         items: [],
       },
       {
-        key: 'div2', num: '2', label: 'Rough-In Trades',
+        key: 'div2', num: '2', label: 'Plumbing Rough-In',
         items: [
           { wbs: '2.1', label: 'Plumbing Rough-In',                 unit: 'flat', rates: { standard: 1800,  mid: 2600,  custom: 3800  } },
-          { wbs: '2.2', label: 'Electrical Circuits',               unit: 'flat', rates: { standard: 1400,  mid: 2000,  custom: 3200  } },
+        ],
+      },
+      {
+        // Electrical, split out of "Rough-In Trades". The line keeps wbs '2.2'
+        // so saved amounts and actual costs stay on it; it shows as E.1.
+        key: 'divE', num: 'E', label: 'Electrical Rough-In',
+        items: [
+          { wbs: '2.2', badge: 'E.1', label: 'Electrical Circuits',               unit: 'flat', rates: { standard: 1400,  mid: 2000,  custom: 3200  } },
         ],
       },
       {
@@ -346,10 +353,17 @@ export const REMODEL_CONFIGS = {
         items: [],
       },
       {
-        key: 'div2', num: '2', label: 'Rough-In Trades',
+        key: 'div2', num: '2', label: 'Plumbing Rough-In',
         items: [
           { wbs: '2.1', label: 'Plumbing Rough-In',                 unit: 'flat', rates: { standard: 1800,  mid: 2600,  custom: 3800  } },
-          { wbs: '2.2', label: 'Electrical Circuits',               unit: 'flat', rates: { standard: 1400,  mid: 2000,  custom: 3200  } },
+        ],
+      },
+      {
+        // Electrical, split out of "Rough-In Trades". The line keeps wbs '2.2'
+        // so saved amounts and actual costs stay on it; it shows as E.1.
+        key: 'divE', num: 'E', label: 'Electrical Rough-In',
+        items: [
+          { wbs: '2.2', badge: 'E.1', label: 'Electrical Circuits',               unit: 'flat', rates: { standard: 1400,  mid: 2000,  custom: 3200  } },
         ],
       },
       {
@@ -414,10 +428,17 @@ export const REMODEL_CONFIGS = {
         items: [],
       },
       {
-        key: 'div2', num: '2', label: 'Rough-In Trades',
+        key: 'div2', num: '2', label: 'Plumbing Rough-In',
         items: [
           { wbs: '2.1', label: 'Plumbing Rough-In',                 unit: 'flat', rates: { standard: 1800,  mid: 2600,  custom: 3800  } },
-          { wbs: '2.2', label: 'Electrical Circuits',               unit: 'flat', rates: { standard: 1400,  mid: 2000,  custom: 3200  } },
+        ],
+      },
+      {
+        // Electrical, split out of "Rough-In Trades". The line keeps wbs '2.2'
+        // so saved amounts and actual costs stay on it; it shows as E.1.
+        key: 'divE', num: 'E', label: 'Electrical Rough-In',
+        items: [
+          { wbs: '2.2', badge: 'E.1', label: 'Electrical Circuits',               unit: 'flat', rates: { standard: 1400,  mid: 2000,  custom: 3200  } },
         ],
       },
       {
