@@ -47,6 +47,13 @@ export const REMODEL_CONFIGS = {
         ],
       },
       {
+        // Framing — starts empty; lines are added per budget with "+ Add line item".
+        // Keyed 'divF' / 'F' so the existing divisions keep their numbers (and
+        // every saved amount and actual cost keyed by those numbers).
+        key: 'divF', num: 'F', label: 'Framing',
+        items: [],
+      },
+      {
         key: 'div2', num: '2', label: 'Plumbing & Electrical Rough-In',
         items: [
           { wbs: '2.1', label: 'Plumbing Rough-In',                 unit: 'flat',   rates: { standard: 2500,  mid: 3400,  custom: 5000  } },
@@ -105,6 +112,13 @@ export const REMODEL_CONFIGS = {
           { wbs: '1.2', label: 'Waterproofing Membrane',            unit: 'sqft',   rates: { standard:  5,    mid:  7,    custom:  9    } },
           { wbs: '1.3', label: 'Cement Board & Drywall Prep',       unit: 'sqft',   rates: { standard:  5.50, mid:  7,    custom:  9    } },
         ],
+      },
+      {
+        // Framing — starts empty; lines are added per budget with "+ Add line item".
+        // Keyed 'divF' / 'F' so the existing divisions keep their numbers (and
+        // every saved amount and actual cost keyed by those numbers).
+        key: 'divF', num: 'F', label: 'Framing',
+        items: [],
       },
       {
         key: 'div2', num: '2', label: 'Plumbing & Electrical Rough-In',
@@ -166,6 +180,13 @@ export const REMODEL_CONFIGS = {
           { wbs: '1.2', label: 'Waterproofing Membrane',            unit: 'sqft',   rates: { standard:  5,    mid:  7,    custom:  9    } },
           { wbs: '1.3', label: 'Cement Board & Drywall Prep',       unit: 'sqft',   rates: { standard:  5.50, mid:  7,    custom:  9    } },
         ],
+      },
+      {
+        // Framing — starts empty; lines are added per budget with "+ Add line item".
+        // Keyed 'divF' / 'F' so the existing divisions keep their numbers (and
+        // every saved amount and actual cost keyed by those numbers).
+        key: 'divF', num: 'F', label: 'Framing',
+        items: [],
       },
       {
         key: 'div2', num: '2', label: 'Plumbing & Electrical Rough-In',
@@ -230,6 +251,13 @@ export const REMODEL_CONFIGS = {
         ],
       },
       {
+        // Framing — starts empty; lines are added per budget with "+ Add line item".
+        // Keyed 'divF' / 'F' so the existing divisions keep their numbers (and
+        // every saved amount and actual cost keyed by those numbers).
+        key: 'divF', num: 'F', label: 'Framing',
+        items: [],
+      },
+      {
         key: 'div2', num: '2', label: 'Rough-In Trades',
         items: [
           { wbs: '2.1', label: 'Plumbing Rough-In',                 unit: 'flat', rates: { standard: 1800,  mid: 2600,  custom: 3800  } },
@@ -288,6 +316,13 @@ export const REMODEL_CONFIGS = {
           { wbs: '1.1', label: 'Demo & Haul',                       unit: 'sqft', rates: { standard:  9,    mid: 11,    custom: 14    } },
           { wbs: '1.2', label: 'Drywall Repair & Prep',             unit: 'sqft', rates: { standard:  5,    mid:  6.50, custom:  8    } },
         ],
+      },
+      {
+        // Framing — starts empty; lines are added per budget with "+ Add line item".
+        // Keyed 'divF' / 'F' so the existing divisions keep their numbers (and
+        // every saved amount and actual cost keyed by those numbers).
+        key: 'divF', num: 'F', label: 'Framing',
+        items: [],
       },
       {
         key: 'div2', num: '2', label: 'Rough-In Trades',
@@ -349,6 +384,13 @@ export const REMODEL_CONFIGS = {
           { wbs: '1.1', label: 'Demo & Haul',                       unit: 'sqft', rates: { standard:  9,    mid: 11,    custom: 14    } },
           { wbs: '1.2', label: 'Drywall Repair & Prep',             unit: 'sqft', rates: { standard:  5,    mid:  6.50, custom:  8    } },
         ],
+      },
+      {
+        // Framing — starts empty; lines are added per budget with "+ Add line item".
+        // Keyed 'divF' / 'F' so the existing divisions keep their numbers (and
+        // every saved amount and actual cost keyed by those numbers).
+        key: 'divF', num: 'F', label: 'Framing',
+        items: [],
       },
       {
         key: 'div2', num: '2', label: 'Rough-In Trades',

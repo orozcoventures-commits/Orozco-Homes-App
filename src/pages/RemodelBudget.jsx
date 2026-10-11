@@ -39,6 +39,7 @@ const DIV_COLORS = {
   '3': { color: '#065F46', bg: '#ECFDF5', border: '#A7F3D0' },
   '4': { color: '#B45309', bg: '#FFFBEB', border: '#FDE68A' },
   '5': { color: '#C2410C', bg: '#FFF7ED', border: '#FDBA74' },
+  'F': { color: '#78350F', bg: '#FDF6EC', border: '#E7C9A0' },
   'M': { color: '#991B1B', bg: '#FEF2F2', border: '#FECACA' },
 };
 
