@@ -62,6 +62,57 @@ function defaultInputs(projectTypeId) {
   return Object.fromEntries(config.inputFields.map((f) => [f.key, f.default]));
 }
 
+// ── Custom line items (migration 050) ─────────────────────────────────────────
+// Each saved budget can rename or remove the built-in lines and add its own.
+// layout = { added: [{ id, div, label }], labels: { wbs: label }, removed: [wbs] }
+const EMPTY_LAYOUT = { added: [], labels: {}, removed: [] };
+const MAX_LABEL = 120;
+
+function normalizeLayout(raw) {
+  const l = raw && typeof raw === 'object' ? raw : {};
+  return {
+    added: (Array.isArray(l.added) ? l.added : [])
+      .filter((a) => a && typeof a.id === 'string' && typeof a.div === 'string')
+      .map((a) => ({ id: a.id, div: a.div, label: String(a.label ?? '').slice(0, MAX_LABEL) })),
+    labels: Object.fromEntries(Object.entries(l.labels && typeof l.labels === 'object' ? l.labels : {})
+      .filter(([, v]) => typeof v === 'string' && v.trim())
+      .map(([k, v]) => [k, v.slice(0, MAX_LABEL)])),
+    removed: (Array.isArray(l.removed) ? l.removed : []).filter((w) => typeof w === 'string'),
+  };
+}
+
+const layoutIsEmpty = (l) => !l.added.length && !l.removed.length && !Object.keys(l.labels).length;
+
+// The project type's built-in divisions with this budget's renamed, removed and
+// added lines applied. Margin/contingency lines can't be renamed or removed.
+function applyLayout(base, layout) {
+  if (!base) return base;
+  const removed = new Set(layout.removed);
+  return {
+    ...base,
+    divisions: base.divisions.map((div) => {
+      const lastNum = Math.max(0, ...div.items.map((it) => Number(String(it.wbs).split('.')[1]) || 0));
+      const builtIn = div.items.map((it) => ({
+        ...it,
+        badge: it.wbs,
+        originalLabel: it.label,
+        label: it.unit !== 'pct' && layout.labels[it.wbs] ? layout.labels[it.wbs] : it.label,
+      }));
+      const added = layout.added.filter((a) => a.div === div.key).map((a, i) => ({
+        wbs: a.id, label: a.label || 'New item', unit: 'flat', custom: true, badge: `${div.num}.${lastNum + i + 1}`,
+      }));
+      return {
+        ...div,
+        items: [...builtIn.filter((it) => !removed.has(it.wbs)), ...added],
+        removedItems: builtIn.filter((it) => removed.has(it.wbs)),
+      };
+    }),
+  };
+}
+
+const newLineId = () => `cu_${Math.random().toString(36).slice(2, 8)}${Date.now().toString(36).slice(-3)}`;
+const escHtml = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
 function allNonPctWbs(config) {
   const list = [];
   for (const div of config.divisions)
@@ -243,7 +294,80 @@ function ActualBreakdown({ parts, showUnsplit, onPartChange }) {
   );
 }
 
-function LineRow({ item, divStyle: ds, value, isOverridden, onChange, onReset, pctRate, onPctChange, isFirst, actualParts, showUnsplit, actualOpen, onToggleActual, onActualPartChange, showActuals, actualsDisabled }) {
+function LineName({ item, onRename }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  if (!editing) {
+    return (
+      <>
+        <span className="flex-1 text-sm truncate min-w-0" style={{ color: '#374151' }} title={item.label}>
+          {item.label}
+          {item.custom && <span className="ml-1.5 text-xs font-semibold" style={{ color: '#9CA3AF' }}>(added)</span>}
+          {!item.custom && item.originalLabel !== item.label && (
+            <span className="ml-1.5 text-xs" style={{ color: '#9CA3AF' }} title={`Originally: ${item.originalLabel}`}>(renamed)</span>
+          )}
+        </span>
+        {onRename && (
+          <button type="button" onClick={() => { setDraft(item.label); setEditing(true); }}
+            className="shrink-0 w-6 h-6 rounded-md text-xs flex items-center justify-center"
+            style={{ color: '#6B7280', border: '1px solid #E5E7EB', backgroundColor: '#fff' }}
+            aria-label={`Rename ${item.label}`} title="Rename">✎</button>
+        )}
+      </>
+    );
+  }
+  const save = () => { setEditing(false); const t = draft.trim(); if (t && t !== item.label) onRename(t); };
+  return (
+    <span className="flex-1 min-w-0 flex items-center gap-1">
+      <input autoFocus value={draft} maxLength={MAX_LABEL} onChange={(e) => setDraft(e.target.value)}
+        onBlur={save} onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false); }}
+        aria-label={`New name for ${item.label}`}
+        className="flex-1 min-w-0 px-2 py-1 rounded-md text-sm focus:outline-none" style={{ border: '1.5px solid #D4AF37', color: '#002147' }} />
+      {!item.custom && item.originalLabel !== item.label && (
+        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { setEditing(false); onRename(item.originalLabel); }}
+          className="shrink-0 text-xs underline" style={{ color: '#6B7280' }}>Original name</button>
+      )}
+    </span>
+  );
+}
+
+function AddLineForm({ div, ds, onAdd }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState('');
+  const [amount, setAmount] = useState('');
+  const submit = (e) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+    onAdd(name.trim().slice(0, MAX_LABEL), Number(amount.replace(/[^0-9]/g, '')) || 0);
+    setName(''); setAmount(''); setOpen(false);
+  };
+  if (!open) {
+    return (
+      <button type="button" onClick={() => setOpen(true)} className="w-full text-left px-4 py-2.5 text-xs font-bold"
+        style={{ borderTop: '1px solid #F3F4F6', color: ds.color }}>
+        + Add line item to {div.label}
+      </button>
+    );
+  }
+  return (
+    <form onSubmit={submit} className="flex flex-wrap items-center gap-2 px-4 py-2.5" style={{ borderTop: '1px solid #F3F4F6', backgroundColor: '#FAFAF8' }}>
+      <input autoFocus value={name} onChange={(e) => setName(e.target.value)} maxLength={MAX_LABEL}
+        placeholder="Item name (e.g. Heated floor)" aria-label={`New line item name for ${div.label}`}
+        className="flex-1 min-w-[180px] px-3 py-1.5 rounded-lg text-sm focus:outline-none" style={{ border: '1.5px solid #E5E7EB', color: '#002147' }} />
+      <div className="relative shrink-0" style={{ width: 110 }}>
+        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs pointer-events-none" style={{ color: '#9CA3AF' }}>$</span>
+        <input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ''))} inputMode="numeric"
+          placeholder="0" aria-label={`New line item amount for ${div.label}`}
+          className="w-full pl-6 pr-2 py-1.5 rounded-lg text-sm font-semibold text-right focus:outline-none" style={{ border: '1.5px solid #E5E7EB', color: '#002147' }} />
+      </div>
+      <button type="submit" disabled={!name.trim()} className="px-3 py-1.5 rounded-lg text-xs font-bold disabled:opacity-50"
+        style={{ backgroundColor: '#002147', color: '#D4AF37' }}>Add</button>
+      <button type="button" onClick={() => setOpen(false)} className="px-2 py-1.5 text-xs font-semibold" style={{ color: '#6B7280' }}>Cancel</button>
+    </form>
+  );
+}
+
+function LineRow({ item, divStyle: ds, value, isOverridden, onChange, onReset, pctRate, onPctChange, isFirst, actualParts, showUnsplit, actualOpen, onToggleActual, onActualPartChange, showActuals, actualsDisabled, onRename, onRemove }) {
   const actual = partsTotal(actualParts);
   const variance = value - actual;
   const hasActual = actual > 0;
@@ -254,11 +378,11 @@ function LineRow({ item, divStyle: ds, value, isOverridden, onChange, onReset, p
       {/* WBS badge */}
       <span className="text-xs font-bold w-8 text-center py-0.5 rounded shrink-0"
         style={{ backgroundColor: ds.bg, color: ds.color }}>
-        {item.wbs}
+        {item.badge ?? item.wbs}
       </span>
 
-      {/* Label */}
-      <span className="flex-1 text-sm truncate min-w-0" style={{ color: '#374151' }}>{item.label}</span>
+      {/* Label, with rename */}
+      <LineName item={item} onRename={onRename} />
 
       {/* Pct rate input (desktop only) */}
       {item.unit === 'pct' && item.pctKey && (
@@ -278,6 +402,13 @@ function LineRow({ item, divStyle: ds, value, isOverridden, onChange, onReset, p
 
       {/* Budgeted */}
       <DollarCell value={value} isOverridden={isOverridden} onChange={onChange} />
+
+      {/* Remove line */}
+      {onRemove ? (
+        <button type="button" onClick={onRemove} aria-label={`Remove ${item.label}`} title="Remove line"
+          className="shrink-0 w-6 h-6 rounded-md text-xs font-bold flex items-center justify-center"
+          style={{ color: '#DC2626', backgroundColor: '#FEF2F2', border: '1px solid #FECACA' }}>✕</button>
+      ) : <div className="w-6 shrink-0" />}
 
       {/* Actual (desktop) — the margin line has no actual spend */}
       {showActuals && (
@@ -494,6 +625,8 @@ export default function RemodelBudget() {
   const [userVals,       setUserVals]       = useState({});
   const [overrideFlags,  setOverrideFlags]  = useState({});
   const [openDivs,       setOpenDivs]       = useState({});
+  const [layout,         setLayout]         = useState(EMPTY_LAYOUT);  // added / renamed / removed lines
+  const [layoutError,    setLayoutError]    = useState('');
 
   // ── Actuals state ───────────────────────────────────────────────────────────
   const [actualParts,    setActualParts]    = useState({});   // { wbs: { material, labor, sub, unsplit } }
@@ -581,6 +714,7 @@ export default function RemodelBudget() {
       setPctRates(budget.pct_rates_json || DEFAULT_PCT_RATES);
       setUserVals(budget.overrides_json || {});
       setOverrideFlags(budget.flags_json || {});
+      setLayout(normalizeLayout(budget.layout_json));
       // Open all divisions
       const cfg = getProjectConfig(type);
       if (cfg) setOpenDivs(Object.fromEntries(cfg.divisions.map((d) => [d.key, true])));
@@ -613,6 +747,8 @@ export default function RemodelBudget() {
     setUserVals({});
     setOverrideFlags({});
     setOpenDivs({});
+    setLayout(EMPTY_LAYOUT);
+    setLayoutError('');
     setActualParts({});
     setUnsplitWbs(new Set());
     setOpenActual(null);
@@ -645,15 +781,24 @@ export default function RemodelBudget() {
       pct_rates_json: pctRates,
       overrides_json: userVals,
       flags_json:    overrideFlags,
+      layout_json:   layout,
     };
 
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(async () => {
       if (!savePayloadRef.current) return;
       setSaving(true);
-      const { error } = await supabase
+      let { error } = await supabase
         .from('remodel_budgets')
         .upsert(savePayloadRef.current, { onConflict: 'project_id' });
+      // Before migration 050 there is no layout_json column: save the rest.
+      if (error && /layout_json/.test(error.message ?? '')) {
+        const { layout_json, ...rest } = savePayloadRef.current;
+        ({ error } = await supabase.from('remodel_budgets').upsert(rest, { onConflict: 'project_id' }));
+        setLayoutError(layoutIsEmpty(layout_json) ? '' : 'Added, renamed and removed lines are not saved yet — run migration 050 in Supabase.');
+      } else {
+        setLayoutError('');
+      }
       setSaving(false);
       if (!error) setLastSaved(new Date());
     }, 1500);
@@ -667,6 +812,8 @@ export default function RemodelBudget() {
     JSON.stringify(inputs), JSON.stringify(pctRates),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     JSON.stringify(userVals), JSON.stringify(overrideFlags),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    JSON.stringify(layout),
   ]);
 
   // ── Save actual cost for one WBS line (debounced 800ms) ────────────────────
@@ -693,7 +840,8 @@ export default function RemodelBudget() {
   }
 
   // ── Derived config ──────────────────────────────────────────────────────────
-  const config = getProjectConfig(projectType);
+  // The project type's lines with this budget's added / renamed / removed lines.
+  const config = useMemo(() => applyLayout(getProjectConfig(projectType), layout), [projectType, layout]);
 
   const resolvedOpenDivs = useMemo(() => {
     if (!config) return {};
@@ -703,6 +851,9 @@ export default function RemodelBudget() {
 
   // ── Project type change ─────────────────────────────────────────────────────
   function changeProjectType(typeId) {
+    if (typeId !== projectType && !layoutIsEmpty(layout)
+      && !confirm('Changing the project type starts a new list of lines. Your added, renamed and removed lines will be cleared. Continue?')) return;
+    setLayout(EMPTY_LAYOUT);
     setProjectType(typeId);
     setInputs(defaultInputs(typeId));
     setPctRates(DEFAULT_PCT_RATES);
@@ -733,6 +884,7 @@ export default function RemodelBudget() {
     for (const div of config.divisions) {
       for (const item of div.items) {
         if (item.unit === 'pct') vals[item.wbs] = 0;
+        else if (item.custom) vals[item.wbs] = userVals[item.wbs] ?? 0;
         else vals[item.wbs] = overrideFlags[item.wbs]
           ? (userVals[item.wbs] ?? formulaVals[item.wbs] ?? 0)
           : (formulaVals[item.wbs] ?? 0);
@@ -799,12 +951,46 @@ export default function RemodelBudget() {
   // ── Event handlers ──────────────────────────────────────────────────────────
   function handleLineChange(wbs, num)  { setUserVals((p) => ({ ...p, [wbs]: num })); setOverrideFlags((p) => ({ ...p, [wbs]: true })); }
   function resetLine(wbs)              { setOverrideFlags((p) => ({ ...p, [wbs]: false })); setUserVals((p) => { const n = { ...p }; delete n[wbs]; return n; }); }
-  function resetAll()                  { setOverrideFlags({}); setUserVals({}); }
+  // Amounts of added lines are their own values, not overrides: keep them.
+  const isCustomWbs = (w) => layout.added.some((a) => a.id === w);
+  function resetAll() {
+    setOverrideFlags((p) => Object.fromEntries(Object.entries(p).filter(([w]) => isCustomWbs(w))));
+    setUserVals((p) => Object.fromEntries(Object.entries(p).filter(([w]) => isCustomWbs(w))));
+  }
+  function addLine(divKey, label, amount) {
+    const id = newLineId();
+    setLayout((l) => ({ ...l, added: [...l.added, { id, div: divKey, label }] }));
+    setUserVals((p) => ({ ...p, [id]: amount }));
+    setOverrideFlags((p) => ({ ...p, [id]: true }));
+  }
+  function renameLine(item, label) {
+    if (item.custom) setLayout((l) => ({ ...l, added: l.added.map((a) => (a.id === item.wbs ? { ...a, label } : a)) }));
+    else setLayout((l) => {
+      const labels = { ...l.labels };
+      if (label === item.originalLabel) delete labels[item.wbs]; else labels[item.wbs] = label;
+      return { ...l, labels };
+    });
+  }
+  function removeLine(item) {
+    if ((actualVals[item.wbs] ?? 0) > 0) {
+      alert(`"${item.label}" has actual costs recorded. Clear its actual costs first, then remove it.`);
+      return;
+    }
+    if (!confirm(`Remove "${item.label}" from this budget?${item.custom ? '' : ' You can restore it later.'}`)) return;
+    if (item.custom) {
+      setLayout((l) => ({ ...l, added: l.added.filter((a) => a.id !== item.wbs) }));
+      setUserVals((p) => { const n = { ...p }; delete n[item.wbs]; return n; });
+      setOverrideFlags((p) => { const n = { ...p }; delete n[item.wbs]; return n; });
+    } else {
+      setLayout((l) => ({ ...l, removed: [...new Set([...l.removed, item.wbs])] }));
+    }
+  }
+  function restoreLine(wbs) { setLayout((l) => ({ ...l, removed: l.removed.filter((w) => w !== wbs) })); }
   function setInput(key, val)          { setInputs((p) => ({ ...p, [key]: val })); }
   function setPctRate(key, val)        { setPctRates((p) => ({ ...p, [key]: val })); }
   function toggleDiv(key)              { setOpenDivs((p) => ({ ...p, [key]: !(resolvedOpenDivs[key] ?? true) })); }
 
-  const hasOverrides = Object.values(overrideFlags).some(Boolean);
+  const hasOverrides = Object.entries(overrideFlags).some(([w, on]) => on && !isCustomWbs(w));
   const showActuals  = !!currentProjectId && actualsOn;
   const actualByType = Object.entries(actualParts).reduce((acc, [wbs, p]) => {
     if (wbs === 'M.2') return acc;
@@ -931,7 +1117,7 @@ export default function RemodelBudget() {
     let changeOrdersHTML = '';
     if (approvedChangeOrders.length > 0) {
       // approved_by is the client's typed signature, so escape everything.
-      const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+      const esc = escHtml;
       const money = (n) => `${n < 0 ? '−' : '+'}$${Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
       const rows = approvedChangeOrders.map((co) => `
         <tr>
@@ -965,8 +1151,8 @@ export default function RemodelBudget() {
         const act = isMarginLine(item) ? 0 : (actualVals[item.wbs] ?? 0);
         const vari = val - act;
         wbsRowsHTML += `<tr>
-          <td class="wbs-code">${item.wbs}</td>
-          <td>${item.label}</td>
+          <td class="wbs-code">${escHtml(item.badge ?? item.wbs)}</td>
+          <td>${escHtml(item.label)}</td>
           <td class="amount">$${Math.round(val).toLocaleString('en-US')}</td>
           ${hasActuals ? `<td class="amount">${act > 0 ? '$' + Math.round(act).toLocaleString('en-US') : '—'}</td><td class="amount" style="color:${vari < 0 ? '#DC2626' : '#374151'}">${act > 0 ? (vari >= 0 ? '+' : '−') + '$' + Math.round(Math.abs(vari)).toLocaleString('en-US') : '—'}</td>` : ''}
         </tr>`;
@@ -1323,6 +1509,7 @@ export default function RemodelBudget() {
             <>
               <div className="w-14 hidden sm:block" />
               <div className="hidden sm:block text-xs font-bold uppercase tracking-wide text-center shrink-0" style={{ width: 110, color: '#6B7280' }}>Budgeted</div>
+              <div className="w-6 hidden sm:block shrink-0" />
               <div className="hidden sm:block text-xs font-bold uppercase tracking-wide text-center shrink-0" style={{ width: 110, color: '#0369A1' }}>Actual</div>
               <div className="hidden sm:block text-xs font-bold uppercase tracking-wide text-center shrink-0" style={{ width: 86, color: '#6B7280' }}>Variance</div>
             </>
@@ -1331,6 +1518,9 @@ export default function RemodelBudget() {
       )}
       {actualsError && (
         <p role="alert" className="px-4 mb-2 text-xs font-semibold" style={{ color: '#DC2626' }}>{actualsError}</p>
+      )}
+      {layoutError && (
+        <p role="alert" className="px-4 mb-2 text-xs font-semibold" style={{ color: '#DC2626' }}>{layoutError}</p>
       )}
 
       {/* Design Selections division */}
@@ -1418,7 +1608,7 @@ export default function RemodelBudget() {
                       item={item}
                       divStyle={ds}
                       value={lineVals[item.wbs] ?? 0}
-                      isOverridden={!!overrideFlags[item.wbs]}
+                      isOverridden={!item.custom && !!overrideFlags[item.wbs]}
                       onChange={(num) => handleLineChange(item.wbs, num)}
                       onReset={() => resetLine(item.wbs)}
                       pctRate={item.pctKey ? pctRates[item.pctKey] : null}
@@ -1431,8 +1621,26 @@ export default function RemodelBudget() {
                       onActualPartChange={handleActualPartChange}
                       showActuals={showActuals}
                       actualsDisabled={isMarginLine(item)}
+                      onRename={item.unit === 'pct' ? null : (label) => renameLine(item, label)}
+                      onRemove={item.unit === 'pct' ? null : () => removeLine(item)}
                     />
                   ))}
+
+                  {div.items.some((it) => it.unit === 'pct') ? null : (
+                    <AddLineForm div={div} ds={ds} onAdd={(label, amount) => addLine(div.key, label, amount)} />
+                  )}
+                  {div.removedItems?.length > 0 && (
+                    <div className="px-4 py-2 text-xs flex flex-wrap items-center gap-x-3 gap-y-1" style={{ borderTop: '1px solid #F3F4F6', color: '#9CA3AF' }}>
+                      <span>Removed:</span>
+                      {div.removedItems.map((it) => (
+                        <span key={it.wbs} className="flex items-center gap-1">
+                          <span style={{ textDecoration: 'line-through' }}>{it.label}</span>
+                          <button type="button" onClick={() => restoreLine(it.wbs)} className="font-bold underline" style={{ color: ds.color }}
+                            aria-label={`Restore ${it.label}`}>Restore</button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
 
                   {/* Division subtotal */}
                   <div className="flex items-center justify-between px-4 py-3"
