@@ -40,6 +40,7 @@ const DIV_COLORS = {
   '4': { color: '#B45309', bg: '#FFFBEB', border: '#FDE68A' },
   '5': { color: '#C2410C', bg: '#FFF7ED', border: '#FDBA74' },
   'F': { color: '#78350F', bg: '#FDF6EC', border: '#E7C9A0' },
+  'E': { color: '#A16207', bg: '#FEFCE8', border: '#FDE047' },
   'M': { color: '#991B1B', bg: '#FEF2F2', border: '#FECACA' },
 };
 
@@ -92,10 +93,10 @@ function applyLayout(base, layout) {
   return {
     ...base,
     divisions: base.divisions.map((div) => {
-      const lastNum = Math.max(0, ...div.items.map((it) => Number(String(it.wbs).split('.')[1]) || 0));
+      const lastNum = Math.max(0, ...div.items.map((it) => Number(String(it.badge ?? it.wbs).split('.')[1]) || 0));
       const builtIn = div.items.map((it) => ({
         ...it,
-        badge: it.wbs,
+        badge: it.badge ?? it.wbs,
         originalLabel: it.label,
         label: it.unit !== 'pct' && layout.labels[it.wbs] ? layout.labels[it.wbs] : it.label,
       }));
