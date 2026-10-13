@@ -391,3 +391,15 @@ document.addEventListener('keydown', (e) => {
     closePresentationModal();
   }
 });
+
+// ---------- Community Values collapse/expand ----------
+const valuesToggle = document.getElementById('valuesToggle');
+const valuesDetail = document.getElementById('valuesDetail');
+const valuesToggleIcon = document.getElementById('valuesToggleIcon');
+
+valuesToggle?.addEventListener('click', () => {
+  const expanded = valuesDetail.hidden;
+  valuesDetail.hidden = !expanded;
+  valuesToggle.setAttribute('aria-expanded', String(expanded));
+  if (valuesToggleIcon) valuesToggleIcon.innerHTML = expanded ? ' &#9652;' : ' &#9662;';
+});
