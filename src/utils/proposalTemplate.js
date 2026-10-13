@@ -173,7 +173,7 @@ export function proposalDefaults(template = null) {
 
 // Puts budget text (overview, scope, materials) into the matching sections,
 // adding a section when the template doesn't have one.
-export function applyPrefillToSections(sections, { project_overview, scope_of_work, materials_included }) {
+export function applyPrefillToSections(sections, { project_overview, scope_of_work, materials_included, allowances }) {
   const next = copySections(sections);
   const put = (id, title, body, afterId) => {
     if (!body) return;
@@ -188,6 +188,7 @@ export function applyPrefillToSections(sections, { project_overview, scope_of_wo
     const items = materials_included.split('\n').map((l) => l.trim()).filter(Boolean).map((l) => `- ${l.replace(/^[-*•]\s*/, '')}`);
     put('materials', 'Materials Included', ['(Based on allowances)', ...items].join('\n'), 'scope');
   }
+  put('allowances', 'Allowances', allowances, 'materials');
   return next;
 }
 
@@ -296,12 +297,13 @@ export function proposalToContractValues(v) {
   if (scope?.body) scopeParts.push(sectionToPlainText(scope.body, v));
   // Sections the admin added to this proposal (Permits, Exclusions, …).
   for (const s of sections) {
-    if (s.kind !== 'text' || !s.body || RETAINER_ONLY_SECTIONS.has(s.id) || ['overview', 'scope', 'materials'].includes(s.id)) continue;
+    if (s.kind !== 'text' || !s.body || RETAINER_ONLY_SECTIONS.has(s.id) || ['overview', 'scope', 'materials', 'allowances'].includes(s.id)) continue;
     const text = sectionToPlainText(s.body, v);
     if (text) scopeParts.push(s.title ? `${s.title.toUpperCase()}\n${text}` : text);
   }
 
   const materials = byId('materials');
+  const allowances = byId('allowances');
   return {
     client_name:     (v.client_name || '').trim(),
     client_email:    (v.client_email || '').trim(),
@@ -311,11 +313,12 @@ export function proposalToContractValues(v) {
     project_type:    (v.project_title || '').trim(),
     scope_of_work:   scopeParts.filter(Boolean).join('\n\n'),
     materials_spec:  materials?.body ? sectionToPlainText(materials.body, v) : '',
+    allowances:      allowances?.body ? sectionToPlainText(allowances.body, v) : '',
   };
 }
 
 // Keys a proposal may fill on the contract (no prices or dates).
 export const PROPOSAL_TO_CONTRACT_KEYS = [
   'client_name', 'client_email', 'client_phone', 'client_address', 'project_address',
-  'project_type', 'scope_of_work', 'materials_spec',
+  'project_type', 'scope_of_work', 'materials_spec', 'allowances',
 ];
