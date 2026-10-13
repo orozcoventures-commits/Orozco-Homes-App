@@ -97,8 +97,9 @@ function defaultInputs(projectTypeId) {
 
 // ── Custom line items (migration 050) ─────────────────────────────────────────
 // Each saved budget can rename or remove the built-in lines and add its own.
-// layout = { added: [{ id, div, label }], labels: { wbs: label }, removed: [wbs] }
-const EMPTY_LAYOUT = { added: [], labels: {}, removed: [] };
+// layout = { added: [{ id, div, label }], labels: { wbs: label }, removed: [wbs],
+//            splits: { wbs: { m, o } } }   (cost breakdown %, see below)
+const EMPTY_LAYOUT = { added: [], labels: {}, removed: [], splits: {} };
 const MAX_LABEL = 120;
 
 function normalizeLayout(raw) {
@@ -111,8 +112,52 @@ function normalizeLayout(raw) {
       .filter(([, v]) => typeof v === 'string' && v.trim())
       .map(([k, v]) => [k, v.slice(0, MAX_LABEL)])),
     removed: (Array.isArray(l.removed) ? l.removed : []).filter((w) => typeof w === 'string'),
+    splits: Object.fromEntries(Object.entries(l.splits && typeof l.splits === 'object' ? l.splits : {})
+      .filter(([, v]) => v && typeof v === 'object')
+      .map(([k, v]) => [k, clampSplit(v)])),
   };
 }
+
+// ── Cost breakdown: Materials / Subcontract / Other (fees) ────────────────────
+// Each line's budget is split by percentage. Subcontract is whatever is left
+// after Materials and Other. Defaults come from the line's name and can be
+// changed per line (saved in layout.splits). Internal only — never sent to
+// proposals or contracts.
+const COST_TYPES = [
+  { key: 'm', label: 'Materials',    color: '#B45309' },
+  { key: 's', label: 'Subcontract',  color: '#0369A1' },
+  { key: 'o', label: 'Other / Fees', color: '#6B7280' },
+];
+
+function clampSplit(v) {
+  const m = Math.min(100, Math.max(0, Math.round(Number(v?.m) || 0)));
+  const o = Math.min(100 - m, Math.max(0, Math.round(Number(v?.o) || 0)));
+  return { m, o };
+}
+
+// First matching rule wins: [pattern, materials %, other %].
+const SPLIT_RULES = [
+  [/permit|engineering|asbestos test|inspection/i,                                0, 100],
+  [/demo|tear-out|remov|haul|scrape|debris/i,                                      5,  10],
+  [/protection|masking|dust/i,                                                    30,   0],
+  [/drying|dehumidification|mold treatment/i,                                     15,   0],
+  [/final set|hookup|reconnect|^install|fixture swap|relocat|widen|adjustment/i, 10,   0],
+  [/vanity|toilet|faucet|mirror|medicine|accessor|fixture|appliance|cabinet|countertop|desktop|hardware|\btub\b|sink|glass|door unit|vinyl window|dehumidifier \(|mini-split|pendant|lighting|grab bar|shelving|drawers|railing|newel|trim kit|lockset|screen door|closet|egress window|island cabinets/i, 75, 0],
+  [/rough-in|plumbing|electrical|circuit|outlet|switch|hvac|drain|valve|gas|data/i, 30,  0],
+  [/tile|backsplash|pan|waterproof|cement board/i,                               45,   0],
+  [/floor|lvp|hardwood|subfloor/i,                                                55,   0],
+  [/frame|framing|joist|beam|footing|post|sheathing|blocking|infill|structural|foundation|slab|shoring/i, 45, 0],
+  [/drywall|skim|ceiling/i,                                                       30,   0],
+  [/paint|stain|caulk/i,                                                          20,   0],
+  [/insulation|spray foam|vapor barrier|housewrap|encapsul|seal/i,                50,   0],
+  [/siding|roof|soffit|fascia|deck|trim|molding|baseboard|casing|crown|wainscot|bench|stair|tread|screen|window|door/i, 45, 0],
+];
+function defaultCostSplit(label) {
+  const rule = SPLIT_RULES.find(([re]) => re.test(label ?? ''));
+  return rule ? { m: rule[1], o: rule[2] } : { m: 50, o: 0 };
+}
+const lineSplit = (item, layout) => layout.splits?.[item.wbs] ?? defaultCostSplit(item.originalLabel ?? item.label);
+const splitAmounts = (value, sp) => ({ m: value * sp.m / 100, o: value * sp.o / 100, s: value * (100 - sp.m - sp.o) / 100 });
 
 const layoutIsEmpty = (l) => !l.added.length && !l.removed.length && !Object.keys(l.labels).length;
 
@@ -274,15 +319,18 @@ function PctCell({ value, onChange, label }) {
 
 // ── Line row — triple-column layout ──────────────────────────────────────────
 
-// Actual costs are entered by type (migration 037). `unsplit` holds an older
-// total that was saved before the split existed.
+// Actual costs are entered by type: Materials, Subcontract and Other / Fees
+// (migrations 037 and 051). `labor` holds amounts entered under the earlier
+// "Labor" box (counted as Subcontract); `unsplit` an older total saved before
+// the split existed.
 const ACTUAL_TYPES = [
-  { key: 'material', label: 'Material',      column: 'material_cost' },
-  { key: 'labor',    label: 'Labor',         column: 'labor_cost'    },
-  { key: 'sub',      label: 'Subcontractor', column: 'sub_cost'      },
+  { key: 'material', label: 'Materials',    column: 'material_cost' },
+  { key: 'sub',      label: 'Subcontract',  column: 'sub_cost'      },
+  { key: 'other',    label: 'Other / Fees', column: 'other_cost'    },
 ];
-const EMPTY_PARTS = { material: 0, labor: 0, sub: 0, unsplit: 0 };
-const partsTotal = (p) => (p ? p.material + p.labor + p.sub + p.unsplit : 0);
+const ACTUAL_COLUMNS = ['material_cost', 'labor_cost', 'sub_cost', 'other_cost'];
+const EMPTY_PARTS = { material: 0, labor: 0, sub: 0, other: 0, unsplit: 0 };
+const partsTotal = (p) => (p ? (p.material || 0) + (p.labor || 0) + (p.sub || 0) + (p.other || 0) + (p.unsplit || 0) : 0);
 
 // Total actual for a line; click to open the by-type breakdown.
 function ActualTotalButton({ total, open, onClick, width = 110 }) {
@@ -305,7 +353,11 @@ function ActualTotalButton({ total, open, onClick, width = 110 }) {
 // By-type inputs for one line's actual cost.
 function ActualBreakdown({ parts, showUnsplit, onPartChange }) {
   const p = parts ?? EMPTY_PARTS;
-  const fields = [...ACTUAL_TYPES, ...(showUnsplit ? [{ key: 'unsplit', label: 'Not split (earlier total)' }] : [])];
+  const fields = [
+    ...ACTUAL_TYPES,
+    ...(p.labor > 0 ? [{ key: 'labor', label: 'Labor (earlier entry)' }] : []),
+    ...(showUnsplit ? [{ key: 'unsplit', label: 'Not split (earlier total)' }] : []),
+  ];
   return (
     <div className="px-4 pb-3 pt-1">
       <div className="ml-auto rounded-xl p-3 flex flex-wrap items-end gap-3 sm:justify-end"
@@ -400,7 +452,34 @@ function AddLineForm({ div, ds, onAdd }) {
   );
 }
 
-function LineRow({ item, divStyle: ds, value, isOverridden, onChange, onReset, pctRate, onPctChange, isFirst, actualParts, showUnsplit, actualOpen, onToggleActual, onActualPartChange, showActuals, actualsDisabled, onRename, onRemove }) {
+// One line's Materials / Subcontract / Other split (shown with the breakdown switch).
+function SplitRow({ value, split, isDefault, onChange, onReset }) {
+  const amt = splitAmounts(value, split);
+  const pct = { m: split.m, s: 100 - split.m - split.o, o: split.o };
+  const box = (key, label) => (
+    <input type="number" min={0} max={100} value={pct[key]} aria-label={`${label} %`}
+      onChange={(e) => onChange({ ...split, [key]: Number(e.target.value) || 0 })}
+      className="w-12 px-1.5 py-0.5 rounded-md text-xs font-semibold text-right focus:outline-none"
+      style={{ border: '1px solid #E5E7EB', color: '#002147', backgroundColor: '#fff' }} />
+  );
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1 px-4 pb-2 -mt-1 text-xs" style={{ color: '#6B7280' }}>
+      {COST_TYPES.map((t) => (
+        <span key={t.key} className="flex items-center gap-1">
+          <span className="font-semibold" style={{ color: t.color }}>{t.label}</span>
+          {t.key === 's' ? <span className="w-12 text-right font-semibold" style={{ color: '#002147' }}>{pct.s}</span> : box(t.key, t.label)}
+          <span>%</span>
+          <span className="font-bold" style={{ color: '#002147', minWidth: 56, textAlign: 'right' }}>{fmt(amt[t.key])}</span>
+        </span>
+      ))}
+      {!isDefault && (
+        <button type="button" onClick={onReset} className="underline font-semibold" style={{ color: '#D97706' }} title="Back to the default split">↻ default</button>
+      )}
+    </div>
+  );
+}
+
+function LineRow({ item, divStyle: ds, value, isOverridden, onChange, onReset, pctRate, onPctChange, isFirst, actualParts, showUnsplit, actualOpen, onToggleActual, onActualPartChange, showActuals, actualsDisabled, onRename, onRemove, breakdown }) {
   const actual = partsTotal(actualParts);
   const variance = value - actual;
   const hasActual = actual > 0;
@@ -468,6 +547,8 @@ function LineRow({ item, divStyle: ds, value, isOverridden, onChange, onReset, p
         <VarianceCell variance={variance} show={hasActual} />
       </div>
     )}
+
+    {breakdown && item.unit !== 'pct' && <SplitRow value={value} {...breakdown} />}
 
     {showActuals && actualOpen && !actualsDisabled && (
       <ActualBreakdown parts={actualParts} showUnsplit={showUnsplit}
@@ -666,6 +747,7 @@ export default function RemodelBudget() {
   const [unsplitWbs,     setUnsplitWbs]     = useState(() => new Set());  // lines loaded with an older, unsplit total
   const [openActual,     setOpenActual]     = useState(null); // wbs whose breakdown is open
   const [actualsOn,      setActualsOn]      = useState(true);
+  const [breakdownOn,    setBreakdownOn]    = useState(false);   // Materials / Subcontract / Other view
   const [actualsError,   setActualsError]   = useState('');
   const actualVals = useMemo(
     () => Object.fromEntries(Object.entries(actualParts).map(([wbs, p]) => [wbs, partsTotal(p)])),
@@ -731,12 +813,17 @@ export default function RemodelBudget() {
         .maybeSingle(),
       supabase
         .from('remodel_budget_actuals')
-        .select(`wbs_key, actual_cost, ${ACTUAL_TYPES.map((t) => t.column).join(', ')}`)
+        .select(`wbs_key, actual_cost, ${ACTUAL_COLUMNS.join(', ')}`)
         .eq('project_id', projectId)
-        .then(async (res) => (res.error
-          // Before migration 037 the by-type columns don't exist yet.
-          ? supabase.from('remodel_budget_actuals').select('wbs_key, actual_cost').eq('project_id', projectId)
-          : res)),
+        .then(async (res) => {
+          if (!res.error) return res;
+          // Before migration 051 there is no other_cost; before 037 no by-type columns.
+          const res037 = await supabase.from('remodel_budget_actuals')
+            .select('wbs_key, actual_cost, material_cost, labor_cost, sub_cost').eq('project_id', projectId);
+          return res037.error
+            ? supabase.from('remodel_budget_actuals').select('wbs_key, actual_cost').eq('project_id', projectId)
+            : res037;
+        }),
     ]);
 
     if (budget) {
@@ -755,8 +842,11 @@ export default function RemodelBudget() {
 
     const loaded = {};
     for (const a of actuals ?? []) {
-      const parts = Object.fromEntries(ACTUAL_TYPES.map((t) => [t.key, Number(a[t.column]) || 0]));
-      const split = parts.material + parts.labor + parts.sub;
+      const parts = {
+        material: Number(a.material_cost) || 0, labor: Number(a.labor_cost) || 0,
+        sub: Number(a.sub_cost) || 0, other: Number(a.other_cost) || 0,
+      };
+      const split = parts.material + parts.labor + parts.sub + parts.other;
       loaded[a.wbs_key] = { ...parts, unsplit: Math.max(0, (Number(a.actual_cost) || 0) - split) };
     }
     setActualParts(loaded);
@@ -857,18 +947,22 @@ export default function RemodelBudget() {
 
     if (actualTimers.current[wbs]) clearTimeout(actualTimers.current[wbs]);
     actualTimers.current[wbs] = setTimeout(async () => {
-      const { error } = await supabase
-        .from('remodel_budget_actuals')
-        .upsert(
-          {
-            project_id:  currentProjectId,
-            wbs_key:     wbs,
-            actual_cost: partsTotal(parts),
-            ...Object.fromEntries(ACTUAL_TYPES.map((t) => [t.column, parts[t.key]])),
-          },
-          { onConflict: 'project_id,wbs_key' }
-        );
-      setActualsError(error ? `Actual cost for line ${wbs} was not saved: ${error.message}` : '');
+      const row = {
+        project_id:    currentProjectId,
+        wbs_key:       wbs,
+        actual_cost:   partsTotal(parts),
+        material_cost: parts.material, labor_cost: parts.labor, sub_cost: parts.sub, other_cost: parts.other,
+      };
+      let { error } = await supabase.from('remodel_budget_actuals').upsert(row, { onConflict: 'project_id,wbs_key' });
+      let hint = '';
+      // Before migration 051 there is no other_cost column: save the rest.
+      if (error && /other_cost/.test(error.message ?? '')) {
+        const { other_cost, ...rest } = row;
+        if (other_cost > 0) hint = ' Other / Fees amounts need migration 051 in Supabase.';
+        ({ error } = await supabase.from('remodel_budget_actuals')
+          .upsert({ ...rest, actual_cost: rest.actual_cost - other_cost }, { onConflict: 'project_id,wbs_key' }));
+      }
+      setActualsError(error ? `Actual cost for line ${wbs} was not saved: ${error.message}` : hint ? `Line ${wbs}:${hint}` : '');
     }, 800);
   }
 
@@ -1018,6 +1112,15 @@ export default function RemodelBudget() {
       setLayout((l) => ({ ...l, removed: [...new Set([...l.removed, item.wbs])] }));
     }
   }
+  function setLineSplit(item, split) {
+    const sp = clampSplit(split);
+    const def = defaultCostSplit(item.originalLabel ?? item.label);
+    setLayout((l) => {
+      const splits = { ...(l.splits ?? {}) };
+      if (sp.m === def.m && sp.o === def.o) delete splits[item.wbs]; else splits[item.wbs] = sp;
+      return { ...l, splits };
+    });
+  }
   function restoreLine(wbs) { setLayout((l) => ({ ...l, removed: l.removed.filter((w) => w !== wbs) })); }
   function setInput(key, val)          { setInputs((p) => ({ ...p, [key]: val })); }
   function setPctRate(key, val)        { setPctRates((p) => ({ ...p, [key]: val })); }
@@ -1029,10 +1132,23 @@ export default function RemodelBudget() {
   const showActuals  = !!currentProjectId && actualsOn;
   const actualByType = Object.entries(actualParts).reduce((acc, [wbs, p]) => {
     if (wbs === 'M.2') return acc;
-    for (const k of Object.keys(EMPTY_PARTS)) acc[k] += p[k];
+    for (const k of Object.keys(EMPTY_PARTS)) acc[k] += p[k] || 0;
     return acc;
   }, { ...EMPTY_PARTS });
   const hasActuals   = Object.entries(actualVals).some(([wbs, v]) => wbs !== 'M.2' && (Number(v) || 0) > 0);
+
+  // Cost breakdown of the direct costs: budget lines by their split, approved
+  // design selections as materials, approved change orders on their own.
+  const lineBreakdown = (item) => splitAmounts(lineVals[item.wbs] ?? 0, lineSplit(item, layout));
+  const divBreakdown = (div) => div.items.filter((it) => it.unit !== 'pct').reduce((acc, it) => {
+    const b = lineBreakdown(it);
+    return { m: acc.m + b.m, s: acc.s + b.s, o: acc.o + b.o };
+  }, { m: 0, s: 0, o: 0 });
+  const budgetByType = config ? config.divisions.reduce((acc, div) => {
+    const b = divBreakdown(div);
+    return { m: acc.m + b.m, s: acc.s + b.s, o: acc.o + b.o };
+  }, { m: designSpecsTotal, s: 0, o: 0 }) : { m: 0, s: 0, o: 0 };
+  const spentByType = { m: actualByType.material, s: actualByType.sub + actualByType.labor, o: actualByType.other };
 
   if (!config) return null;
 
@@ -1472,6 +1588,59 @@ export default function RemodelBudget() {
           color={totals.marginPct >= totals.marginTarget - 0.0005 ? '#059669' : '#D97706'} />
       </div>
 
+      {/* Cost breakdown — Materials / Subcontract / Other (internal) */}
+      {breakdownOn && (() => {
+        const rows = COST_TYPES.map((t) => ({ ...t, budget: budgetByType[t.key], spent: spentByType[t.key] }));
+        const base = rows.reduce((s, r) => s + r.budget, 0);
+        return (
+          <div className="rounded-2xl p-5 mb-5" style={{ backgroundColor: '#fff', border: '1.5px solid #FDE68A', boxShadow: '0 2px 12px rgba(180,83,9,0.06)' }}>
+            <div className="flex items-baseline justify-between flex-wrap gap-2 mb-3">
+              <p className="text-xs font-bold tracking-[0.14em] uppercase" style={{ color: '#B45309' }}>Cost Breakdown</p>
+              <p className="text-xs" style={{ color: '#9CA3AF' }}>Internal — not shown on proposals or contracts</p>
+            </div>
+            {base > 0 && (
+              <div className="flex h-2.5 rounded-full overflow-hidden mb-4" aria-hidden="true">
+                {rows.map((r) => <div key={r.key} style={{ width: `${(r.budget / base) * 100}%`, backgroundColor: r.color }} />)}
+              </div>
+            )}
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-xs uppercase tracking-wide" style={{ color: '#9CA3AF' }}>
+                    <th className="text-left font-semibold pb-1.5">Type</th>
+                    <th className="text-right font-semibold pb-1.5">Share</th>
+                    <th className="text-right font-semibold pb-1.5">Budget</th>
+                    {hasActuals && <th className="text-right font-semibold pb-1.5">Spent</th>}
+                    {hasActuals && <th className="text-right font-semibold pb-1.5">Left</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r) => (
+                    <tr key={r.key} style={{ borderTop: '1px solid #F3F4F6' }}>
+                      <td className="py-1.5 font-semibold" style={{ color: r.color }}>{r.label}</td>
+                      <td className="py-1.5 text-right" style={{ color: '#6B7280' }}>{base > 0 ? `${Math.round((r.budget / base) * 100)}%` : '—'}</td>
+                      <td className="py-1.5 text-right font-bold" style={{ color: '#002147' }}>{fmt(r.budget)}</td>
+                      {hasActuals && <td className="py-1.5 text-right" style={{ color: '#0369A1' }}>{fmt(r.spent)}</td>}
+                      {hasActuals && (
+                        <td className="py-1.5 text-right font-bold" style={{ color: r.budget - r.spent < 0 ? '#DC2626' : '#059669' }}>
+                          {r.budget - r.spent < 0 ? '−' : ''}{fmt(Math.abs(r.budget - r.spent))}{r.budget - r.spent < 0 ? ' over' : ''}
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-xs mt-3" style={{ color: '#9CA3AF' }}>
+              Direct costs by type{designSpecsTotal > 0 ? ' (approved design selections count as materials)' : ''}.
+              {totals.changeOrderCost ? ` Approved change orders (${fmt(totals.changeOrderCost)} cost) and contingency are not split.` : ' Contingency is not split.'}
+              {actualByType.unsplit > 0 ? ` ${fmt(actualByType.unsplit)} of actuals was entered before the split and isn't counted here.` : ''}
+              {' '}Change any line's split under it.
+            </p>
+          </div>
+        );
+      })()}
+
       {/* Budget vs Actual summary bar — shown once actuals exist */}
       {hasActuals && (
         <div className="rounded-2xl p-5 mb-5"
@@ -1529,30 +1698,39 @@ export default function RemodelBudget() {
         </div>
       )}
 
-      {/* Actuals switch + column headers (headers on desktop only) */}
-      {currentProjectId && (
-        <div className="flex items-center gap-2 px-4 pb-1 mb-0.5">
-          <button type="button" role="switch" aria-checked={actualsOn} onClick={() => setActualsOn((v) => !v)}
-            className="flex items-center gap-2 text-xs font-semibold focus:outline-none" style={{ color: '#0369A1' }}>
-            <span className="relative inline-block w-8 h-4 rounded-full transition-colors"
-              style={{ backgroundColor: actualsOn ? '#0369A1' : '#D1D5DB' }}>
-              <span className="absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all"
-                style={{ left: actualsOn ? '1.125rem' : '0.125rem' }} />
-            </span>
-            Show actuals
-          </button>
-          <div className="flex-1" />
-          {showActuals && (
-            <>
-              <div className="w-14 hidden sm:block" />
-              <div className="hidden sm:block text-xs font-bold uppercase tracking-wide text-center shrink-0" style={{ width: 110, color: '#6B7280' }}>Budgeted</div>
-              <div className="w-6 hidden sm:block shrink-0" />
-              <div className="hidden sm:block text-xs font-bold uppercase tracking-wide text-center shrink-0" style={{ width: 110, color: '#0369A1' }}>Actual</div>
-              <div className="hidden sm:block text-xs font-bold uppercase tracking-wide text-center shrink-0" style={{ width: 86, color: '#6B7280' }}>Variance</div>
-            </>
-          )}
-        </div>
-      )}
+      {/* Actuals + cost breakdown switches, column headers (headers on desktop only) */}
+      <div className="flex items-center gap-4 px-4 pb-1 mb-0.5 flex-wrap">
+        {currentProjectId && (
+        <button type="button" role="switch" aria-checked={actualsOn} onClick={() => setActualsOn((v) => !v)}
+          className="flex items-center gap-2 text-xs font-semibold focus:outline-none" style={{ color: '#0369A1' }}>
+          <span className="relative inline-block w-8 h-4 rounded-full transition-colors"
+            style={{ backgroundColor: actualsOn ? '#0369A1' : '#D1D5DB' }}>
+            <span className="absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all"
+              style={{ left: actualsOn ? '1.125rem' : '0.125rem' }} />
+          </span>
+          Show actuals
+        </button>
+        )}
+        <button type="button" role="switch" aria-checked={breakdownOn} onClick={() => setBreakdownOn((v) => !v)}
+          className="flex items-center gap-2 text-xs font-semibold focus:outline-none" style={{ color: '#B45309' }}>
+          <span className="relative inline-block w-8 h-4 rounded-full transition-colors"
+            style={{ backgroundColor: breakdownOn ? '#B45309' : '#D1D5DB' }}>
+            <span className="absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all"
+              style={{ left: breakdownOn ? '1.125rem' : '0.125rem' }} />
+          </span>
+          Show cost breakdown
+        </button>
+        <div className="flex-1" />
+        {showActuals && (
+          <>
+            <div className="w-14 hidden sm:block" />
+            <div className="hidden sm:block text-xs font-bold uppercase tracking-wide text-center shrink-0" style={{ width: 110, color: '#6B7280' }}>Budgeted</div>
+            <div className="w-6 hidden sm:block shrink-0" />
+            <div className="hidden sm:block text-xs font-bold uppercase tracking-wide text-center shrink-0" style={{ width: 110, color: '#0369A1' }}>Actual</div>
+            <div className="hidden sm:block text-xs font-bold uppercase tracking-wide text-center shrink-0" style={{ width: 86, color: '#6B7280' }}>Variance</div>
+          </>
+        )}
+      </div>
       {actualsError && (
         <p role="alert" className="px-4 mb-2 text-xs font-semibold" style={{ color: '#DC2626' }}>{actualsError}</p>
       )}
@@ -1660,6 +1838,12 @@ export default function RemodelBudget() {
                       actualsDisabled={isMarginLine(item)}
                       onRename={item.unit === 'pct' ? null : (label) => renameLine(item, label)}
                       onRemove={item.unit === 'pct' ? null : () => removeLine(item)}
+                      breakdown={breakdownOn && item.unit !== 'pct' ? {
+                        split: lineSplit(item, layout),
+                        isDefault: !layout.splits?.[item.wbs],
+                        onChange: (sp) => setLineSplit(item, sp),
+                        onReset: () => setLineSplit(item, defaultCostSplit(item.originalLabel ?? item.label)),
+                      } : null}
                     />
                   ))}
 
@@ -1680,6 +1864,18 @@ export default function RemodelBudget() {
                   )}
 
                   {/* Division subtotal */}
+                  {breakdownOn && !div.items.every((it) => it.unit === 'pct') && (() => {
+                    const b = divBreakdown(div);
+                    return (
+                      <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1 px-4 py-2 text-xs font-semibold"
+                        style={{ borderTop: `1px solid ${ds.border}`, backgroundColor: '#FCFCFB' }}>
+                        <span style={{ color: '#9CA3AF' }}>{div.label} by type:</span>
+                        {COST_TYPES.map((t) => (
+                          <span key={t.key}><span style={{ color: t.color }}>{t.label}</span> <span style={{ color: '#002147' }}>{fmt(b[t.key])}</span></span>
+                        ))}
+                      </div>
+                    );
+                  })()}
                   <div className="flex items-center justify-between px-4 py-3"
                     style={{ borderTop: `1px solid ${ds.border}`, backgroundColor: ds.bg }}>
                     <span className="text-xs font-bold tracking-wide" style={{ color: ds.color }}>
@@ -1766,7 +1962,7 @@ export default function RemodelBudget() {
             </p>
             <p className="w-full text-xs" style={{ color: 'rgba(255,255,255,0.6)' }}>
               <span className="font-semibold uppercase tracking-wide mr-2" style={{ color: 'rgba(212,175,55,0.6)' }}>Actual spent by type</span>
-              {ACTUAL_TYPES.map((t) => `${t.label} ${fmt(actualByType[t.key])}`).join(' · ')}
+              {[`Materials ${fmt(spentByType.m)}`, `Subcontract ${fmt(spentByType.s)}`, `Other / Fees ${fmt(spentByType.o)}`].join(' · ')}
               {actualByType.unsplit > 0 && ` · Not split ${fmt(actualByType.unsplit)}`}
             </p>
           </div>
