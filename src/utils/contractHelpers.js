@@ -15,6 +15,8 @@ export const CONTRACT_FIELDS = [
     placeholder: 'Describe all work to be performed: demo, tile, fixtures, framing, electrical, plumbing, painting, etc.' },
   { key: 'materials_spec',         label: 'Materials & Specifications', section: 'scope',    type: 'textarea', required: false,
     placeholder: 'List key materials, brands, model numbers, or reference the attached Selections Sheet.' },
+  { key: 'allowances',             label: 'Allowances (included in the price)', section: 'scope', type: 'textarea', required: false,
+    placeholder: 'e.g., • Vanity + Sink: $2,800 — filled from the Remodel Budget; leave blank if none.' },
   { key: 'exclusions',             label: 'Exclusions / Not Included',  section: 'scope',    type: 'textarea', required: false,
     placeholder: 'Any work NOT included in this contract (e.g., landscaping, appliance installation, furniture).' },
 
@@ -155,7 +157,10 @@ ${v.scope_of_work || '[Detailed scope to be inserted]'}
 
 Materials and Specifications:
 ${v.materials_spec || 'Refer to the attached Material Selections Sheet, incorporated herein by reference.'}
-
+${v.allowances ? `
+Allowances (included in the Contract Price):
+${v.allowances}
+` : ''}
 Exclusions (Work NOT included in this Contract):
 ${v.exclusions || 'None specified. Any work not explicitly listed above is excluded.'}
 

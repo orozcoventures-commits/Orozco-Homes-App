@@ -15,12 +15,30 @@ export const CONTRACT_PREFILL_KEYS = [
   'project_type',
   'scope_of_work',
   'materials_spec',
+  'allowances',
   'total_cost',
 ];
 
 const INTERNAL_TERMS = /margin|mark-?up|profit|overhead|contingenc|net\s*cost|direct\s*cost|sub-?contractor|actual\s*cost|variance|\$\s*\d|\d+(\.\d+)?\s*%/i;
 
 const clean = (text) => (typeof text === 'string' ? text.trim() : '');
+
+// ── Allowances ────────────────────────────────────────────────────────────────
+// The only per-item amounts a client document may show: the material
+// allowance included in the price for items the client selects (tile, vanity,
+// lighting…). Built from { label, amount } only; a label that mentions an
+// internal figure is dropped.
+export const ALLOWANCE_NOTE = 'Allowances are included in the price above. If selections cost more than an allowance, the difference is added by change order; if they cost less, the difference is credited.';
+
+export function allowanceItems(allowances = []) {
+  return allowances
+    .map((a) => ({
+      label: clean(a?.label).replace(/\$\s*[\d,.]+/g, '').replace(/\s*\((mat|material)s?\s*\+\s*labor\)/i, '').trim(),
+      amount: Math.round(Number(a?.amount)),
+    }))
+    .filter((a) => a.label && Number.isFinite(a.amount) && a.amount > 0 && !INTERNAL_TERMS.test(a.label));
+}
+const money = (n) => `$${n.toLocaleString('en-US')}`;
 
 // Drops every line that mentions an internal figure.
 export function stripInternalLines(text) {
@@ -41,7 +59,7 @@ export function stripInternalLines(text) {
  * @param {number}   args.clientPrice  total client price (the only number passed)
  * @returns {object} frozen object with only CONTRACT_PREFILL_KEYS
  */
-export function buildContractPrefill({ client, projectType, scope = [], changeOrders = [], materials = [], clientPrice }) {
+export function buildContractPrefill({ client, projectType, scope = [], changeOrders = [], materials = [], allowances = [], clientPrice }) {
   const scopeLines = [];
   for (const { division, items } of scope) {
     if (!items.length) continue;
@@ -60,6 +78,10 @@ export function buildContractPrefill({ client, projectType, scope = [], changeOr
     project_type:   stripInternalLines(projectType),
     scope_of_work:  stripInternalLines(scopeLines.length ? `Work includes:\n${scopeLines.join('\n')}` : ''),
     materials_spec: stripInternalLines(materials.map((m) => `• ${m}`).join('\n')),
+    allowances:     (() => {
+      const items = allowanceItems(allowances);
+      return items.length ? [...items.map((a) => `• ${a.label}: ${money(a.amount)}`), '', ALLOWANCE_NOTE].join('\n') : '';
+    })(),
     total_cost:     Number.isFinite(price) && price > 0 ? price.toFixed(2) : '',
   };
 
@@ -80,6 +102,7 @@ export const PROPOSAL_PREFILL_KEYS = [
   'project_overview',
   'scope_of_work',
   'materials_included',
+  'allowances',
   'investment_low',
   'investment_high',
 ];
@@ -94,7 +117,7 @@ const roundTo = (n, step) => Math.round(n / step) * step;
  * @param {string[]} args.materials    approved selections, no amounts
  * @param {number}   args.clientPrice  total client price; the range is −5% / +10%, rounded to $1,000
  */
-export function buildProposalPrefill({ client, projectTitle, scope = [], materials = [], clientPrice }) {
+export function buildProposalPrefill({ client, projectTitle, scope = [], materials = [], allowances = [], clientPrice }) {
   const scopeLines = [];
   for (const { division, items } of scope) {
     if (!items.length) continue;
@@ -111,6 +134,10 @@ export function buildProposalPrefill({ client, projectTitle, scope = [], materia
     project_overview:   title ? `Orozco Homes will complete the ${title} under a coordinated construction schedule.` : '',
     scope_of_work:      stripInternalLines(scopeLines.join('\n')),
     materials_included: stripInternalLines([...materials, 'All required building materials'].join('\n')),
+    allowances:         (() => {
+      const items = allowanceItems(allowances);
+      return items.length ? [...items.map((a) => `- ${a.label}: ${money(a.amount)}`), '', ALLOWANCE_NOTE].join('\n') : '';
+    })(),
     investment_low:     hasPrice ? String(roundTo(price * 0.95, 1000)) : '',
     investment_high:    hasPrice ? String(roundTo(price * 1.10, 1000)) : '',
   };

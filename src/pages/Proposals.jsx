@@ -235,8 +235,8 @@ export default function Proposals() {
     const allowed = Object.fromEntries(
       PROPOSAL_PREFILL_KEYS.filter((k) => fromDraft.values?.[k]).map((k) => [k, String(fromDraft.values[k])]),
     );
-    const { project_overview, scope_of_work, materials_included, ...fields } = allowed;
-    return { ...base, ...fields, sections: applyPrefillToSections(base.sections, { project_overview, scope_of_work, materials_included }) };
+    const { project_overview, scope_of_work, materials_included, allowances, ...fields } = allowed;
+    return { ...base, ...fields, sections: applyPrefillToSections(base.sections, { project_overview, scope_of_work, materials_included, allowances }) };
   };
   const [values, setValues] = useState(() => buildInitial(null, draft));
   const [template, setTemplate] = useState(null);       // saved default template, if any

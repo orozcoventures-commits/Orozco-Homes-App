@@ -98,8 +98,9 @@ function defaultInputs(projectTypeId) {
 // ── Custom line items (migration 050) ─────────────────────────────────────────
 // Each saved budget can rename or remove the built-in lines and add its own.
 // layout = { added: [{ id, div, label }], labels: { wbs: label }, removed: [wbs],
-//            splits: { wbs: { m, o } } }   (cost breakdown %, see below)
-const EMPTY_LAYOUT = { added: [], labels: {}, removed: [], splits: {} };
+//            splits: { wbs: { m, o } },     (cost breakdown %, see below)
+//            allowances: { wbs: { on, amount } } }  (client allowances, see below)
+const EMPTY_LAYOUT = { added: [], labels: {}, removed: [], splits: {}, allowances: {} };
 const MAX_LABEL = 120;
 
 function normalizeLayout(raw) {
@@ -115,6 +116,12 @@ function normalizeLayout(raw) {
     splits: Object.fromEntries(Object.entries(l.splits && typeof l.splits === 'object' ? l.splits : {})
       .filter(([, v]) => v && typeof v === 'object')
       .map(([k, v]) => [k, clampSplit(v)])),
+    allowances: Object.fromEntries(Object.entries(l.allowances && typeof l.allowances === 'object' ? l.allowances : {})
+      .filter(([, v]) => v && typeof v === 'object')
+      .map(([k, v]) => [k, {
+        on: !!v.on,
+        amount: v.amount == null || v.amount === '' || !Number.isFinite(Number(v.amount)) ? null : Math.max(0, Math.round(Number(v.amount))),
+      }])),
   };
 }
 
@@ -156,6 +163,16 @@ function defaultCostSplit(label) {
   const rule = SPLIT_RULES.find(([re]) => re.test(label ?? ''));
   return rule ? { m: rule[1], o: rule[2] } : { m: 50, o: 0 };
 }
+// ── Allowances ────────────────────────────────────────────────────────────────
+// Material amounts the client sees on proposals and contracts for items they
+// select (tile, vanity, lighting…). Already part of the price. Lines like
+// these start as allowances; any line can be turned on or off, and the amount
+// (default: the line's materials amount, rounded to $50) can be typed.
+const ALLOWANCE_RE = /vanity|toilet|faucet|fixture|lighting|light fixture|mirror|medicine|accessor|cabinet|countertop|desktop|backsplash|tile|flooring|\bfloor\b|lvp|hardwood|appliance|hardware|\btub\b|\bsink\b|glass|door unit|vinyl window|decking|railing|pendant|shelving|trim kit|lockset|newel/i;
+const NOT_ALLOWANCE_RE = /prep|patch|remov|demo|haul|install,|final|hookup|reconnect|rough|relocat|circuit|outlet|swap|blocking|end panels/i;
+const isDefaultAllowance = (label) => ALLOWANCE_RE.test(label ?? '') && !NOT_ALLOWANCE_RE.test(label ?? '');
+const roundTo50 = (n) => Math.round((Number(n) || 0) / 50) * 50;
+
 const lineSplit = (item, layout) => layout.splits?.[item.wbs] ?? defaultCostSplit(item.originalLabel ?? item.label);
 const splitAmounts = (value, sp) => ({ m: value * sp.m / 100, o: value * sp.o / 100, s: value * (100 - sp.m - sp.o) / 100 });
 
@@ -379,7 +396,7 @@ function ActualBreakdown({ parts, showUnsplit, onPartChange }) {
   );
 }
 
-function LineName({ item, onRename }) {
+function LineName({ item, onRename, isAllowance }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
   if (!editing) {
@@ -388,6 +405,7 @@ function LineName({ item, onRename }) {
         <span className="flex-1 text-sm truncate min-w-0" style={{ color: '#374151' }} title={item.label}>
           {item.label}
           {item.custom && <span className="ml-1.5 text-xs font-semibold" style={{ color: '#9CA3AF' }}>(added)</span>}
+          {isAllowance && <span className="ml-1.5 text-xs font-semibold px-1.5 py-0.5 rounded" style={{ color: '#7C3AED', backgroundColor: '#F5F3FF' }} title="Shown to the client as an allowance">Allowance</span>}
           {!item.custom && item.originalLabel !== item.label && (
             <span className="ml-1.5 text-xs" style={{ color: '#9CA3AF' }} title={`Originally: ${item.originalLabel}`}>(renamed)</span>
           )}
@@ -453,7 +471,7 @@ function AddLineForm({ div, ds, onAdd }) {
 }
 
 // One line's Materials / Subcontract / Other split (shown with the breakdown switch).
-function SplitRow({ value, split, isDefault, onChange, onReset }) {
+function SplitRow({ value, split, isDefault, onChange, onReset, allowance }) {
   const amt = splitAmounts(value, split);
   const pct = { m: split.m, s: 100 - split.m - split.o, o: split.o };
   const box = (key, label) => (
@@ -475,11 +493,31 @@ function SplitRow({ value, split, isDefault, onChange, onReset }) {
       {!isDefault && (
         <button type="button" onClick={onReset} className="underline font-semibold" style={{ color: '#D97706' }} title="Back to the default split">↻ default</button>
       )}
+      {allowance && (
+        <span className="flex items-center gap-1.5 pl-3" style={{ borderLeft: '1px solid #E5E7EB' }}>
+          <label className="flex items-center gap-1 font-semibold" style={{ color: '#7C3AED' }}>
+            <input type="checkbox" checked={allowance.on} onChange={(e) => allowance.onToggle(e.target.checked)} style={{ accentColor: '#7C3AED' }} />
+            Allowance
+          </label>
+          {allowance.on && (
+            <>
+              <span>$</span>
+              <input type="text" inputMode="numeric" value={allowance.amount.toLocaleString('en-US')} aria-label="Allowance amount"
+                onChange={(e) => allowance.onAmount(Number(e.target.value.replace(/[^0-9]/g, '')) || 0)}
+                className="w-20 px-1.5 py-0.5 rounded-md text-xs font-semibold text-right focus:outline-none"
+                style={{ border: '1px solid #DDD6FE', color: '#002147', backgroundColor: '#fff' }} />
+              {allowance.isAuto
+                ? <span title="Materials amount, rounded">auto</span>
+                : <button type="button" onClick={() => allowance.onAmount(null)} className="underline font-semibold" style={{ color: '#7C3AED' }} title="Use the materials amount">↻ auto</button>}
+            </>
+          )}
+        </span>
+      )}
     </div>
   );
 }
 
-function LineRow({ item, divStyle: ds, value, isOverridden, onChange, onReset, pctRate, onPctChange, isFirst, actualParts, showUnsplit, actualOpen, onToggleActual, onActualPartChange, showActuals, actualsDisabled, onRename, onRemove, breakdown }) {
+function LineRow({ item, divStyle: ds, value, isOverridden, onChange, onReset, pctRate, onPctChange, isFirst, actualParts, showUnsplit, actualOpen, onToggleActual, onActualPartChange, showActuals, actualsDisabled, onRename, onRemove, breakdown, isAllowance }) {
   const actual = partsTotal(actualParts);
   const variance = value - actual;
   const hasActual = actual > 0;
@@ -494,7 +532,7 @@ function LineRow({ item, divStyle: ds, value, isOverridden, onChange, onReset, p
       </span>
 
       {/* Label, with rename */}
-      <LineName item={item} onRename={onRename} />
+      <LineName item={item} onRename={onRename} isAllowance={isAllowance} />
 
       {/* Pct rate input (desktop only) */}
       {item.unit === 'pct' && item.pctKey && (
@@ -1112,6 +1150,16 @@ export default function RemodelBudget() {
       setLayout((l) => ({ ...l, removed: [...new Set([...l.removed, item.wbs])] }));
     }
   }
+  function setAllowance(item, patch) {
+    setLayout((l) => {
+      const allowances = { ...(l.allowances ?? {}) };
+      const cur = allowances[item.wbs] ?? { on: isDefaultAllowance(item.originalLabel ?? item.label), amount: null };
+      const next = { ...cur, ...patch };
+      if (next.on === isDefaultAllowance(item.originalLabel ?? item.label) && next.amount == null) delete allowances[item.wbs];
+      else allowances[item.wbs] = next;
+      return { ...l, allowances };
+    });
+  }
   function setLineSplit(item, split) {
     const sp = clampSplit(split);
     const def = defaultCostSplit(item.originalLabel ?? item.label);
@@ -1149,6 +1197,20 @@ export default function RemodelBudget() {
     return { m: acc.m + b.m, s: acc.s + b.s, o: acc.o + b.o };
   }, { m: designSpecsTotal, s: 0, o: 0 }) : { m: 0, s: 0, o: 0 };
   const spentByType = { m: actualByType.material, s: actualByType.sub + actualByType.labor, o: actualByType.other };
+
+  // Client allowances (shown on proposals and contracts).
+  const allowanceOf = (item) => {
+    const user = layout.allowances?.[item.wbs];
+    const on = user ? user.on : isDefaultAllowance(item.originalLabel ?? item.label);
+    const auto = roundTo50(lineBreakdown(item).m);
+    return { on, amount: user?.amount ?? auto, isAuto: user?.amount == null };
+  };
+  const allowanceList = config ? config.divisions.flatMap((div) => div.items
+    .filter((it) => it.unit !== 'pct')
+    .map((it) => ({ item: it, div, ...allowanceOf(it) }))
+    .filter((a) => a.on && a.amount > 0)) : [];
+  const allowancesForClient = allowanceList.map((a) => ({ label: a.item.label, amount: a.amount }));
+  const allowanceTotal = allowanceList.reduce((s, a) => s + a.amount, 0);
 
   if (!config) return null;
 
@@ -1200,6 +1262,7 @@ export default function RemodelBudget() {
       scope: clientScope(),
       changeOrders: approvedChangeOrders.filter((co) => coDelta(co) !== 0).map((co) => co.title),
       materials: clientMaterials(),
+      allowances: allowancesForClient,
       clientPrice: totals.totalClientPrice,
     });
 
@@ -1227,6 +1290,7 @@ export default function RemodelBudget() {
       projectTitle: project.project_name || config.label,
       scope: clientScope(),
       materials: clientMaterials(),
+      allowances: allowancesForClient,
       clientPrice: totals.totalClientPrice,
     });
 
@@ -1641,6 +1705,38 @@ export default function RemodelBudget() {
         );
       })()}
 
+      {/* Allowances — what the client sees on proposals and contracts */}
+      {breakdownOn && (
+        <div className="rounded-2xl p-5 mb-5" style={{ backgroundColor: '#fff', border: '1.5px solid #DDD6FE' }}>
+          <div className="flex items-baseline justify-between flex-wrap gap-2 mb-3">
+            <p className="text-xs font-bold tracking-[0.14em] uppercase" style={{ color: '#7C3AED' }}>Client Allowances</p>
+            <p className="text-xs" style={{ color: '#9CA3AF' }}>Shown on proposals and contracts — already included in the price</p>
+          </div>
+          {allowanceList.length === 0 ? (
+            <p className="text-xs" style={{ color: '#9CA3AF' }}>No allowances. Tick "Allowance" under any line to add one.</p>
+          ) : (
+            <table className="w-full text-sm">
+              <tbody>
+                {allowanceList.map((a) => (
+                  <tr key={a.item.wbs} style={{ borderTop: '1px solid #F3F4F6' }}>
+                    <td className="py-1.5" style={{ color: '#374151' }}>{a.item.label} <span className="text-xs" style={{ color: '#9CA3AF' }}>· {a.div.label}</span></td>
+                    <td className="py-1.5 text-right font-bold" style={{ color: '#002147' }}>{fmt(a.amount)}</td>
+                  </tr>
+                ))}
+                <tr style={{ borderTop: '1.5px solid #DDD6FE' }}>
+                  <td className="py-1.5 text-xs font-bold uppercase tracking-wide" style={{ color: '#7C3AED' }}>Total allowances</td>
+                  <td className="py-1.5 text-right font-extrabold" style={{ color: '#7C3AED' }}>{fmt(allowanceTotal)}</td>
+                </tr>
+              </tbody>
+            </table>
+          )}
+          <p className="text-xs mt-3" style={{ color: '#9CA3AF' }}>
+            Amounts start as each line's materials amount (rounded) and can be changed under the line. If the client's selections cost more,
+            the difference is added by change order; if less, it's credited.
+          </p>
+        </div>
+      )}
+
       {/* Budget vs Actual summary bar — shown once actuals exist */}
       {hasActuals && (
         <div className="rounded-2xl p-5 mb-5"
@@ -1843,7 +1939,12 @@ export default function RemodelBudget() {
                         isDefault: !layout.splits?.[item.wbs],
                         onChange: (sp) => setLineSplit(item, sp),
                         onReset: () => setLineSplit(item, defaultCostSplit(item.originalLabel ?? item.label)),
+                        allowance: (() => {
+                          const a = allowanceOf(item);
+                          return { ...a, onToggle: (on) => setAllowance(item, { on }), onAmount: (amount) => setAllowance(item, { amount }) };
+                        })(),
                       } : null}
+                      isAllowance={item.unit !== 'pct' && allowanceOf(item).on && allowanceOf(item).amount > 0}
                     />
                   ))}
 
