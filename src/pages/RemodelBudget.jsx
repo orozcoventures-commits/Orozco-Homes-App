@@ -1480,12 +1480,7 @@ export default function RemodelBudget() {
     .totals-row.grand .t-label{color:rgba(212,175,55,.75);font-size:10pt}
     .t-label{font-weight:600;color:#374151;font-size:9pt}
     .t-value{font-weight:700;font-variant-numeric:tabular-nums}
-    .sig-block{margin-top:32px;padding-top:20px;border-top:1.5px solid #E5E7EB}
-    .sig-title{font-size:10pt;font-weight:800;color:#002147;text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px}
-    .sig-intro{font-size:8.5pt;color:#374151;margin-bottom:18px;line-height:1.5}
-    .sig-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px 48px}
-    .sig-line{border-bottom:1.5px solid #374151;min-height:30px;margin-bottom:4px}
-    .sig-label{font-size:8pt;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.08em}
+.internal{display:inline-block;margin-top:4px;font-size:7.5pt;font-weight:800;letter-spacing:.1em;color:#B45309;border:1px solid #FDE68A;background:#FFFBEB;border-radius:4px;padding:1px 6px}
     .footer-note{margin-top:24px;font-size:8pt;color:#9CA3AF;text-align:center;border-top:1px solid #F3F4F6;padding-top:12px}
     @media print{body{padding:0}@page{margin:.65in;size:letter portrait}}
   </style>
@@ -1499,7 +1494,7 @@ export default function RemodelBudget() {
         <div class="brand-sub">Design &amp; Construction · Virginia Beach, VA</div>
       </div>
     </div>
-    <div class="doc-meta"><strong>Budget Estimate — ${escHtml(currentProjectName ?? '')}</strong>${dateStr}</div>
+    <div class="doc-meta"><strong>Budget Estimate — ${escHtml(currentProjectName ?? '')}</strong>${dateStr}<br><span class="internal">INTERNAL — NOT FOR THE CLIENT</span></div>
   </div>
   <h2>Project Parameters</h2>
   <div class="params-grid">
@@ -1524,16 +1519,6 @@ export default function RemodelBudget() {
     ${hasActuals ? `<div class="totals-row sub"><span class="t-label">Actual Cost Expended</span><span class="t-value" style="color:#0369A1">$${Math.round(totals.actualTotalCost).toLocaleString('en-US')}</span></div>` : ''}
     ${hasActuals ? `<div class="totals-row sub"><span class="t-label">Cost Variance (Cost Budget − Actual)</span><span class="t-value" style="color:${totals.totalVariance < 0 ? '#DC2626' : '#065F46'}">${totals.totalVariance >= 0 ? '+' : '−'}$${Math.round(Math.abs(totals.totalVariance)).toLocaleString('en-US')}</span></div>` : ''}
     <div class="totals-row grand"><span class="t-label">TOTAL CLIENT PRICE (BUDGET)</span><span class="t-value">$${Math.round(totals.totalClientPrice).toLocaleString('en-US')}</span></div>
-  </div>
-  <div class="sig-block">
-    <div class="sig-title">Client Authorization</div>
-    <p class="sig-intro">By signing below, the client acknowledges and approves the scope of work and pricing outlined in this estimate. This document constitutes a preliminary agreement pending execution of a formal contract.</p>
-    <div class="sig-grid">
-      <div><div class="sig-line"></div><div class="sig-label">Client Signature</div></div>
-      <div><div class="sig-line"></div><div class="sig-label">Date</div></div>
-      <div><div class="sig-line"></div><div class="sig-label">Client Printed Name</div></div>
-      <div><div class="sig-line"></div><div class="sig-label">Contractor Representative</div></div>
-    </div>
   </div>
   <div class="footer-note">Orozco Homes LLC · Virginia Beach, VA · orozcoventures@gmail.com · Estimate valid 30 days.</div>
   <script>window.onload=function(){window.print()}</script>
