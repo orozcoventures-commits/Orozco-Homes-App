@@ -16,11 +16,10 @@ import { buildContractPrefill, buildProposalPrefill } from '../utils/contractPre
 
 const PROJECT_GROUPS = [
   { label: 'Bathrooms',     types: ['bathroom-small', 'bathroom-medium', 'bathroom-large'] },
-  { label: 'Kitchens',      types: ['kitchen-small', 'kitchen-medium', 'kitchen-large'] },
+  { label: 'Kitchens',      types: ['kitchen-small', 'kitchen-medium', 'kitchen-large', 'kitchen-refresh', 'kitchen-island'] },
   { label: 'Home Services', types: ['addition', 'portico', 'garage-conversion', 'full-renovation'] },
   // Partial renovations (remodelRenovationTypes.js)
   { label: 'Bathroom Projects',     types: ['add-shower', 'tub-to-shower', 'bath-refresh', 'aging-in-place-bath', 'double-vanity'] },
-  { label: 'Kitchen Projects',      types: ['kitchen-refresh', 'kitchen-island'] },
   { label: 'Interior Renovations',  types: ['fireplace-builtin', 'wall-removal', 'flooring', 'attic-conversion', 'interior-painting',
                                            'popcorn-removal', 'trim-molding', 'laundry-mudroom', 'closet-buildout', 'home-office-builtins', 'staircase-remodel'] },
   { label: 'Exterior & Outdoor',    types: ['deck', 'screened-porch', 'window-replacement', 'exterior-door', 'siding'] },
