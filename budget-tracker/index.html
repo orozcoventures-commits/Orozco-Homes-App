@@ -149,6 +149,11 @@
             <button id="addExpenseBtn" type="button" class="w-full rounded-md bg-emerald-600 hover:bg-emerald-500 text-white py-2 font-medium">Add Expense</button>
             <p id="expMsg" class="text-sm min-h-[1.25rem]" aria-live="polite"></p>
           </div>
+          <div class="border-t border-slate-200 pt-4 mt-1">
+            <button id="importBtn" type="button" class="w-full rounded-md border border-slate-300 hover:bg-slate-50 py-2 text-sm font-medium">Import from credit card</button>
+            <p class="text-xs text-slate-500 mt-1">Download your transactions from your card's website (Excel or CSV) and pick the file here. Nothing is saved until you review it.</p>
+            <input id="importFile" type="file" accept=".xlsx,.xls,.csv,text/csv" hidden />
+          </div>
         </section>
       </div>
 
@@ -221,6 +226,38 @@
       </div>
     </div>
   </div>
+  <!-- Credit card import review -->
+  <div id="importBox" hidden class="fixed inset-0 z-40 bg-slate-900/50 overflow-y-auto px-4 py-6">
+    <div role="dialog" aria-modal="true" aria-labelledby="importTitle" class="bg-white rounded-xl shadow-xl max-w-4xl mx-auto">
+      <div class="p-5 border-b border-slate-200">
+        <h2 id="importTitle" class="text-lg font-semibold">Review credit card purchases</h2>
+        <p id="importSummary" class="text-sm text-slate-600 mt-1"></p>
+        <p class="text-xs text-slate-500 mt-1">Pick a category for each purchase. Use <span class="font-medium">Split</span> to divide one charge (like an Amazon order) across categories. Uncheck anything you don't want to count.</p>
+        <div id="importWarn" hidden class="mt-3 rounded-md bg-amber-50 border border-amber-200 text-amber-900 text-sm p-3"></div>
+      </div>
+      <div class="overflow-x-auto max-h-[60vh] overflow-y-auto">
+        <table class="w-full text-sm">
+          <thead class="sticky top-0 bg-white shadow-sm">
+            <tr class="text-left text-slate-500">
+              <th class="py-2 pl-5 pr-2"><span class="sr-only">Include</span></th>
+              <th class="py-2 px-2 font-medium">Date</th>
+              <th class="py-2 px-2 font-medium">Store</th>
+              <th class="py-2 px-2 font-medium text-right">Amount</th>
+              <th class="py-2 px-2 font-medium">Category</th>
+              <th class="py-2 pl-2 pr-5"></th>
+            </tr>
+          </thead>
+          <tbody id="importBody"></tbody>
+        </table>
+      </div>
+      <div class="p-5 border-t border-slate-200 flex flex-wrap items-center justify-end gap-3">
+        <p id="importMsg" class="text-sm text-red-600 mr-auto" aria-live="polite"></p>
+        <button id="importCancel" type="button" class="rounded-md border border-slate-300 hover:bg-slate-50 px-4 py-2 text-sm">Cancel</button>
+        <button id="importConfirm" type="button" class="rounded-md bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 text-sm font-medium">Import</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast" hidden class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 rounded-md bg-slate-900 text-white text-sm px-4 py-2 shadow-lg"></div>
 
   <script>
@@ -260,6 +297,7 @@
           monthIncome: {},
           monthBudgets: {},
           monthActuals: {},
+          importRules: {},
         };
       }
 
@@ -283,6 +321,7 @@
             monthIncome: isObj(data.monthIncome) ? data.monthIncome : {},
             monthBudgets: isObj(data.monthBudgets) ? data.monthBudgets : {},
             monthActuals: isObj(data.monthActuals) ? data.monthActuals : {},
+            importRules: isObj(data.importRules) ? data.importRules : {},
           };
         } catch (e) {
           return freshState();
@@ -369,7 +408,7 @@
         $('toast').textContent = message;
         $('toast').hidden = false;
         clearTimeout(toastTimer);
-        toastTimer = setTimeout(() => { $('toast').hidden = true; }, 2500);
+        toastTimer = setTimeout(() => { $('toast').hidden = true; }, Math.max(2500, message.length * 60));
       }
 
       function storageWorks() {
@@ -703,8 +742,8 @@
           <tr class="border-b border-slate-100 hover:bg-slate-50">
             <td class="py-2 pr-2 whitespace-nowrap">${escapeHtml(e.date)}</td>
             <td class="py-2 px-2">${escapeHtml(categoryName(e.categoryId))}</td>
-            <td class="py-2 px-2 text-slate-600">${escapeHtml(e.description || '—')}</td>
-            <td class="py-2 px-2 text-right tabular-nums">${fmt.format(e.amount)}</td>
+            <td class="py-2 px-2 text-slate-600">${escapeHtml(e.description || '—')}${e.importKey ? ' <span class="text-[11px] text-slate-400">· card</span>' : ''}</td>
+            <td class="py-2 px-2 text-right tabular-nums ${e.amount < 0 ? 'text-emerald-700' : ''}">${fmt.format(e.amount)}${e.amount < 0 ? ' <span class="text-[11px]">refund</span>' : ''}</td>
             <td class="py-2 pl-2 text-right whitespace-nowrap">
               <button data-edit="${e.id}" class="text-slate-400 hover:text-indigo-600 text-xs mr-2">Edit</button>
               <button data-del="${e.id}" class="text-slate-400 hover:text-red-600 text-xs">Delete</button>
@@ -721,7 +760,7 @@
             <td class="py-2 pr-2"><input type="date" data-f="date" value="${escapeHtml(e.date)}" required class="${field}" /></td>
             <td class="py-2 px-2"><select data-f="categoryId" class="${field} bg-white">${opts}</select></td>
             <td class="py-2 px-2"><input type="text" data-f="description" maxlength="80" value="${escapeHtml(e.description || '')}" class="${field}" /></td>
-            <td class="py-2 px-2"><input type="number" data-f="amount" min="0.01" step="0.01" value="${e.amount}" class="${field} w-24 text-right" /></td>
+            <td class="py-2 px-2"><input type="number" data-f="amount" step="0.01" value="${e.amount}" class="${field} w-24 text-right" /></td>
             <td class="py-2 pl-2 text-right whitespace-nowrap">
               <button data-save="${e.id}" class="text-emerald-700 hover:text-emerald-600 text-xs font-semibold mr-2">Save</button>
               <button data-cancel="1" class="text-slate-500 hover:text-slate-700 text-xs">Cancel</button>
@@ -734,7 +773,9 @@
         const exp = state.expenses.find((x) => x.id === id);
         if (!row || !exp) return;
         const get = (f) => row.querySelector(`[data-f="${f}"]`);
-        const amount = toNum(get('amount').value);
+        // Refunds from a card import are negative; keep their sign
+        const raw = parseFloat(get('amount').value);
+        const amount = exp.amount < 0 && raw < 0 ? -toNum(-raw) : toNum(raw);
         const date = get('date').value;
         if (!amount) { get('amount').focus(); get('amount').classList.add('ring-2', 'ring-red-500'); return; }
         if (!date) { get('date').focus(); get('date').classList.add('ring-2', 'ring-red-500'); return; }
@@ -975,6 +1016,345 @@
         a.download = 'budget-expenses.csv';
         a.click();
         URL.revokeObjectURL(a.href);
+      });
+
+      // ---------- Credit card import ----------
+      const XLSX_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      const NEW_INSURANCE = '__new:Insurance';
+      let importRows = [];
+      let importSkippedPayments = 0;
+
+      // Card statement category -> budget category name (used only when that category exists)
+      const CARD_CATEGORY_MAP = [
+        [/insurance/i, 'Insurance'],
+        [/groceries|grocery|supermarket|wholesale/i, 'Groceries'],
+        [/hardware|contracting|home improvement|building supplies/i, 'Home Improvement'],
+        [/charit/i, 'Giving'],
+        [/restaurant|bar & caf|dining|cable & internet|entertainment|streaming/i, 'Entertainment'],
+        [/auto service|auto repair|automotive/i, 'Car Repairs'],
+        [/fuel|gas station|transportation|parking|toll/i, 'Transportation'],
+        [/utilit/i, 'Electrical'],
+      ];
+      const MERCHANT_MAP = [
+        [/dominion/i, 'Electrical'],
+        [/virginia natural gas|columbia gas/i, 'Natural Gas'],
+        [/geico|state farm|progressive|allstate|usaa|insurance/i, 'Insurance'],
+        [/netflix|spotify|hulu|disney|hbo|youtube/i, 'Entertainment'],
+        [/kroger|publix|food lion|harris teeter|aldi|lidl|whole foods|trader joe|costco/i, 'Groceries'],
+        [/home depot|lowe'?s|ace hardware|menards/i, 'Home Improvement'],
+        [/\bshell\b|exxon|wawa|7-eleven|sunoco|citgo|speedway|royal farms|\buber\b|\blyft\b/i, 'Transportation'],
+        [/jiffy|firestone|pep boys|autozone|advance auto|o'?reilly|midas|meineke/i, 'Car Repairs'],
+      ];
+      const isPaymentText = (s) => /payment.*thank|online payment|autopay|auto pay|payment received|mobile payment|e-?payment/i.test(s);
+      const isAmazon = (s) => /amazon|amzn/i.test(s);
+      const catByName = (name) => state.categories.find((c) => c.name.trim().toLowerCase() === name.toLowerCase());
+
+      function loadXlsx() {
+        if (window.XLSX) return Promise.resolve(window.XLSX);
+        return new Promise((resolve, reject) => {
+          const el = document.createElement('script');
+          el.src = XLSX_URL;
+          el.onload = () => resolve(window.XLSX);
+          el.onerror = () => reject(new Error('Couldn’t load the Excel reader. Check your connection, or download the file as CSV instead.'));
+          document.head.appendChild(el);
+        });
+      }
+
+      function parseCsv(text) {
+        const rows = [];
+        let row = [], cell = '', quoted = false;
+        for (let i = 0; i < text.length; i++) {
+          const ch = text[i];
+          if (quoted) {
+            if (ch === '"' && text[i + 1] === '"') { cell += '"'; i++; }
+            else if (ch === '"') quoted = false;
+            else cell += ch;
+          } else if (ch === '"') quoted = true;
+          else if (ch === ',') { row.push(cell); cell = ''; }
+          else if (ch === '\n' || ch === '\r') {
+            if (ch === '\r' && text[i + 1] === '\n') i++;
+            row.push(cell); rows.push(row); row = []; cell = '';
+          } else cell += ch;
+        }
+        if (cell || row.length) { row.push(cell); rows.push(row); }
+        return rows;
+      }
+
+      async function readTable(file) {
+        if (/\.csv$/i.test(file.name)) return parseCsv(await file.text());
+        const XLSX = await loadXlsx();
+        const wb = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true });
+        return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: '' });
+      }
+
+      const pad2 = (n) => String(n).padStart(2, '0');
+      function parseDate(v) {
+        if (v instanceof Date && !isNaN(v)) return `${v.getFullYear()}-${pad2(v.getMonth() + 1)}-${pad2(v.getDate())}`;
+        if (typeof v === 'number' && v > 20000) {   // Excel serial date
+          const d = new Date(Math.round((v - 25569) * 86400000));
+          return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
+        }
+        const s = String(v || '').trim();
+        let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+        if (m) return `${m[1]}-${pad2(m[2])}-${pad2(m[3])}`;
+        m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+        if (m) return `${m[3].length === 2 ? '20' + m[3] : m[3]}-${pad2(m[1])}-${pad2(m[2])}`;
+        return '';
+      }
+
+      function parseAmount(v) {
+        if (typeof v === 'number') return v;
+        let s = String(v || '').trim();
+        if (!s) return NaN;
+        const neg = /^\(.*\)$/.test(s) || /^-/.test(s.replace(/[$\s]/g, ''));
+        s = s.replace(/[^0-9.]/g, '');
+        const n = parseFloat(s);
+        return isNaN(n) ? NaN : (neg ? -n : n);
+      }
+
+      const cleanStore = (s) => String(s).replace(/^(aplpay|tst\*|sq \*)\s*/i, '').replace(/\s{2,}/g, ' ').trim();
+      // First meaningful word of the store name, e.g. "kroger", "walgreens", "sams"
+      function merchantKey(s) {
+        const words = cleanStore(s).toLowerCase().replace(/[^a-z' ]/g, ' ').split(/\s+/).filter((w) => w.length > 1);
+        return words[0] === 'the' ? words.slice(0, 2).join(' ') : (words[0] || '');
+      }
+
+      function suggestCategory(desc, cardCategory) {
+        if (isAmazon(desc)) return '';   // Amazon orders vary; choose per charge
+        const learned = state.importRules[merchantKey(desc)];
+        if (learned && state.categories.some((c) => c.id === learned)) return learned;
+        for (const [table, text] of [[MERCHANT_MAP, desc], [CARD_CATEGORY_MAP, cardCategory]]) {
+          for (const [re, name] of table) {
+            if (!text || !re.test(text)) continue;
+            const c = catByName(name);
+            if (c) return c.id;
+            if (name === 'Insurance') return NEW_INSURANCE;
+          }
+        }
+        return '';
+      }
+
+      function buildImportRows(table) {
+        const headerIdx = table.slice(0, 25).findIndex((r) =>
+          r.some((c) => /date/i.test(c)) && r.some((c) => /amount|debit/i.test(c)));
+        if (headerIdx < 0) throw new Error('Couldn’t find the Date and Amount columns in this file.');
+        const head = table[headerIdx].map((h) => String(h).trim().toLowerCase());
+        const col = (...res) => { for (const re of res) { const i = head.findIndex((h) => re.test(h)); if (i >= 0) return i; } return -1; };
+        const cDate = col(/^transaction date$/, /^trans\.? date$/, /^date$/, /date/);
+        const cDesc = col(/^description$/, /description/, /merchant/, /payee/, /name/);
+        const cAmt = col(/^amount$/, /amount/);
+        const cDebit = col(/debit/), cCredit = col(/credit/);
+        const cCat = col(/^category$/, /category/);
+        const cType = col(/^type$/);
+        if (cDate < 0 || cDesc < 0 || (cAmt < 0 && cDebit < 0)) throw new Error('Couldn’t find the Date, Description and Amount columns in this file.');
+
+        const raw = [];
+        importSkippedPayments = 0;
+        for (const r of table.slice(headerIdx + 1)) {
+          const date = parseDate(r[cDate]);
+          const desc = String(r[cDesc] || '').trim();
+          let amount = cAmt >= 0 ? parseAmount(r[cAmt]) : (parseAmount(r[cDebit]) || 0) - (parseAmount(r[cCredit]) || 0);
+          if (!date || !desc || isNaN(amount) || amount === 0) continue;
+          if (isPaymentText(desc) || (cType >= 0 && /payment/i.test(r[cType]))) { importSkippedPayments++; continue; }
+          raw.push({ date, desc, amount, cardCategory: cCat >= 0 ? String(r[cCat] || '') : '' });
+        }
+        // Some cards list purchases as negative numbers; make purchases positive
+        if (cAmt >= 0 && raw.filter((x) => x.amount < 0).length > raw.length / 2) raw.forEach((x) => { x.amount = -x.amount; });
+
+        const seen = {};
+        return raw.map((x) => {
+          const base = `${x.date}|${x.desc}|${x.amount.toFixed(2)}`;
+          seen[base] = (seen[base] || 0) + 1;
+          const key = `${base}|${seen[base]}`;
+          const dup = state.expenses.some((e) => e.importKey && (e.importKey === key || e.importKey.startsWith(key + '#')));
+          return {
+            key, date: x.date, desc: x.desc, store: cleanStore(x.desc), amount: Math.round(x.amount * 100) / 100,
+            cardCategory: x.cardCategory, amazon: isAmazon(x.desc), dup, include: !dup,
+            catId: dup ? '' : suggestCategory(x.desc, x.cardCategory), parts: null,
+          };
+        }).sort((a, b) => b.date.localeCompare(a.date));
+      }
+
+      function categoryOptions(selected) {
+        const hasInsurance = !!catByName('Insurance');
+        return `<option value="">Choose…</option>` +
+          state.categories.map((c) => `<option value="${c.id}" ${c.id === selected ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('') +
+          (hasInsurance ? '' : `<option value="${NEW_INSURANCE}" ${selected === NEW_INSURANCE ? 'selected' : ''}>Insurance (new category)</option>`);
+      }
+
+      const selectCls = 'rounded-md border px-2 py-1 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500';
+      function renderImport() {
+        const n = importRows.length;
+        const dups = importRows.filter((r) => r.dup).length;
+        const chosen = importRows.filter((r) => r.include);
+        $('importSummary').textContent = `${n} purchase${n === 1 ? '' : 's'} found`
+          + (importSkippedPayments ? ` · ${importSkippedPayments} card payment${importSkippedPayments === 1 ? '' : 's'} left out` : '')
+          + (dups ? ` · ${dups} already imported` : '')
+          + ` · ${chosen.length} selected, ${fmt.format(chosen.reduce((s, r) => s + r.amount, 0))}`;
+        const monthTotals = {};
+        chosen.forEach((r) => {
+          const t = monthTotals[r.date.slice(0, 7)] || (monthTotals[r.date.slice(0, 7)] = { n: 0, sum: 0 });
+          t.n++; t.sum += r.amount;
+        });
+        let lastMonth = '';
+        $('importBody').innerHTML = importRows.map((r, i) => {
+          const m = r.date.slice(0, 7);
+          const t = monthTotals[m] || { n: 0, sum: 0 };
+          const heading = m === lastMonth ? '' : `<tr class="bg-slate-100" data-month="${m}">
+              <td colspan="6" class="py-2 pl-5 pr-5 font-semibold text-slate-700">${escapeHtml(monthName(m))}
+                <span class="font-normal text-slate-500">\u00b7 goes into ${escapeHtml(monthName(m))} Actual \u00b7 ${t.n} selected, ${fmt.format(t.sum)}</span></td>
+            </tr>`;
+          lastMonth = m;
+          const muted = r.include ? '' : 'opacity-50';
+          const needs = r.include && !r.parts && !r.catId;
+          const main = `<tr class="border-t border-slate-100 ${muted}" data-i="${i}">
+            <td class="py-2 pl-5 pr-2"><input type="checkbox" data-inc ${r.include ? 'checked' : ''} aria-label="Include ${escapeHtml(r.store)}" /></td>
+            <td class="py-2 px-2 whitespace-nowrap tabular-nums">${escapeHtml(r.date)}</td>
+            <td class="py-2 px-2">${escapeHtml(r.store)}${r.dup ? ' <span class="text-[11px] text-slate-500">(already imported)</span>' : ''}
+              ${r.cardCategory ? `<div class="text-[11px] text-slate-400">${escapeHtml(r.cardCategory)}</div>` : ''}</td>
+            <td class="py-2 px-2 text-right tabular-nums whitespace-nowrap ${r.amount < 0 ? 'text-emerald-700' : ''}">${fmt.format(r.amount)}${r.amount < 0 ? '<div class="text-[11px]">refund</div>' : ''}</td>
+            <td class="py-2 px-2">${r.parts ? '<span class="text-xs text-slate-500">Split below</span>'
+              : `<select data-cat class="${selectCls} ${needs ? 'border-red-400' : 'border-slate-300'}">${categoryOptions(r.catId)}</select>`}</td>
+            <td class="py-2 pl-2 pr-5 text-right whitespace-nowrap">${r.parts
+              ? '<button type="button" data-unsplit class="text-xs text-slate-500 hover:text-slate-700 underline">Undo split</button>'
+              : '<button type="button" data-split class="text-xs text-emerald-700 hover:text-emerald-600 underline">Split</button>'}</td>
+          </tr>`;
+          if (!r.parts) return heading + main;
+          const left = Math.round((r.amount - r.parts.reduce((s, p) => s + (p.amount || 0), 0)) * 100) / 100;
+          return heading + main + r.parts.map((p, j) => `<tr class="${muted}" data-i="${i}" data-j="${j}">
+              <td></td><td></td>
+              <td class="py-1 px-2 text-right text-xs text-slate-500">Part ${j + 1}</td>
+              <td class="py-1 px-2 text-right"><input type="number" step="0.01" inputmode="decimal" data-pamt value="${p.amount || ''}" aria-label="Part ${j + 1} amount"
+                  class="w-24 rounded-md border border-slate-300 px-2 py-1 text-sm text-right tabular-nums" /></td>
+              <td class="py-1 px-2"><select data-pcat class="${selectCls} ${r.include && !p.catId && p.amount ? 'border-red-400' : 'border-slate-300'}">${categoryOptions(p.catId)}</select></td>
+              <td class="py-1 pl-2 pr-5 text-right">${r.parts.length > 2 ? '<button type="button" data-premove class="text-xs text-slate-400 hover:text-red-600" aria-label="Remove part">&times;</button>' : ''}</td>
+            </tr>`).join('') + `<tr class="${muted}" data-i="${i}">
+              <td></td><td></td>
+              <td colspan="2" class="pb-2 px-2 text-right text-xs ${Math.abs(left) < 0.005 ? 'text-emerald-700' : 'text-red-600'}">${Math.abs(left) < 0.005 ? 'Parts add up ✓' : `${fmt.format(left)} not assigned yet`}</td>
+              <td colspan="2" class="pb-2 px-2"><button type="button" data-padd class="text-xs text-emerald-700 hover:text-emerald-600 underline">+ Add part</button></td>
+            </tr>`;
+        }).join('') || `<tr><td colspan="6" class="py-6 text-center text-slate-400">No purchases found in this file.</td></tr>`;
+        renderImportWarn();
+        $('importConfirm').textContent = `Import ${chosen.length} purchase${chosen.length === 1 ? '' : 's'}`;
+      }
+
+      // Amounts typed into the Actual column would be counted twice if the same purchases are imported
+      function overlapWithTyped() {
+        const hits = {};
+        importRows.filter((r) => r.include).forEach((r) => {
+          const m = r.date.slice(0, 7);
+          (r.parts ? r.parts.map((p) => p.catId) : [r.catId]).forEach((cid) => {
+            const typed = toNum((state.monthActuals[m] || {})[cid]);
+            if (cid && typed) hits[m + '|' + cid] = { m, cid, typed };
+          });
+        });
+        return Object.values(hits);
+      }
+
+      function renderImportWarn() {
+        const hits = overlapWithTyped();
+        const box = $('importWarn');
+        box.hidden = !hits.length;
+        if (!hits.length) return;
+        const wasChecked = $('importClearTyped') ? $('importClearTyped').checked : false;
+        box.innerHTML = `You already typed amounts in the Actual column for: ${hits.map((h) =>
+          `<strong>${escapeHtml(categoryName(h.cid))}</strong> in ${escapeHtml(monthName(h.m))} (${fmt.format(h.typed)})`).join(', ')}.
+          If those are the same purchases, they would be counted twice.
+          <label class="flex items-center gap-2 mt-2 font-medium"><input type="checkbox" id="importClearTyped" ${wasChecked ? 'checked' : ''} />
+          Clear those typed amounts when importing</label>`;
+      }
+
+      async function openImport(file) {
+        try {
+          importRows = buildImportRows(await readTable(file));
+        } catch (e) {
+          toast(e.message || 'Couldn’t read that file.');
+          return;
+        }
+        $('importMsg').textContent = '';
+        $('importBox').hidden = false;
+        renderImport();
+      }
+
+      function closeImport() {
+        $('importBox').hidden = true;
+        importRows = [];
+        $('importFile').value = '';
+      }
+
+      function confirmImport() {
+        const chosen = importRows.filter((r) => r.include);
+        if (!chosen.length) { $('importMsg').textContent = 'Select at least one purchase.'; return; }
+        const missing = chosen.filter((r) => r.parts ? r.parts.some((p) => p.amount && !p.catId) : !r.catId).length;
+        if (missing) { $('importMsg').textContent = `${missing} purchase${missing === 1 ? ' needs' : 's need'} a category.`; return; }
+        const badSplit = chosen.filter((r) => r.parts && Math.abs(r.parts.reduce((s, p) => s + (p.amount || 0), 0) - r.amount) >= 0.005).length;
+        if (badSplit) { $('importMsg').textContent = `${badSplit} split purchase${badSplit === 1 ? '’s parts don’t' : 's’ parts don’t'} add up to the charge.`; return; }
+
+        const clearTyped = $('importClearTyped') && $('importClearTyped').checked ? overlapWithTyped() : [];
+        let insuranceId = null;
+        const resolve = (cid) => {
+          if (cid !== NEW_INSURANCE) return cid;
+          if (!insuranceId) {
+            const existing = catByName('Insurance');
+            insuranceId = existing ? existing.id : uid();
+            if (!existing) state.categories.push({ id: insuranceId, name: 'Insurance', budget: 0 });
+          }
+          return insuranceId;
+        };
+        const now = Date.now();
+        chosen.forEach((r) => {
+          const pieces = r.parts ? r.parts.filter((p) => p.amount) : [{ amount: r.amount, catId: r.catId }];
+          pieces.forEach((p, j) => {
+            state.expenses.push({
+              id: uid(), date: r.date, categoryId: resolve(p.catId), amount: Math.round(p.amount * 100) / 100,
+              description: r.store + (r.parts ? ` (part ${j + 1})` : ''), createdAt: now,
+              importKey: r.parts ? `${r.key}#${j + 1}` : r.key,
+            });
+          });
+          // Remember the choice for this store next time (not Amazon, which varies)
+          if (!r.parts && !r.amazon) { const k = merchantKey(r.desc); if (k) state.importRules[k] = resolve(r.catId); }
+        });
+        clearTyped.forEach((h) => { if (state.monthActuals[h.m]) delete state.monthActuals[h.m][h.cid]; });
+        Object.keys(state.monthActuals).forEach((m) => { if (!Object.keys(state.monthActuals[m]).length) delete state.monthActuals[m]; });
+
+        const count = chosen.length;
+        const latest = chosen.map((r) => r.date).sort().pop().slice(0, 7);
+        const perMonth = {};
+        chosen.forEach((r) => { const m = r.date.slice(0, 7); perMonth[m] = (perMonth[m] || 0) + r.amount; });
+        const breakdown = Object.keys(perMonth).sort().reverse().map((m) => `${monthName(m)}: ${fmt.format(perMonth[m])}`).join(' \u00b7 ');
+        closeImport();
+        save();
+        if (latest !== selectedMonth) switchMonth(latest); else renderAll();
+        toast(`Imported ${count} purchase${count === 1 ? '' : 's'}. ${breakdown}.` + (importSkippedPayments ? ' Card payments were left out.' : ''));
+      }
+
+      $('importBtn').addEventListener('click', () => $('importFile').click());
+      $('importFile').addEventListener('change', (e) => { if (e.target.files[0]) openImport(e.target.files[0]); });
+      $('importCancel').addEventListener('click', closeImport);
+      $('importConfirm').addEventListener('click', confirmImport);
+      $('importBox').addEventListener('keydown', (e) => { if (e.key === 'Escape') closeImport(); });
+      $('importBody').addEventListener('change', (e) => {
+        const tr = e.target.closest('[data-i]');
+        if (!tr) return;
+        const r = importRows[+tr.dataset.i];
+        const d = e.target.dataset;
+        if ('inc' in d) r.include = e.target.checked;
+        else if ('cat' in d) r.catId = e.target.value;
+        else if ('pcat' in d) r.parts[+tr.dataset.j].catId = e.target.value;
+        else if ('pamt' in d) r.parts[+tr.dataset.j].amount = Math.round((parseFloat(e.target.value) || 0) * 100) / 100;
+        $('importMsg').textContent = '';
+        renderImport();
+      });
+      $('importBody').addEventListener('click', (e) => {
+        const tr = e.target.closest('[data-i]');
+        if (!tr || e.target.tagName !== 'BUTTON') return;
+        const r = importRows[+tr.dataset.i];
+        const d = e.target.dataset;
+        if ('split' in d) r.parts = [{ amount: r.amount, catId: r.catId }, { amount: 0, catId: '' }];
+        else if ('unsplit' in d) { r.catId = r.parts[0].catId; r.parts = null; }
+        else if ('padd' in d) r.parts.push({ amount: 0, catId: '' });
+        else if ('premove' in d) r.parts.splice(+tr.dataset.j, 1);
+        renderImport();
       });
 
       $('signInBtn').addEventListener('click', signIn);
