@@ -819,7 +819,7 @@ export default function RemodelBudget() {
     if (!pid) { setApprovedSpecs([]); return; }
     const { data } = await supabase
       .from('design_specs')
-      .select('id, product_name, supplier, quantity, unit_type, installed_cost, room_category')
+      .select('id, product_name, supplier, quantity, unit_type, unit_price, installed_cost, room_category')
       .eq('project_id', pid)
       .eq('status', 'approved')
       .order('room_category');
@@ -1344,9 +1344,9 @@ export default function RemodelBudget() {
     if (approvedSpecs.length > 0) {
       const rows = approvedSpecs.map((sp) => `
         <tr>
-          <td>${sp.product_name}</td>
-          <td>${sp.supplier || '—'}</td>
-          <td class="amount">${sp.quantity} ${sp.unit_type}</td>
+          <td>${escHtml(sp.product_name)}</td>
+          <td>${escHtml(sp.supplier || '—')}</td>
+          <td class="amount">${escHtml(`${sp.quantity} ${sp.unit_type}`)}</td>
           <td class="amount">$${(Number(sp.installed_cost) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
         </tr>`).join('');
       specsTableHTML = `
@@ -1378,14 +1378,18 @@ export default function RemodelBudget() {
         </table>`;
     }
 
+    const money = (n) => '$' + Math.round(Number(n) || 0).toLocaleString('en-US');
     let wbsRowsHTML = '';
     for (const div of config.divisions) {
       const divTotal  = totals.divSums?.[div.key] ?? 0;
       const divActual = div.items.reduce((s, item) => (isMarginLine(item) ? s : s + (actualVals[item.wbs] ?? 0)), 0);
       const divVar    = divCostBudget(div, lineVals) - divActual;
       const varCol    = divVar < 0 ? '#DC2626' : '#065F46';
+      const db = divBreakdown(div);
+      const isPctDiv = div.items.every((it) => it.unit === 'pct');
       wbsRowsHTML += `<tr class="div-header">
-        <td colspan="2">${div.label}</td>
+        <td colspan="2">${escHtml(div.label)}</td>
+        ${isPctDiv ? '<td></td><td></td><td></td>' : `<td class="amount m">${money(db.m)}</td><td class="amount s">${money(db.s)}</td><td class="amount o">${money(db.o)}</td>`}
         <td class="amount">$${Math.round(divTotal).toLocaleString('en-US')}</td>
         ${hasActuals ? `<td class="amount">$${Math.round(divActual).toLocaleString('en-US')}</td><td class="amount" style="color:${varCol}">${divVar >= 0 ? '+' : '−'}$${Math.round(Math.abs(divVar)).toLocaleString('en-US')}</td>` : ''}
       </tr>`;
@@ -1394,9 +1398,12 @@ export default function RemodelBudget() {
         if (val === 0) continue;
         const act = isMarginLine(item) ? 0 : (actualVals[item.wbs] ?? 0);
         const vari = val - act;
+        const lb = item.unit === 'pct' ? null : lineBreakdown(item);
+        const al = item.unit === 'pct' ? null : allowanceOf(item);
         wbsRowsHTML += `<tr>
           <td class="wbs-code">${escHtml(item.badge ?? item.wbs)}</td>
-          <td>${escHtml(item.label)}</td>
+          <td>${escHtml(item.label)}${al?.on && al.amount > 0 ? ' <span class="tag">Allowance</span>' : ''}</td>
+          ${lb ? `<td class="amount m">${money(lb.m)}</td><td class="amount s">${money(lb.s)}</td><td class="amount o">${money(lb.o)}</td>` : '<td></td><td></td><td></td>'}
           <td class="amount">$${Math.round(val).toLocaleString('en-US')}</td>
           ${hasActuals ? `<td class="amount">${act > 0 ? '$' + Math.round(act).toLocaleString('en-US') : '—'}</td><td class="amount" style="color:${vari < 0 ? '#DC2626' : '#374151'}">${act > 0 ? (vari >= 0 ? '+' : '−') + '$' + Math.round(Math.abs(vari)).toLocaleString('en-US') : '—'}</td>` : ''}
         </tr>`;
@@ -1408,6 +1415,30 @@ export default function RemodelBudget() {
     ).join('');
 
     const extraColHeaders = hasActuals ? '<th class="amount">Actual</th><th class="amount">Variance</th>' : '';
+
+    // Cost breakdown and client allowances (internal printout).
+    const bdBase = budgetByType.m + budgetByType.s + budgetByType.o;
+    const breakdownHTML = `
+      <h2>Cost Breakdown</h2>
+      <table>
+        <thead><tr><th>Type</th><th class="amount">Share</th><th class="amount">Budget</th>${hasActuals ? '<th class="amount">Spent</th><th class="amount">Left</th>' : ''}</tr></thead>
+        <tbody>${COST_TYPES.map((t) => {
+          const b = budgetByType[t.key]; const sp = spentByType[t.key];
+          return `<tr><td style="font-weight:700;color:${t.color}">${t.label}</td>
+            <td class="amount">${bdBase > 0 ? Math.round((b / bdBase) * 100) + '%' : '—'}</td>
+            <td class="amount">${money(b)}</td>
+            ${hasActuals ? `<td class="amount">${money(sp)}</td><td class="amount" style="color:${b - sp < 0 ? '#DC2626' : '#065F46'}">${b - sp < 0 ? '−' : ''}${money(Math.abs(b - sp))}${b - sp < 0 ? ' over' : ''}</td>` : ''}</tr>`;
+        }).join('')}</tbody>
+        <tfoot><tr><td class="amount-label">Direct costs by type</td><td></td><td class="amount">${money(bdBase)}</td>${hasActuals ? '<td></td><td></td>' : ''}</tr></tfoot>
+      </table>
+      <p class="note">${designSpecsTotal > 0 ? 'Approved design selections count as materials. ' : ''}${totals.changeOrderCost ? 'Approved change orders and contingency are not split.' : 'Contingency is not split.'}</p>`;
+    const allowancesHTML = allowanceList.length ? `
+      <h2>Client Allowances <span class="h2-note">(shown to the client — included in the price)</span></h2>
+      <table>
+        <thead><tr><th>Item</th><th>Section</th><th class="amount">Allowance</th></tr></thead>
+        <tbody>${allowanceList.map((a) => `<tr><td>${escHtml(a.item.label)}</td><td>${escHtml(a.div.label)}</td><td class="amount">${money(a.amount)}</td></tr>`).join('')}</tbody>
+        <tfoot><tr><td colspan="2" class="amount-label">Total Allowances</td><td class="amount">${money(allowanceTotal)}</td></tr></tfoot>
+      </table>` : '';
 
     const html = `<!DOCTYPE html>
 <html>
@@ -1436,6 +1467,10 @@ export default function RemodelBudget() {
     .amount-label{text-align:right;font-weight:700;font-size:9pt;color:#002147}
     tr.div-header td{background:#F5F4F0;font-weight:700;font-size:9pt;color:#002147;border-bottom:1px solid #E5E7EB}
     .wbs-code{font-size:8pt;font-weight:700;color:#7C3AED;width:40px}
+    th.m,td.m{color:#B45309} th.s,td.s{color:#0369A1} th.o,td.o{color:#6B7280}
+    .tag{font-size:7pt;font-weight:700;color:#7C3AED;background:#F5F3FF;border-radius:3px;padding:1px 4px;margin-left:4px}
+    .note{font-size:8pt;color:#9CA3AF;margin-bottom:6px}
+    .h2-note{font-size:7.5pt;font-weight:600;color:#9CA3AF;text-transform:none;letter-spacing:0}
     tfoot tr td{font-weight:700;border-top:1.5px solid #D1D5DB;border-bottom:none;background:#F9FAFB}
     .totals-block{margin-top:20px;border:2px solid #002147;border-radius:8px;overflow:hidden}
     .totals-row{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;font-size:10pt;border-bottom:1px solid #E5E7EB}
@@ -1464,7 +1499,7 @@ export default function RemodelBudget() {
         <div class="brand-sub">Design &amp; Construction · Virginia Beach, VA</div>
       </div>
     </div>
-    <div class="doc-meta"><strong>Budget Estimate — ${currentProjectName ?? ''}</strong>${dateStr}</div>
+    <div class="doc-meta"><strong>Budget Estimate — ${escHtml(currentProjectName ?? '')}</strong>${dateStr}</div>
   </div>
   <h2>Project Parameters</h2>
   <div class="params-grid">
@@ -1476,9 +1511,11 @@ export default function RemodelBudget() {
   ${changeOrdersHTML}
   <h2>Work Breakdown Structure${hasActuals ? ' — Budget vs Actual' : ''}</h2>
   <table>
-    <thead><tr><th style="width:40px">WBS</th><th>Description</th><th class="amount">Budget</th>${extraColHeaders}</tr></thead>
+    <thead><tr><th style="width:40px">WBS</th><th>Description</th><th class="amount m">Materials</th><th class="amount s">Subcontract</th><th class="amount o">Other / Fees</th><th class="amount">Budget</th>${extraColHeaders}</tr></thead>
     <tbody>${wbsRowsHTML}</tbody>
   </table>
+  ${breakdownHTML}
+  ${allowancesHTML}
   <div class="totals-block">
     <div class="totals-row sub"><span class="t-label">Direct Costs (Materials + Labor)</span><span class="t-value">$${Math.round(totals.directCosts).toLocaleString('en-US')}</span></div>
     <div class="totals-row sub"><span class="t-label">Contingency (${pctRates.contingencyPct}%)</span><span class="t-value">$${Math.round(totals.contingency).toLocaleString('en-US')}</span></div>
@@ -1503,6 +1540,82 @@ export default function RemodelBudget() {
 </body>
 </html>`;
 
+    const win = window.open('', '_blank');
+    if (win) { win.document.write(html); win.document.close(); }
+  }
+
+  // ── Materials List (internal): what to buy, by section ─────────────────────
+  // Each line's materials budget (from the cost breakdown), marked when it is a
+  // client allowance, plus approved design selections at their material price.
+  function handleMaterialsList() {
+    const dateStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    const money = (n) => '$' + Math.round(Number(n) || 0).toLocaleString('en-US');
+    let rowsHTML = '';
+    let total = 0;
+    for (const div of config.divisions) {
+      const lines = div.items.filter((it) => it.unit !== 'pct')
+        .map((it) => ({ it, m: lineBreakdown(it).m, al: allowanceOf(it) }))
+        .filter((x) => x.m > 0.5);
+      if (!lines.length) continue;
+      const sub = lines.reduce((t, x) => t + x.m, 0);
+      total += sub;
+      rowsHTML += `<tr class="div-header"><td colspan="2">${escHtml(div.label)}</td><td></td><td class="amount">${money(sub)}</td></tr>`;
+      rowsHTML += lines.map(({ it, m, al }) => `<tr>
+        <td class="wbs-code">${escHtml(it.badge ?? it.wbs)}</td>
+        <td>${escHtml(it.label)}</td>
+        <td class="amount">${al.on && al.amount > 0 ? `<span class="tag">Allowance ${money(al.amount)}</span>` : ''}</td>
+        <td class="amount">${money(m)}</td></tr>`).join('');
+    }
+    const specCost = (sp) => (Number(sp.unit_price) || 0) * (Number(sp.quantity) || 0) || (Number(sp.installed_cost) || 0);
+    const specsTotal = approvedSpecs.reduce((t, sp) => t + specCost(sp), 0);
+    const specsHTML = approvedSpecs.length ? `
+      <h2>Approved Design Selections</h2>
+      <table>
+        <thead><tr><th>Product</th><th>Supplier</th><th class="amount">Qty</th><th class="amount">Material Price</th></tr></thead>
+        <tbody>${approvedSpecs.map((sp) => `<tr><td>${escHtml(sp.product_name)}</td><td>${escHtml(sp.supplier || '—')}</td>
+          <td class="amount">${escHtml(`${sp.quantity} ${sp.unit_type ?? ''}`)}</td><td class="amount">${money(specCost(sp))}</td></tr>`).join('')}</tbody>
+        <tfoot><tr><td colspan="3" class="amount-label">Design Selections Total</td><td class="amount">${money(specsTotal)}</td></tr></tfoot>
+      </table>` : '';
+    const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Orozco Homes — Materials List</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:10.5pt;color:#1A1A1A;padding:40px 48px;max-width:820px;margin:0 auto}
+  .header{display:flex;align-items:center;justify-content:space-between;padding-bottom:16px;border-bottom:2.5px solid #002147;margin-bottom:18px}
+  .brand-name{font-size:17pt;font-weight:900;color:#002147}
+  .brand-sub{font-size:8pt;color:#6B7280;text-transform:uppercase;letter-spacing:.12em;font-weight:600}
+  .doc-meta{text-align:right;font-size:8pt;color:#6B7280}
+  .doc-meta strong{display:block;font-size:10pt;color:#002147;margin-bottom:2px}
+  .internal{display:inline-block;margin-top:4px;font-size:7.5pt;font-weight:800;letter-spacing:.1em;color:#B45309;border:1px solid #FDE68A;background:#FFFBEB;border-radius:4px;padding:1px 6px}
+  h2{font-size:10pt;font-weight:800;color:#002147;text-transform:uppercase;letter-spacing:.1em;margin:18px 0 8px;border-left:3px solid #D4AF37;padding-left:8px}
+  table{width:100%;border-collapse:collapse;margin-bottom:8px;font-size:9.5pt}
+  th{text-align:left;font-size:8pt;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#6B7280;border-bottom:1.5px solid #E5E7EB;padding:5px 6px}
+  td{padding:5px 6px;border-bottom:1px solid #F3F4F6;vertical-align:top}
+  .amount{text-align:right;font-variant-numeric:tabular-nums}
+  .amount-label{text-align:right;font-weight:700;font-size:9pt;color:#002147}
+  tr.div-header td{background:#F5F4F0;font-weight:700;font-size:9pt;color:#002147;border-bottom:1px solid #E5E7EB}
+  .wbs-code{font-size:8pt;font-weight:700;color:#7C3AED;width:40px}
+  .tag{font-size:7.5pt;font-weight:700;color:#7C3AED;background:#F5F3FF;border-radius:3px;padding:1px 5px}
+  tfoot tr td{font-weight:700;border-top:1.5px solid #D1D5DB;border-bottom:none;background:#F9FAFB}
+  .grand{margin-top:14px;display:flex;justify-content:space-between;padding:10px 14px;border:2px solid #002147;border-radius:8px;font-weight:800;color:#002147}
+  .note{font-size:8pt;color:#9CA3AF;margin-top:14px}
+  @media print{body{padding:0}@page{margin:.6in;size:letter portrait}}
+</style></head><body>
+  <div class="header">
+    <div><div class="brand-name">Orozco Homes</div><div class="brand-sub">Design &amp; Construction · Virginia Beach, VA</div></div>
+    <div class="doc-meta"><strong>Materials List — ${escHtml(currentProjectName ?? config.label)}</strong>${dateStr}<br><span class="internal">INTERNAL</span></div>
+  </div>
+  <h2>Materials by Section</h2>
+  <table>
+    <thead><tr><th style="width:40px">WBS</th><th>Item</th><th class="amount">Client Allowance</th><th class="amount">Materials Budget</th></tr></thead>
+    <tbody>${rowsHTML || '<tr><td colspan="4">No materials in this budget.</td></tr>'}</tbody>
+    <tfoot><tr><td colspan="3" class="amount-label">Materials Budget Total</td><td class="amount">${money(total)}</td></tr></tfoot>
+  </table>
+  ${specsHTML}
+  <div class="grand"><span>Total Materials (budget${approvedSpecs.length ? ' + approved selections' : ''})</span><span>${money(total + specsTotal)}</span></div>
+  <p class="note">Materials budget = each line's budget × its Materials %. Use for ordering and supplier quotes; compare purchases with these amounts. Internal — not for the client.</p>
+  <script>window.onload=function(){window.print()}</script>
+</body></html>`;
     const win = window.open('', '_blank');
     if (win) { win.document.write(html); win.document.close(); }
   }
@@ -1555,6 +1668,16 @@ export default function RemodelBudget() {
               &#8635; Reset overrides
             </button>
           )}
+          <button onClick={handleMaterialsList}
+            title="Internal list of materials to buy, by section. Don't send this to clients."
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold"
+            style={{ backgroundColor: '#fff', color: '#B45309', border: '1.5px solid #FDE68A' }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
+              <line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" />
+            </svg>
+            Materials List
+          </button>
           <button onClick={handleExport}
             title="Internal budget with costs and margin. Don't send this to clients."
             className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold"
