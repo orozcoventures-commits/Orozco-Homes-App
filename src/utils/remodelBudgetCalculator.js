@@ -2,10 +2,13 @@
 // Remodel Budget Estimation Engine
 // Regional basis: Virginia Beach / Hampton Roads, VA  |  Index year: 2026
 // Covers: Bathrooms (S/M/L), Kitchens (S/M/L), Addition, Portico,
-//         Garage Conversion, Full Renovation
+//         Garage Conversion, Full Renovation, plus the partial renovation
+//         types in remodelRenovationTypes.js
 // Pricing: Final Price = (Direct Costs + Contingency 10%) / (1 - Gross Margin 35%).
 // The gross margin covers overhead AND profit, so overhead is not a separate line.
 // ─────────────────────────────────────────────────────────────────────────────
+
+import { RENOVATION_CONFIGS } from './remodelRenovationTypes';
 
 export const SPEC_LEVELS = ['standard', 'mid', 'custom'];
 
@@ -686,6 +689,8 @@ export const REMODEL_CONFIGS = {
     ],
   },
 
+  // Partial renovations (shower add, flooring, attic, deck, ...)
+  ...RENOVATION_CONFIGS,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -716,6 +721,7 @@ export function computeBaseLineValues(projectTypeId, inputs, specLevel) {
   const spec   = SPEC_LEVELS.includes(specLevel) ? specLevel : 'mid';
   const sqft   = Number(inputs.sqft) || 0;
   const cabLf  = Number(inputs.cabinetLinearFt) || 0;
+  const qty    = Number(inputs.qty) || 0;
   const result = {};
 
   for (const div of config.divisions) {
@@ -746,6 +752,9 @@ export function computeBaseLineValues(projectTypeId, inputs, specLevel) {
           break;
         case 'flat':
           result[item.wbs] = rate;
+          break;
+        case 'qty':
+          result[item.wbs] = rate * qty;
           break;
         default:
           result[item.wbs] = 0;
