@@ -1023,6 +1023,8 @@ export default function RemodelBudget() {
   function setPctRate(key, val)        { setPctRates((p) => ({ ...p, [key]: val })); }
   function toggleDiv(key)              { setOpenDivs((p) => ({ ...p, [key]: !(resolvedOpenDivs[key] ?? true) })); }
 
+  // The Project Type drop-downs show the group that holds the current type.
+  const currentGroup = PROJECT_GROUPS.find((g) => g.types.includes(projectType)) ?? PROJECT_GROUPS[0];
   const hasOverrides = Object.entries(overrideFlags).some(([w, on]) => on && !isCustomWbs(w));
   const showActuals  = !!currentProjectId && actualsOn;
   const actualByType = Object.entries(actualParts).reduce((acc, [wbs, p]) => {
@@ -1399,28 +1401,30 @@ export default function RemodelBudget() {
       <div className="rounded-2xl p-5 mb-5"
         style={{ backgroundColor: '#fff', border: '1.5px solid #E8E6E1', boxShadow: '0 2px 12px rgba(0,33,71,0.05)' }}>
         <p className="text-xs font-bold tracking-[0.14em] uppercase mb-3" style={{ color: '#002147' }}>Project Type</p>
-        <div className="space-y-3">
-          {PROJECT_GROUPS.map((group) => (
-            <div key={group.label}>
-              <p className="text-xs font-semibold mb-1.5 uppercase tracking-wide" style={{ color: '#9CA3AF' }}>{group.label}</p>
-              <div className="flex flex-wrap gap-2">
-                {group.types.map((typeId) => {
-                  const isActive = projectType === typeId;
-                  return (
-                    <button key={typeId} onClick={() => changeProjectType(typeId)}
-                      className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-150 focus:outline-none"
-                      style={{
-                        backgroundColor: isActive ? '#002147' : '#F9FAFB',
-                        color:           isActive ? '#D4AF37'  : '#6B7280',
-                        border:          isActive ? '1.5px solid #002147' : '1.5px solid #E5E7EB',
-                      }}>
-                      {TYPE_BUTTON_LABELS[typeId]}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
+        {/* Two drop-downs: pick a category, then a project in it */}
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="rb-category" className="block text-xs font-semibold mb-1.5" style={{ color: '#374151' }}>Category</label>
+            <select id="rb-category" value={currentGroup?.label ?? ''}
+              onChange={(e) => {
+                const group = PROJECT_GROUPS.find((g) => g.label === e.target.value);
+                if (group) changeProjectType(group.types[0]);
+              }}
+              className="w-full px-3 py-2.5 rounded-xl text-sm font-semibold focus:outline-none"
+              style={{ backgroundColor: '#F9FAFB', border: '1.5px solid #E5E7EB', color: '#002147' }}>
+              {PROJECT_GROUPS.map((g) => <option key={g.label} value={g.label}>{g.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="rb-project-type" className="block text-xs font-semibold mb-1.5" style={{ color: '#374151' }}>Project</label>
+            <select id="rb-project-type" value={projectType} onChange={(e) => changeProjectType(e.target.value)}
+              className="w-full px-3 py-2.5 rounded-xl text-sm font-semibold focus:outline-none"
+              style={{ backgroundColor: '#F9FAFB', border: '1.5px solid #E5E7EB', color: '#002147' }}>
+              {(currentGroup?.types ?? []).map((typeId) => (
+                <option key={typeId} value={typeId}>{getProjectConfig(typeId)?.label ?? TYPE_BUTTON_LABELS[typeId]}</option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
