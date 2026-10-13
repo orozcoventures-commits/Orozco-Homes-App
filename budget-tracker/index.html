@@ -530,9 +530,10 @@
         try {
           const { data, error } = await sb.auth.signInWithPassword({ email, password });
           if (error) {
-            $('authMsg').textContent = /invalid/i.test(error.message)
+            const wrongLogin = error.code === 'invalid_credentials' || /invalid login credentials/i.test(error.message);
+            $('authMsg').textContent = wrongLogin
               ? 'That email and password don\u2019t match. Use the same login as the Orozco Homes app.'
-              : 'Couldn\u2019t sign in: ' + error.message;
+              : 'Couldn\u2019t sign in (' + (error.status || '') + ' ' + (error.code || '') + '): ' + error.message;
             return;
           }
           $('authPassword').value = '';

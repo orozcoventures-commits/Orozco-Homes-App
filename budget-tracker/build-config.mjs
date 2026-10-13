@@ -4,11 +4,15 @@
 // this-device-only mode.
 import { writeFileSync } from 'node:fs';
 
-const url = process.env.VITE_SUPABASE_URL || '';
-const anonKey = process.env.VITE_SUPABASE_ANON_KEY || '';
+// Tolerate values pasted with spaces, quotes, a trailing slash or the "/rest/v1/" API path
+const clean = (v) => (v || '').trim().replace(/^["']|["']$/g, '').trim();
+const url = clean(process.env.VITE_SUPABASE_URL).replace(/\/+$/, '').replace(/\/rest\/v1$/, '');
+const anonKey = clean(process.env.VITE_SUPABASE_ANON_KEY);
 
 writeFileSync(
   new URL('./config.js', import.meta.url),
   `window.BUDGET_CONFIG = ${JSON.stringify({ supabaseUrl: url, supabaseAnonKey: anonKey })};\n`,
 );
-console.log(url && anonKey ? 'config.js written with Supabase settings' : 'config.js written WITHOUT Supabase settings (device-only mode)');
+console.log(url && anonKey
+  ? `config.js written with Supabase settings (url=${url}, key starts ${anonKey.slice(0, 15)}…)`
+  : 'config.js written WITHOUT Supabase settings (device-only mode)');
