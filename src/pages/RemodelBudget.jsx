@@ -18,6 +18,13 @@ const PROJECT_GROUPS = [
   { label: 'Bathrooms',     types: ['bathroom-small', 'bathroom-medium', 'bathroom-large'] },
   { label: 'Kitchens',      types: ['kitchen-small', 'kitchen-medium', 'kitchen-large'] },
   { label: 'Home Services', types: ['addition', 'portico', 'garage-conversion', 'full-renovation'] },
+  // Partial renovations (remodelRenovationTypes.js)
+  { label: 'Bathroom Projects',     types: ['add-shower', 'tub-to-shower', 'bath-refresh', 'aging-in-place-bath', 'double-vanity'] },
+  { label: 'Kitchen Projects',      types: ['kitchen-refresh', 'kitchen-island'] },
+  { label: 'Interior Renovations',  types: ['fireplace-builtin', 'wall-removal', 'flooring', 'attic-conversion', 'interior-painting',
+                                           'popcorn-removal', 'trim-molding', 'laundry-mudroom', 'closet-buildout', 'home-office-builtins', 'staircase-remodel'] },
+  { label: 'Exterior & Outdoor',    types: ['deck', 'screened-porch', 'window-replacement', 'exterior-door', 'siding'] },
+  { label: 'Repairs & Building Health', types: ['crawlspace-encapsulation', 'water-damage-repair'] },
 ];
 
 const TYPE_BUTTON_LABELS = {
@@ -31,6 +38,31 @@ const TYPE_BUTTON_LABELS = {
   'portico':           'Portico',
   'garage-conversion': 'Garage Conv.',
   'full-renovation':   'Full Reno',
+  'add-shower':               'Add a Shower',
+  'tub-to-shower':            'Tub-to-Shower',
+  'bath-refresh':             'Bath Refresh',
+  'aging-in-place-bath':      'Accessible Bath',
+  'double-vanity':            'Double Vanity',
+  'kitchen-refresh':          'Kitchen Refresh',
+  'kitchen-island':           'Kitchen Island',
+  'fireplace-builtin':        'Fireplace → Built-In',
+  'wall-removal':             'Wall Removal',
+  'flooring':                 'Flooring',
+  'attic-conversion':         'Attic Conversion',
+  'interior-painting':        'Interior Painting',
+  'popcorn-removal':          'Popcorn Ceiling',
+  'trim-molding':             'Trim & Molding',
+  'laundry-mudroom':          'Laundry / Mudroom',
+  'closet-buildout':          'Closet Build-Out',
+  'home-office-builtins':     'Office Built-Ins',
+  'staircase-remodel':        'Staircase',
+  'deck':                     'Deck',
+  'screened-porch':           'Screened Porch',
+  'window-replacement':       'Windows',
+  'exterior-door':            'Exterior Door',
+  'siding':                   'Siding',
+  'crawlspace-encapsulation': 'Crawlspace',
+  'water-damage-repair':      'Water Damage',
 };
 
 const DIV_COLORS = {
@@ -1397,7 +1429,7 @@ export default function RemodelBudget() {
       <div className="rounded-2xl p-6 mb-5"
         style={{ backgroundColor: '#fff', border: '1.5px solid #E8E6E1', boxShadow: '0 2px 12px rgba(0,33,71,0.05)' }}>
         <p className="text-xs font-bold tracking-[0.14em] uppercase mb-4" style={{ color: '#002147' }}>Project Parameters</p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-4">
+        {config.inputFields.length > 0 && <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-4">
           {config.inputFields.map((field) => (
             <NumberInput key={field.key} label={field.label}
               value={inputs[field.key] ?? field.default}
@@ -1405,7 +1437,7 @@ export default function RemodelBudget() {
               min={field.min} max={field.max} step={field.step} suffix={field.unit}
             />
           ))}
-        </div>
+        </div>}
         <div className="flex flex-col gap-1">
           <label className="text-xs font-semibold" style={{ color: '#374151' }}>Specification Level</label>
           <div className="flex gap-2">
