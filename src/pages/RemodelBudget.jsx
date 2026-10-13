@@ -811,6 +811,7 @@ export default function RemodelBudget() {
   const syncingRef      = useRef(false);  // true while loading from DB (suppress saves)
   const saveTimerRef    = useRef(null);
   const savePayloadRef  = useRef(null);
+  const allowancesSnapshotRef = useRef([]);  // [{ key, label, amount }] saved for Designer Workspace
   const actualTimers    = useRef({});     // per-wbs debounce timers
 
   // ── Load design specs ───────────────────────────────────────────────────────
@@ -949,12 +950,21 @@ export default function RemodelBudget() {
     saveTimerRef.current = setTimeout(async () => {
       if (!savePayloadRef.current) return;
       setSaving(true);
+      // The allowance list is read now (it is refreshed after every render).
+      let payload = { ...savePayloadRef.current, allowances_json: allowancesSnapshotRef.current };
       let { error } = await supabase
         .from('remodel_budgets')
-        .upsert(savePayloadRef.current, { onConflict: 'project_id' });
-      // Before migration 050 there is no layout_json column: save the rest.
+        .upsert(payload, { onConflict: 'project_id' });
+      // Before migration 052 there is no allowances_json column (Designer
+      // Workspace comparison); before 050 no layout_json: save the rest.
+      if (error && /allowances_json/.test(error.message ?? '')) {
+        payload = { ...payload };
+        delete payload.allowances_json;
+        ({ error } = await supabase.from('remodel_budgets').upsert(payload, { onConflict: 'project_id' }));
+      }
       if (error && /layout_json/.test(error.message ?? '')) {
-        const { layout_json, ...rest } = savePayloadRef.current;
+        const { layout_json, ...rest } = payload;
+        delete rest.allowances_json;
         ({ error } = await supabase.from('remodel_budgets').upsert(rest, { onConflict: 'project_id' }));
         setLayoutError(layoutIsEmpty(layout_json) ? '' : 'Added, renamed and removed lines are not saved yet — run migration 050 in Supabase.');
       } else {
@@ -1210,6 +1220,25 @@ export default function RemodelBudget() {
     .map((it) => ({ item: it, div, ...allowanceOf(it) }))
     .filter((a) => a.on && a.amount > 0)) : [];
   const allowancesForClient = allowanceList.map((a) => ({ label: a.item.label, amount: a.amount }));
+  // Client-facing names, as on proposals: no "(Mat + Labor)".
+  const allowancesSnapshot = JSON.stringify(allowanceList.map((a) => ({
+    key: a.item.wbs, label: a.item.label.replace(/\s*\((mat|material)s?\s*\+\s*labor\)/i, '').trim(), amount: a.amount,
+  })));
+  useEffect(() => { allowancesSnapshotRef.current = JSON.parse(allowancesSnapshot); }, [allowancesSnapshot]);
+  // Keep the saved allowance list current for Designer Workspace, also for
+  // budgets saved before it existed. Updates only that column of an existing
+  // budget row (never creates one); errors (e.g. before migration 052) are ignored.
+  const lastAllowanceWrite = useRef('');
+  useEffect(() => {
+    if (!currentProjectId) return undefined;
+    const key = `${currentProjectId}|${allowancesSnapshot}`;
+    const t = setTimeout(() => {
+      if (syncingRef.current || lastAllowanceWrite.current === key) return;
+      lastAllowanceWrite.current = key;
+      supabase.from('remodel_budgets').update({ allowances_json: JSON.parse(allowancesSnapshot) }).eq('project_id', currentProjectId).then(() => {});
+    }, 2000);
+    return () => clearTimeout(t);
+  }, [currentProjectId, allowancesSnapshot]);
   const allowanceTotal = allowanceList.reduce((s, a) => s + a.amount, 0);
 
   if (!config) return null;
