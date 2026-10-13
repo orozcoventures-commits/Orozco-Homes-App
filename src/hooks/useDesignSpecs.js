@@ -7,6 +7,10 @@ const SPEC_SELECT = `
   phase_tag, designer_notes, status, client_feedback, created_by, created_at, updated_at,
   project:projects(id, project_name)
 `;
+// allowance_key arrives with migration 052; without it the app works as before.
+const SPEC_SELECT_ALLOWANCE = `${SPEC_SELECT}, allowance_key`;
+const missingAllowanceCol = (error) => /allowance_key/.test(error?.message ?? '');
+const withoutAllowance = (payload) => { const rest = { ...payload }; delete rest.allowance_key; return rest; };
 
 export function useDesignSpecs(projectId = null) {
   const [specs,   setSpecs]   = useState([]);
@@ -16,11 +20,12 @@ export function useDesignSpecs(projectId = null) {
     const target = pid ?? projectId;
     if (!target) { setSpecs([]); return; }
     setLoading(true);
-    const { data } = await supabase
+    let { data, error } = await supabase
       .from('design_specs')
-      .select(SPEC_SELECT)
+      .select(SPEC_SELECT_ALLOWANCE)
       .eq('project_id', target)
       .order('created_at');
+    if (error) ({ data } = await supabase.from('design_specs').select(SPEC_SELECT).eq('project_id', target).order('created_at'));
     setSpecs(data ?? []);
     setLoading(false);
   }, [projectId]);
@@ -29,23 +34,31 @@ export function useDesignSpecs(projectId = null) {
 
   const createSpec = useCallback(async (payload) => {
     const { data: { user } } = await supabase.auth.getUser();
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('design_specs')
       .insert({ ...payload, created_by: user?.id })
-      .select(SPEC_SELECT)
+      .select(SPEC_SELECT_ALLOWANCE)
       .single();
+    if (error && missingAllowanceCol(error)) {
+      ({ data, error } = await supabase.from('design_specs')
+        .insert({ ...withoutAllowance(payload), created_by: user?.id }).select(SPEC_SELECT).single());
+    }
     if (error) return { error: error.message };
     setSpecs((prev) => [...prev, data]);
     return { data };
   }, []);
 
   const updateSpec = useCallback(async (id, payload) => {
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('design_specs')
       .update(payload)
       .eq('id', id)
-      .select(SPEC_SELECT)
+      .select(SPEC_SELECT_ALLOWANCE)
       .single();
+    if (error && missingAllowanceCol(error)) {
+      ({ data, error } = await supabase.from('design_specs')
+        .update(withoutAllowance(payload)).eq('id', id).select(SPEC_SELECT).single());
+    }
     if (error) return { error: error.message };
     setSpecs((prev) => prev.map((s) => (s.id === id ? data : s)));
     return { data };

@@ -3,6 +3,8 @@ import { supabase } from '../lib/supabase';
 import { useDesignSpecs } from '../hooks/useDesignSpecs';
 import { useAuth } from '../context/AuthContext';
 import { useProject } from '../context/ProjectContext';
+import { useProjectAllowances } from '../hooks/useProjectAllowances';
+import { suggestAllowanceKey, compareAllowances } from '../utils/allowances';
 
 const ROOM_CATEGORIES = [
   { key: 'all',      label: 'All Rooms' },
@@ -50,7 +52,58 @@ const EMPTY_FORM = {
   phase_tag:      '',
   designer_notes: '',
   status:         'pending_review',
+  allowance_key:  '',
 };
+
+// Allowances vs. selections (material price = unit price × quantity).
+function AllowancePanel({ allowances, specs, forClient }) {
+  if (!allowances.length) return null;
+  const rows = compareAllowances(allowances, specs);
+  const money = (n) => '$' + Math.round(Math.abs(n)).toLocaleString('en-US');
+  return (
+    <div className="rounded-2xl p-5 mb-6" style={{ backgroundColor: '#fff', border: '1.5px solid #DDD6FE', boxShadow: '0 2px 12px rgba(124,58,237,0.06)' }}>
+      <div className="flex items-baseline justify-between flex-wrap gap-2 mb-3">
+        <p className="text-xs font-bold tracking-[0.14em] uppercase" style={{ color: '#7C3AED' }}>{forClient ? 'Your Allowances' : 'Allowances'}</p>
+        <p className="text-xs" style={{ color: '#9CA3AF' }}>
+          {forClient ? 'Included in your price — compared with your selections' : 'From the Remodel Budget — compared with material prices of selections'}
+        </p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-xs uppercase tracking-wide" style={{ color: '#9CA3AF' }}>
+              <th className="text-left font-semibold pb-1.5">Allowance</th>
+              <th className="text-right font-semibold pb-1.5">Amount</th>
+              <th className="text-right font-semibold pb-1.5">Selected</th>
+              <th className="text-right font-semibold pb-1.5">Over / Under</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.key} style={{ borderTop: '1px solid #F3F4F6' }}>
+                <td className="py-2 font-semibold" style={{ color: '#374151' }}>{r.label}</td>
+                <td className="py-2 text-right font-bold" style={{ color: '#002147' }}>{money(r.amount)}</td>
+                <td className="py-2 text-right" style={{ color: '#0369A1' }}>
+                  {r.count ? money(r.selected) : <span style={{ color: '#9CA3AF' }}>—</span>}
+                  {r.pending > 0 && <span className="block text-xs" style={{ color: '#92400E' }}>{money(r.pending)} pending</span>}
+                </td>
+                <td className="py-2 text-right font-extrabold"
+                  style={{ color: !r.count ? '#9CA3AF' : r.diff < 0 ? '#DC2626' : '#059669' }}>
+                  {!r.count ? 'Not selected' : r.diff < 0 ? `${money(r.diff)} over` : r.diff > 0 ? `${money(r.diff)} under` : 'On budget'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-xs mt-3" style={{ color: '#9CA3AF' }}>
+        {forClient
+          ? 'If your selections cost more than an allowance, the difference is added by change order; if they cost less, it is credited. Declined selections are not counted.'
+          : 'Selected = material price (unit price × quantity) of approved and pending selections linked to the allowance; declined ones are not counted. Overages go to a change order.'}
+      </p>
+    </div>
+  );
+}
 
 function StatusPill({ status }) {
   const cfg = STATUS_CFG[status] ?? STATUS_CFG.pending_review;
@@ -65,7 +118,7 @@ function StatusPill({ status }) {
   );
 }
 
-function SpecCard({ spec, onEdit = () => {}, onDelete = () => {}, isAdmin, onApprove, onDecline, responding }) {
+function SpecCard({ spec, onEdit = () => {}, onDelete = () => {}, isAdmin, onApprove, onDecline, responding, allowanceLabel }) {
   const installed = Number(spec.installed_cost) || 0;
   const hasClientActions = !!onApprove && !!onDecline;
   return (
@@ -77,6 +130,11 @@ function SpecCard({ spec, onEdit = () => {}, onDelete = () => {}, isAdmin, onApp
         <div className="flex-1 min-w-0">
           <p className="font-bold text-sm truncate" style={{ color: '#002147' }}>{spec.product_name}</p>
           {spec.supplier && <p className="text-xs mt-0.5 truncate" style={{ color: '#9CA3AF' }}>{spec.supplier}</p>}
+          {allowanceLabel && (
+            <p className="inline-block text-xs font-semibold mt-1 px-1.5 py-0.5 rounded" style={{ color: '#7C3AED', backgroundColor: '#F5F3FF' }}>
+              Allowance: {allowanceLabel}
+            </p>
+          )}
         </div>
         <StatusPill status={spec.status} />
       </div>
@@ -280,6 +338,10 @@ function SpecModal({ initial, prefill, projects, onSave, onClose, saving }) {
   const [form, setForm] = useState(initial ?? { ...EMPTY_FORM, ...prefill });
   const [projectId, setProjectId] = useState(initial?.project_id ?? (projects[0]?.id ?? ''));
   const [error, setError] = useState('');
+  const allowances = useProjectAllowances(projectId || null);
+  // Until the user picks one, the allowance follows the product name.
+  const [allowanceTouched, setAllowanceTouched] = useState(!!initial);
+  const allowanceKey = allowanceTouched ? (form.allowance_key ?? '') : suggestAllowanceKey(form.product_name, allowances);
 
   function set(k, v) { setForm((p) => ({ ...p, [k]: v })); }
 
@@ -302,6 +364,8 @@ function SpecModal({ initial, prefill, projects, onSave, onClose, saving }) {
       designer_notes: form.designer_notes.trim(),
       status:         form.status,
     };
+    // Only sent when the project has allowances or the spec already had one.
+    if (allowances.length || initial?.allowance_key) payload.allowance_key = allowanceKey || null;
     await onSave(payload, initial?.id);
   }
 
@@ -432,6 +496,23 @@ function SpecModal({ initial, prefill, projects, onSave, onClose, saving }) {
             </div>
           </div>
 
+          {/* Allowance */}
+          {allowances.length > 0 && (
+            <div>
+              <label htmlFor="spec-allowance" className="text-xs font-bold uppercase tracking-wide block mb-1" style={{ color: '#374151' }}>Counts toward allowance</label>
+              <select id="spec-allowance" value={allowanceKey}
+                onChange={(e) => { setAllowanceTouched(true); set('allowance_key', e.target.value); }}
+                className="w-full px-3 py-2.5 rounded-xl text-sm focus:outline-none"
+                style={{ backgroundColor: '#F9FAFB', border: '1.5px solid #E5E7EB', color: '#111827' }}>
+                <option value="">— Not part of an allowance —</option>
+                {allowances.map((a) => (
+                  <option key={a.key} value={a.key}>{a.label} (${Math.round(a.amount).toLocaleString('en-US')})</option>
+                ))}
+              </select>
+              <p className="text-xs mt-1" style={{ color: '#9CA3AF' }}>Compared using the material price (unit price × quantity).</p>
+            </div>
+          )}
+
           {/* Installed cost preview */}
           <div
             className="flex items-center justify-between px-4 py-3 rounded-xl"
@@ -493,6 +574,8 @@ function ClientDesignWorkspace() {
   }, [projectId]);
 
   const { specs: resolvedSpecs, loading: resolvedLoading, clientRespond: respond } = useDesignSpecs(projectId || null);
+  const allowances = useProjectAllowances(projectId || null);
+  const allowanceLabelOf = (spec) => allowances.find((a) => a.key === spec.allowance_key)?.label;
 
   const filteredSpecs = useMemo(() => {
     if (activeRoom === 'all') return resolvedSpecs;
@@ -554,6 +637,8 @@ function ClientDesignWorkspace() {
             : 'Browse and respond to your curated material selections.'}
         </p>
       </div>
+
+      <AllowancePanel allowances={allowances} specs={resolvedSpecs} forClient />
 
       {/* Room category tabs */}
       <div className="flex gap-1.5 overflow-x-auto pb-2 mb-6" style={{ scrollbarWidth: 'none' }}>
@@ -617,6 +702,7 @@ function ClientDesignWorkspace() {
               key={spec.id}
               spec={spec}
               isAdmin={false}
+              allowanceLabel={allowanceLabelOf(spec)}
               onApprove={handleApprove}
               onDecline={(id) => setDeclining(id)}
               responding={responding}
@@ -710,6 +796,8 @@ export default function DesignerWorkspace() {
   const [editingList, setEditingList] = useState(null);  // room key whose checklist is being edited
 
   const { specs, loading, createSpec, updateSpec, deleteSpec } = useDesignSpecs(projectId || null);
+  const allowances = useProjectAllowances(projectId || null);
+  const allowanceLabelOf = (spec) => allowances.find((a) => a.key === spec.allowance_key)?.label;
 
   // Saved checklists. If the table isn't there yet (migration 038), the
   // built-in lists are used and editing stays hidden.
@@ -867,6 +955,8 @@ export default function DesignerWorkspace() {
         </div>
       </div>
 
+      {projectId && <AllowancePanel allowances={allowances} specs={specs} />}
+
       {!projectId ? (
         <div className="rounded-2xl p-16 text-center" style={{ backgroundColor: '#fff', border: '1.5px solid #E8E6E1' }}>
           <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: '#F5F4F0' }}>
@@ -1003,6 +1093,7 @@ export default function DesignerWorkspace() {
                   key={spec.id}
                   spec={spec}
                   isAdmin={canEdit}
+                  allowanceLabel={allowanceLabelOf(spec)}
                   onEdit={(s) => setModal(s)}
                   onDelete={(id) => setDeleteId(id)}
                 />
