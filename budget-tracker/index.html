@@ -274,6 +274,18 @@
             <input id="loanExtra" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0"
                    class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>
+          <div class="col-span-2 md:col-span-5 grid grid-cols-2 md:grid-cols-5 gap-3 pt-1">
+            <p class="col-span-2 md:col-span-1 self-end text-sm text-slate-600">Escrow <span class="text-slate-400">(optional)</span>
+              <span class="block text-xs text-slate-400">yearly amounts from your bills</span></p>
+            <div>
+              <label for="loanInsurance" class="block text-sm font-medium text-slate-600 mb-1">Home insurance / year ($)</label>
+              <input id="loanInsurance" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            </div>
+            <div>
+              <label for="loanTax" class="block text-sm font-medium text-slate-600 mb-1">Real estate tax / year ($)</label>
+              <input id="loanTax" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            </div>
+          </div>
         </div>
         <div id="loanLumpForm" class="mt-4 rounded-lg bg-slate-50 border border-slate-200 p-3">
           <p class="text-sm font-medium text-slate-700 mb-2">One-time payment <span class="font-normal text-slate-500">(optional, e.g. a bonus or sale proceeds)</span></p>
@@ -316,10 +328,13 @@
             <thead class="sticky top-0 bg-white">
               <tr class="text-left text-slate-500 border-b border-slate-200">
                 <th class="py-2 pr-2 font-medium" id="loanPeriodHead">Year</th>
-                <th class="py-2 px-2 font-medium text-right">Payment</th>
+                <th class="py-2 px-2 font-medium text-right" id="loanPayHead">Payment</th>
                 <th class="py-2 px-2 font-medium text-right">Principal</th>
                 <th class="py-2 px-2 font-medium text-right">Interest</th>
-                <th class="py-2 pl-2 font-medium text-right">Balance</th>
+                <th class="py-2 px-2 font-medium text-right">Balance</th>
+                <th class="py-2 px-2 font-medium text-right" data-escrow-col>Insurance</th>
+                <th class="py-2 px-2 font-medium text-right" data-escrow-col>Real estate tax</th>
+                <th class="py-2 pl-2 font-medium text-right" data-escrow-col>Total payment</th>
               </tr>
             </thead>
             <tbody id="loanBody"></tbody>
@@ -1037,7 +1052,7 @@
 
       function renderLoan() {
         const L = state.loan || {};
-        ['Amount', 'Rate', 'Years', 'Start', 'Extra', 'Lump', 'LumpMonth', 'LumpMode'].forEach((k) => {
+        ['Amount', 'Rate', 'Years', 'Start', 'Extra', 'Lump', 'LumpMonth', 'LumpMode', 'Insurance', 'Tax'].forEach((k) => {
           const el = $('loan' + k), v = L[k.toLowerCase()];
           if (document.activeElement !== el) el.value = v === undefined || v === null || v === '' ? (k === 'LumpMode' ? 'shorten' : '') : v;
         });
@@ -1086,12 +1101,19 @@
         const card = (label, value, sub = '') => `<div class="rounded-lg border border-slate-200 p-3">
             <p class="text-xs uppercase tracking-wide text-slate-500">${label}</p>
             <p class="text-xl font-semibold mt-1 tabular-nums">${value}</p>${sub ? `<p class="text-xs text-slate-500 mt-0.5">${sub}</p>` : ''}</div>`;
+        // Escrow: 1/12 of the yearly insurance and real estate tax, added to each payment
+        const insM = cents(Math.max(0, parseFloat(L.insurance) || 0) / 12), taxM = cents(Math.max(0, parseFloat(L.tax) || 0) / 12);
+        const escrow = cents(insM + taxM);
+        const pi = (plan.newPmt !== null && plan.newPmt !== undefined) ? plan.newPmt : plan.pmt;
+        const parts = [`principal + interest ${fmt.format(pi)}`];
+        if (extra) parts.push(`extra ${fmt.format(extra)}`);
+        if (insM) parts.push(`insurance ${fmt.format(insM)}`);
+        if (taxM) parts.push(`tax ${fmt.format(taxM)}`);
         $('loanSummary').innerHTML =
-          (plan.newPmt !== null && plan.newPmt !== undefined
-            ? card('Monthly payment', fmt.format(plan.newPmt + extra), `was ${fmt.format(plan.pmt + extra)} before the one-time payment`)
-            : card('Monthly payment', fmt.format(plan.pmt + extra), extra ? `${fmt.format(plan.pmt)} + ${fmt.format(extra)} extra` : 'principal + interest'))
+          card('Monthly payment', fmt.format(cents(pi + extra + escrow)),
+            parts.join(' + ') + (plan.newPmt !== null && plan.newPmt !== undefined ? ` (was ${fmt.format(plan.pmt + extra + escrow)} before the one-time payment)` : ''))
           + card('Total interest', fmt.format(plan.interest))
-          + card('Total paid', fmt.format(cents(amount + plan.interest)))
+          + card('Total paid', fmt.format(cents(amount + plan.interest)), 'principal + interest')
           + card('Paid off', escapeHtml(monthName(payoff)), `${plan.rows.length} payments`);
         $('loanSaving').className = 'text-sm mt-3';
         if (extra > 0) {
@@ -1104,7 +1126,7 @@
           $('loanSaving').className = 'text-sm mt-3 text-slate-500';
         }
         // Schedule, by month or summed by calendar year
-        const dated = plan.rows.map((x) => ({ ...x, m: addMonths(start, x.i - 1) }));
+        const dated = plan.rows.map((x) => ({ ...x, m: addMonths(start, x.i - 1), ins: insM, tax: taxM, total: cents(x.payment + insM + taxM) }));
         let rows;
         if (loanView === 'month') {
           rows = dated.map((x) => ({ label: `${x.i}. ${monthName(x.m)}${x.lump ? ` (includes ${fmt.format(x.lump)} one-time)` : ''}`, ...x, cur: x.m === selectedMonth }));
@@ -1112,8 +1134,9 @@
           const by = {};
           dated.forEach((x) => {
             const y = x.m.slice(0, 4);
-            const t = by[y] || (by[y] = { label: y, payment: 0, principal: 0, interest: 0, balance: 0, cur: false });
+            const t = by[y] || (by[y] = { label: y, payment: 0, principal: 0, interest: 0, balance: 0, ins: 0, tax: 0, total: 0, cur: false });
             t.payment += x.payment; t.principal += x.principal; t.interest += x.interest; t.balance = x.balance;
+            t.ins += x.ins; t.tax += x.tax; t.total += x.total;
             if (x.lump) t.label = `${y} (includes ${fmt.format(x.lump)} one-time)`;
             if (x.m === selectedMonth) t.cur = true;
           });
@@ -1125,7 +1148,12 @@
             <td class="py-1.5 px-2 text-right tabular-nums">${fmt.format(x.payment)}</td>
             <td class="py-1.5 px-2 text-right tabular-nums">${fmt.format(x.principal)}</td>
             <td class="py-1.5 px-2 text-right tabular-nums">${fmt.format(x.interest)}</td>
-            <td class="py-1.5 pl-2 text-right tabular-nums">${fmt.format(x.balance)}</td></tr>`).join('');
+            <td class="py-1.5 px-2 text-right tabular-nums">${fmt.format(x.balance)}</td>
+            ${escrow ? `<td class="py-1.5 px-2 text-right tabular-nums">${fmt.format(x.ins)}</td>
+            <td class="py-1.5 px-2 text-right tabular-nums">${fmt.format(x.tax)}</td>
+            <td class="py-1.5 pl-2 text-right tabular-nums font-medium">${fmt.format(x.total)}</td>` : ''}</tr>`).join('');
+        document.querySelectorAll('[data-escrow-col]').forEach((th) => { th.hidden = !escrow; });
+        $('loanPayHead').textContent = escrow ? 'Principal + interest' : 'Payment';
         document.querySelectorAll('[data-loanview]').forEach((b) => {
           const on = b.dataset.loanview === loanView;
           b.setAttribute('aria-pressed', String(on));
