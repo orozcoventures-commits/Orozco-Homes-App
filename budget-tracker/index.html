@@ -162,7 +162,7 @@
         <!-- 3. Budget vs Actual -->
         <section class="bg-white rounded-xl shadow-sm p-5">
           <h2 class="text-lg font-semibold">3. Budget vs. Actual <span id="monthLabel" class="text-sm font-normal text-slate-500"></span></h2>
-          <p class="text-sm text-slate-500 mb-4">Type what you actually spent in each <span class="font-medium text-slate-700">Actual</span> box. Expenses you log below are added in automatically.</p>
+          <p class="text-sm text-slate-500 mb-4">Type what you actually spent in any <span class="font-medium text-slate-700">Actual</span> box. Card imports and logged expenses fill it in automatically, and you can still change the amount.</p>
           <div class="overflow-x-auto">
             <table class="w-full text-sm">
               <thead>
@@ -365,7 +365,10 @@
       }
 
       // Actual = amount typed into the Actual column + expenses logged in the ledger.
-      const typedActual = (id) => toNum((state.monthActuals[selectedMonth] || {})[id]);
+      // Actual = logged/card expenses + this adjustment. The adjustment can be negative so the
+      // Actual box can be set to any amount, even below the card purchases in it.
+      const signedNum = (v) => { const n = parseFloat(v); return Number.isFinite(n) ? Math.round(n * 100) / 100 : 0; };
+      const typedActual = (id) => signedNum((state.monthActuals[selectedMonth] || {})[id]);
       function loggedTotals() {
         const t = {};
         monthExpenses().forEach((e) => { t[e.categoryId] = (t[e.categoryId] || 0) + e.amount; });
@@ -373,7 +376,7 @@
       }
       function setTypedActual(id, value) {
         const month = state.monthActuals[selectedMonth] || (state.monthActuals[selectedMonth] = {});
-        if (value > 0) month[id] = value; else delete month[id];
+        if (value !== null && Math.abs(value) >= 0.005) month[id] = value; else delete month[id];
         if (!Object.keys(month).length) delete state.monthActuals[selectedMonth];
       }
 
@@ -635,7 +638,7 @@
         const rows = state.categories.map((c) => {
           const typed = typedActual(c.id);
           const fromLedger = logged[c.id] || 0;
-          return { id: c.id, name: c.name, budget: effectiveBudget(c), typed, logged: fromLedger, actual: typed + fromLedger };
+          return { id: c.id, name: c.name, budget: effectiveBudget(c), typed, logged: fromLedger, actual: Math.round((typed + fromLedger) * 100) / 100 };
         });
         // Expenses whose category was deleted
         const orphan = Object.keys(logged).filter((id) => !state.categories.some((c) => c.id === id))
@@ -655,8 +658,11 @@
         const over = r.budget - r.actual < -0.005;
         return 'border-b border-slate-100 ' + (r.id === highlightId ? 'bg-amber-50' : over ? 'bg-red-50' : '');
       };
-      const loggedNote = (r) => (r.logged > 0 && r.id !== '_orphan'
-        ? `includes ${fmt.format(r.logged)} from expense log` : '');
+      const loggedNote = (r) => {
+        if (!r.logged || r.id === '_orphan') return '';
+        if (r.typed < 0) return `${fmt.format(r.logged)} from expense log, adjusted to your amount`;
+        return `includes ${fmt.format(r.logged)} from expense log`;
+      };
 
       function actualCell(r) {
         if (r.id === '_orphan') return `<span class="tabular-nums">${fmt.format(r.actual)}</span>`;
@@ -906,8 +912,10 @@
       function readActualBox(input) {
         const id = input.dataset.actual;
         const logged = loggedTotals()[id] || 0;
-        const total = toNum(input.value);
-        setTypedActual(id, Math.max(0, Math.round((total - logged) * 100) / 100));
+        // An empty box means "no adjustment": Actual goes back to the logged/card total
+        const empty = input.value.trim() === '';
+        const total = empty ? logged : toNum(input.value);
+        setTypedActual(id, empty ? null : Math.round((total - logged) * 100) / 100);
         return { id, logged, total };
       }
 
@@ -919,9 +927,7 @@
         const r = rows.find((x) => x.id === id);
         e.target.closest('tr').className = rowClass(r);
         document.querySelector(`[data-var="${CSS.escape(id)}"]`).innerHTML = varianceCell(r.budget - r.actual);
-        document.querySelector(`[data-note="${CSS.escape(id)}"]`).textContent = total < logged - 0.005
-          ? `Logged expenses already total ${fmt.format(logged)}. Edit them in the log to go lower.`
-          : loggedNote(r);
+        document.querySelector(`[data-note="${CSS.escape(id)}"]`).textContent = loggedNote(r);
         renderTotals(rows);
       });
 
@@ -1000,7 +1006,7 @@
         const rowsOut = state.expenses.map((e) => [e.date, categoryName(e.categoryId), e.description || '', e.amount]);
         Object.keys(state.monthActuals).forEach((m) => {
           Object.keys(state.monthActuals[m]).forEach((id) => {
-            rowsOut.push([m + '-01', categoryName(id), 'Entered in Actual column (' + monthName(m) + ')', toNum(state.monthActuals[m][id])]);
+            rowsOut.push([m + '-01', categoryName(id), 'Entered in Actual column (' + monthName(m) + ')', signedNum(state.monthActuals[m][id])]);
           });
         });
         rowsOut.sort((a, b) => a[0].localeCompare(b[0])).forEach(([d, c, desc, amt]) => {
