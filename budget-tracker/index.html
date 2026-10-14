@@ -298,6 +298,7 @@
           monthBudgets: {},
           monthActuals: {},
           importRules: {},
+          importedKeys: [],
         };
       }
 
@@ -322,6 +323,7 @@
             monthBudgets: isObj(data.monthBudgets) ? data.monthBudgets : {},
             monthActuals: isObj(data.monthActuals) ? data.monthActuals : {},
             importRules: isObj(data.importRules) ? data.importRules : {},
+            importedKeys: Array.isArray(data.importedKeys) ? data.importedKeys : [],
           };
         } catch (e) {
           return freshState();
@@ -1231,18 +1233,43 @@
         if (cAmt >= 0 && raw.filter((x) => x.amount < 0).length > raw.length / 2) raw.forEach((x) => { x.amount = -x.amount; });
 
         const hist = importHistory();
+        // Every purchase ever imported, even ones deleted later, so they never come back
+        const known = new Set(state.importedKeys);
+        const keyOwner = {};
+        state.expenses.forEach((e) => {
+          if (!e.importKey) return;
+          const k = e.importKey.replace(/#\d+$/, '');
+          known.add(k);
+          (keyOwner[k] || (keyOwner[k] = [])).push(e.id);
+        });
         const seen = {};
-        return raw.map((x) => {
-          const base = `${x.date}|${x.desc}|${x.amount.toFixed(2)}`;
-          seen[base] = (seen[base] || 0) + 1;
-          const key = `${base}|${seen[base]}`;
-          const dup = state.expenses.some((e) => e.importKey && (e.importKey === key || e.importKey.startsWith(key + '#')));
+        const rows = raw.map((x) => {
+          const amount = Math.round(x.amount * 100) / 100;
+          // Two keys: the exact card text, and one by store name (survives small wording changes)
+          const exact = `${x.date}|${x.desc}|${amount.toFixed(2)}`;
+          const byStore = `m:${x.date}|${merchantKey(x.desc)}|${amount.toFixed(2)}`;
+          seen[exact] = (seen[exact] || 0) + 1;
+          seen[byStore] = (seen[byStore] || 0) + 1;
+          const key = `${exact}|${seen[exact]}`;
+          const key2 = `${byStore}|${seen[byStore]}`;
           return {
-            key, date: x.date, desc: x.desc, store: cleanStore(x.desc), amount: Math.round(x.amount * 100) / 100,
-            cardCategory: x.cardCategory, amazon: isAmazon(x.desc), dup, include: !dup,
-            catId: dup ? '' : suggestCategory(x.desc, x.cardCategory, hist), parts: null,
+            key, key2, date: x.date, desc: x.desc, store: cleanStore(x.desc), amount,
+            cardCategory: x.cardCategory, amazon: isAmazon(x.desc), dup: known.has(key) || known.has(key2), possible: null,
+            catId: suggestCategory(x.desc, x.cardCategory, hist), parts: null,
           };
-        }).sort((a, b) => b.date.localeCompare(a.date));
+        });
+        // Possible duplicates: same amount within 3 days of something already in the budget (a date
+        // shifted by the card, or a purchase you logged yourself). Each existing expense matches once.
+        const used = new Set();
+        rows.filter((r) => r.dup).forEach((r) => [r.key, r.key2].forEach((k) => (keyOwner[k] || []).forEach((id) => used.add(id))));
+        const days = (a, b) => Math.abs(Date.parse(a) - Date.parse(b)) / 86400000;
+        rows.filter((r) => !r.dup).forEach((r) => {
+          const match = state.expenses.find((e) => !used.has(e.id) && Math.abs(e.amount - r.amount) < 0.005 && days(e.date, r.date) <= 3
+            && (!e.importKey || merchantKey(e.description || '') === merchantKey(r.desc)));
+          if (match) { used.add(match.id); r.possible = match; }
+        });
+        rows.forEach((r) => { r.include = !r.dup && !r.possible; });
+        return rows.sort((a, b) => b.date.localeCompare(a.date));
       }
 
       function categoryOptions(selected) {
@@ -1256,10 +1283,12 @@
       function renderImport() {
         const n = importRows.length;
         const dups = importRows.filter((r) => r.dup).length;
+        const possibles = importRows.filter((r) => r.possible).length;
         const chosen = importRows.filter((r) => r.include);
         $('importSummary').textContent = `${n} purchase${n === 1 ? '' : 's'} found`
           + (importSkippedPayments ? ` · ${importSkippedPayments} card payment${importSkippedPayments === 1 ? '' : 's'} left out` : '')
-          + (dups ? ` · ${dups} already imported` : '')
+          + (dups ? ` · ${dups} already imported (left out)` : '')
+          + (possibles ? ` · ${possibles} possible duplicate${possibles === 1 ? '' : 's'} (unchecked)` : '')
           + ` · ${chosen.length} selected, ${fmt.format(chosen.reduce((s, r) => s + r.amount, 0))}`;
         const monthTotals = {};
         chosen.forEach((r) => {
@@ -1281,6 +1310,7 @@
             <td class="py-2 pl-5 pr-2"><input type="checkbox" data-inc ${r.include ? 'checked' : ''} aria-label="Include ${escapeHtml(r.store)}" /></td>
             <td class="py-2 px-2 whitespace-nowrap tabular-nums">${escapeHtml(r.date)}</td>
             <td class="py-2 px-2">${escapeHtml(r.store)}${r.dup ? ' <span class="text-[11px] text-slate-500">(already imported)</span>' : ''}
+              ${r.possible ? `<div class="text-[11px] text-amber-700">Possible duplicate: ${escapeHtml(r.possible.description || categoryName(r.possible.categoryId))}, ${fmt.format(r.possible.amount)} on ${escapeHtml(r.possible.date)} is already in your budget. Check the box to add it anyway.</div>` : ''}
               ${r.cardCategory ? `<div class="text-[11px] text-slate-400">${escapeHtml(r.cardCategory)}</div>` : ''}</td>
             <td class="py-2 px-2 text-right tabular-nums whitespace-nowrap ${r.amount < 0 ? 'text-emerald-700' : ''}">${fmt.format(r.amount)}${r.amount < 0 ? '<div class="text-[11px]">refund</div>' : ''}</td>
             <td class="py-2 px-2">${r.parts ? '<span class="text-xs text-slate-500">Split below</span>'
@@ -1373,12 +1403,13 @@
         };
         const now = Date.now();
         chosen.forEach((r) => {
+          state.importedKeys.push(r.key, r.key2);
           const pieces = r.parts ? r.parts.filter((p) => p.amount) : [{ amount: r.amount, catId: r.catId }];
           pieces.forEach((p, j) => {
             state.expenses.push({
               id: uid(), date: r.date, categoryId: resolve(p.catId), amount: Math.round(p.amount * 100) / 100,
               description: r.store + (r.parts ? ` (part ${j + 1})` : ''), createdAt: now,
-              importKey: r.parts ? `${r.key}#${j + 1}` : r.key,
+              importKey: r.parts ? `${r.key2}#${j + 1}` : r.key2,
               cardCategory: r.cardCategory || undefined,
             });
           });
