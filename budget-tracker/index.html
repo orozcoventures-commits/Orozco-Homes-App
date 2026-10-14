@@ -93,6 +93,7 @@
     <nav class="flex gap-1 border-b border-slate-300" role="tablist" aria-label="Sections">
       <button type="button" role="tab" data-tab="overview" class="tab-btn">Overview</button>
       <button type="button" role="tab" data-tab="transactions" class="tab-btn">Transactions</button>
+      <button type="button" role="tab" data-tab="networth" class="tab-btn">Net Worth</button>
       <button type="button" role="tab" data-tab="loans" class="tab-btn">Loans</button>
       <button type="button" role="tab" data-tab="setup" class="tab-btn">Setup</button>
     </nav>
@@ -326,6 +327,90 @@
       </section>
     </div>
 
+    <!-- NET WORTH -->
+    <div data-tabpanel="networth" hidden class="space-y-6">
+      <section class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="bg-white rounded-xl shadow-sm p-5">
+          <p class="text-xs uppercase tracking-wide text-slate-500">Total assets</p>
+          <p id="nwAssets" class="text-2xl font-semibold mt-1 tabular-nums">$0</p>
+          <p id="nwAssetsCount" class="text-xs text-slate-500 mt-1"></p>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-5">
+          <p class="text-xs uppercase tracking-wide text-slate-500">Total liabilities</p>
+          <p id="nwDebts" class="text-2xl font-semibold mt-1 tabular-nums">$0</p>
+          <p id="nwDebtsCount" class="text-xs text-slate-500 mt-1"></p>
+        </div>
+        <div class="bg-slate-900 text-white rounded-xl shadow-sm p-5">
+          <p class="text-xs uppercase tracking-wide text-slate-300">Net worth</p>
+          <p id="nwTotal" class="text-3xl font-bold mt-1 tabular-nums">$0</p>
+          <p id="nwEquity" class="text-xs text-slate-300 mt-1"></p>
+        </div>
+      </section>
+
+      <div class="grid lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-2 space-y-6 min-w-0">
+          <section class="bg-white rounded-xl shadow-sm p-5">
+            <div class="flex flex-wrap items-baseline justify-between gap-2 mb-3">
+              <h2 class="text-lg font-semibold">Assets</h2>
+              <p class="text-xs text-slate-500">Click any name, category or amount to change it. Changes save automatically.</p>
+            </div>
+            <div class="overflow-x-auto"><table class="w-full text-sm"><tbody id="nwAssetRows"></tbody></table></div>
+          </section>
+          <section class="bg-white rounded-xl shadow-sm p-5">
+            <h2 class="text-lg font-semibold mb-3">Liabilities</h2>
+            <div class="overflow-x-auto"><table class="w-full text-sm"><tbody id="nwDebtRows"></tbody></table></div>
+          </section>
+          <section class="bg-white rounded-xl shadow-sm p-5">
+            <h2 class="text-lg font-semibold">Net worth over time</h2>
+            <p class="text-xs text-slate-500 mb-3">Your totals are recorded automatically for each month you update them.</p>
+            <div id="nwHistoryWrap" class="relative"><div id="nwHistory"></div></div>
+          </section>
+        </div>
+
+        <div class="space-y-6 min-w-0">
+          <section class="bg-white rounded-xl shadow-sm p-5">
+            <h2 class="text-lg font-semibold mb-3">Add an item</h2>
+            <div id="nwAddForm" class="space-y-3">
+              <div>
+                <label for="nwName" class="block text-sm font-medium text-slate-600 mb-1">Name</label>
+                <input id="nwName" type="text" maxlength="60" placeholder="e.g. Fidelity 401(k)" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label for="nwType" class="block text-sm font-medium text-slate-600 mb-1">Type</label>
+                  <select id="nwType" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"><option value="asset">Asset</option><option value="debt">Liability</option></select>
+                </div>
+                <div>
+                  <label for="nwCategory" class="block text-sm font-medium text-slate-600 mb-1">Category</label>
+                  <select id="nwCategory" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"></select>
+                </div>
+              </div>
+              <div>
+                <label for="nwValue" class="block text-sm font-medium text-slate-600 mb-1">Value ($)</label>
+                <input id="nwValue" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              </div>
+              <button id="nwAddBtn" type="button" class="w-full rounded-md bg-indigo-600 hover:bg-indigo-500 text-white py-2 font-medium">Add item</button>
+              <p id="nwAddMsg" class="text-sm text-red-600 min-h-[1.25rem]" aria-live="polite"></p>
+            </div>
+          </section>
+          <section class="bg-white rounded-xl shadow-sm p-5">
+            <h2 class="text-lg font-semibold">Paste a list</h2>
+            <p class="text-xs text-slate-500 mb-2">One item per line: <span class="font-mono">Name, Category, Amount</span>. The category is optional.
+              Mortgages, loans and credit cards are added as liabilities.</p>
+            <textarea id="nwPaste" rows="6" placeholder="Wells Fargo, Cash & Bank, 35000&#10;Primary Residence, Primary Home, 750000&#10;Mortgage, Mortgage, 607500"
+                      class="w-full font-mono text-xs rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+            <button id="nwPasteBtn" type="button" class="mt-2 w-full rounded-md border border-slate-300 hover:bg-slate-50 py-2 text-sm font-medium">Add all</button>
+            <p id="nwPasteMsg" class="text-sm mt-1 min-h-[1.25rem]" aria-live="polite"></p>
+          </section>
+          <section class="bg-white rounded-xl shadow-sm p-5">
+            <h2 class="text-lg font-semibold mb-3">Asset mix</h2>
+            <div id="nwMix" class="space-y-3"></div>
+          </section>
+          <p class="text-xs text-slate-500 px-1">For your safety, enter names and balances only, never account numbers or passwords.</p>
+        </div>
+      </div>
+    </div>
+
     <!-- SETUP -->
     <div data-tabpanel="setup" hidden class="max-w-3xl">
         <!-- 1. Income & Category Setup -->
@@ -462,6 +547,7 @@
           importedKeys: [],
           vendorRules: [],
           loan: {},
+          netWorth: { items: [], history: {} },
         };
       }
 
@@ -489,6 +575,10 @@
             importedKeys: Array.isArray(data.importedKeys) ? data.importedKeys : [],
             vendorRules: Array.isArray(data.vendorRules) ? data.vendorRules : [],
             loan: isObj(data.loan) ? data.loan : {},
+            netWorth: isObj(data.netWorth) ? {
+              items: Array.isArray(data.netWorth.items) ? data.netWorth.items : [],
+              history: isObj(data.netWorth.history) ? data.netWorth.history : {},
+            } : { items: [], history: {} },
           };
         } catch (e) {
           return freshState();
@@ -1052,6 +1142,199 @@
       $('loanLumpForm').addEventListener('input', onLoanInput);
       document.querySelectorAll('[data-loanview]').forEach((b) => b.addEventListener('click', () => { loanView = b.dataset.loanview; renderLoan(); }));
 
+      // ---------- Net worth ----------
+      const NW_CATS = {
+        asset: ['Cash & Bank', 'Retirement', 'Investments', 'Crypto', 'Real Estate', 'Primary Home', 'Vehicles', 'Other Assets'],
+        debt: ['Mortgage', 'Loans', 'Credit Cards', 'Other Debt'],
+      };
+      const fmt0 = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+      const nw = () => state.netWorth || (state.netWorth = { items: [], history: {} });
+      const nwTypeOf = (cat) => (NW_CATS.debt.includes(cat) ? 'debt' : 'asset');
+      // Best-guess category from a name, for items added without one
+      function guessNwCategory(text) {
+        const t = String(text).toLowerCase();
+        if (/mortgage|heloc/.test(t)) return 'Mortgage';
+        if (/credit card|amex|visa|mastercard|discover/.test(t)) return 'Credit Cards';
+        if (/\bloan\b|auto loan|student|debt|owe/.test(t)) return /home|house|residen|property/.test(t) ? 'Mortgage' : 'Loans';
+        if (/retire|401|403|\bira\b|roth|pension|tsp/.test(t)) return 'Retirement';
+        if (/coinbase|crypto|bitcoin|btc|eth/.test(t)) return 'Crypto';
+        if (/residen|my home|house|primary/.test(t)) return 'Primary Home';
+        if (/real estate|property|rental|land|\bst\b|\bave\b|\bpark\b|commerce|apartment|condo|lot/.test(t)) return 'Real Estate';
+        if (/checking|savings|bank|wells fargo|chase|navy federal|credit union|cash|money market|\bcd\b/.test(t)) return 'Cash & Bank';
+        if (/schwab|vanguard|fidelity|merrill|tasty|e\*?trade|robinhood|brokerage|stock|invest|webull/.test(t)) return 'Investments';
+        if (/car|truck|vehicle|boat|rv\b/.test(t)) return 'Vehicles';
+        return 'Other Assets';
+      }
+      const matchNwCategory = (text) => {
+        const t = String(text || '').trim().toLowerCase();
+        if (!t) return '';
+        const all = [...NW_CATS.asset, ...NW_CATS.debt];
+        return all.find((c) => c.toLowerCase() === t)
+          || all.find((c) => c.toLowerCase().startsWith(t) || t.startsWith(c.toLowerCase().split(' ')[0]))
+          || '';
+      };
+      const nwAmount = (v) => { const n = parseFloat(String(v).replace(/[$,\s]/g, '')); return Number.isFinite(n) ? Math.abs(Math.round(n * 100) / 100) : NaN; };
+
+      function nwTotals() {
+        const t = { asset: 0, debt: 0, nAsset: 0, nDebt: 0, byCat: {} };
+        nw().items.forEach((it) => {
+          const type = nwTypeOf(it.category), v = Number(it.value) || 0;
+          t[type] += v; t[type === 'asset' ? 'nAsset' : 'nDebt']++;
+          t.byCat[it.category] = (t.byCat[it.category] || 0) + v;
+        });
+        t.net = t.asset - t.debt;
+        return t;
+      }
+      // Remember this calendar month's totals so the history chart can show the trend
+      function recordNetWorth() {
+        const t = nwTotals();
+        nw().history[today().slice(0, 7)] = { assets: Math.round(t.asset), liabilities: Math.round(t.debt) };
+      }
+
+      function renderNwTotals() {
+        const t = nwTotals();
+        $('nwAssets').textContent = fmt0.format(t.asset);
+        $('nwDebts').textContent = fmt0.format(t.debt);
+        $('nwTotal').textContent = fmt0.format(t.net);
+        $('nwAssetsCount').textContent = `${t.nAsset} item${t.nAsset === 1 ? '' : 's'}`;
+        $('nwDebtsCount').textContent = `${t.nDebt} item${t.nDebt === 1 ? '' : 's'}`;
+        const home = t.byCat['Primary Home'] || 0, mort = t.byCat['Mortgage'] || 0;
+        $('nwEquity').textContent = home ? `Home equity ${fmt0.format(home - mort)} (${Math.round(((home - mort) / home) * 100)}% of home value)` : '';
+        document.querySelectorAll('[data-nw-sub]').forEach((el) => { el.textContent = fmt0.format(t.byCat[el.dataset.nwSub] || 0); });
+        // Asset mix: share of total assets by category (one hue; this shows size, not identity)
+        $('nwMix').innerHTML = NW_CATS.asset.filter((c) => t.byCat[c]).sort((a, b) => t.byCat[b] - t.byCat[a]).map((c) => {
+          const pct = t.asset ? (t.byCat[c] / t.asset) * 100 : 0;
+          return `<div><div class="flex justify-between text-sm"><span>${escapeHtml(c)}</span>
+              <span class="tabular-nums text-slate-600">${fmt0.format(t.byCat[c])} <span class="text-slate-400">· ${pct.toFixed(pct < 10 ? 1 : 0)}%</span></span></div>
+            <div class="h-2 rounded-full bg-slate-100 overflow-hidden mt-1"><div class="h-full rounded-full" style="width:${pct}%;background:#2a78d6"></div></div></div>`;
+        }).join('') || '<p class="text-sm text-slate-400">Add assets to see how they are spread.</p>';
+      }
+
+      function nwRowsHtml(type) {
+        const items = nw().items.filter((it) => nwTypeOf(it.category) === type);
+        const cats = NW_CATS[type].filter((c) => items.some((it) => it.category === c));
+        if (!cats.length) return `<tr><td class="py-4 text-center text-slate-400">${type === 'asset' ? 'No assets yet. Add one on the right.' : 'No liabilities. Add a mortgage, loan or credit card balance on the right.'}</td></tr>`;
+        const field = 'rounded-md border border-transparent hover:border-slate-300 focus:border-slate-300 bg-transparent px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500';
+        return cats.map((c) => `<tr class="bg-slate-50 border-y border-slate-200">
+              <th scope="rowgroup" class="py-2 px-2 text-left font-semibold text-slate-700">${escapeHtml(c)}</th>
+              <td></td><td class="py-2 px-2 text-right font-semibold tabular-nums" data-nw-sub="${escapeHtml(c)}"></td><td></td></tr>`
+          + items.filter((it) => it.category === c).sort((a, b) => (b.value || 0) - (a.value || 0)).map((it) => `<tr class="border-b border-slate-100" data-nw-id="${it.id}">
+              <td class="py-1 pl-4 pr-1"><input type="text" data-f="name" value="${escapeHtml(it.name)}" maxlength="60" aria-label="Name" class="w-full min-w-[9rem] ${field}" /></td>
+              <td class="py-1 px-1"><select data-f="category" aria-label="Category for ${escapeHtml(it.name)}" class="${field}">
+                ${['asset', 'debt'].map((ty) => `<optgroup label="${ty === 'asset' ? 'Assets' : 'Liabilities'}">${NW_CATS[ty].map((x) =>
+                  `<option ${x === it.category ? 'selected' : ''}>${escapeHtml(x)}</option>`).join('')}</optgroup>`).join('')}</select></td>
+              <td class="py-1 px-1 text-right"><div class="relative inline-block"><span class="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400">$</span>
+                <input type="number" data-f="value" min="0" step="0.01" inputmode="decimal" value="${it.value}" aria-label="Value of ${escapeHtml(it.name)}"
+                       class="w-36 pl-5 text-right tabular-nums ${field}" /></div></td>
+              <td class="py-1 pl-1 text-right"><button type="button" data-nw-del="${it.id}" class="text-slate-400 hover:text-red-600 px-1 text-lg leading-none" aria-label="Delete ${escapeHtml(it.name)}">&times;</button></td>
+            </tr>`).join('')).join('');
+      }
+
+      function renderNetWorth() {
+        $('nwAssetRows').innerHTML = nwRowsHtml('asset');
+        $('nwDebtRows').innerHTML = nwRowsHtml('debt');
+        const type = $('nwType').value || 'asset', cur = $('nwCategory').value;
+        $('nwCategory').innerHTML = NW_CATS[type].map((c) => `<option>${escapeHtml(c)}</option>`).join('');
+        if (NW_CATS[type].includes(cur)) $('nwCategory').value = cur;
+        renderNwTotals();
+        renderNwHistory();
+      }
+
+      // Net worth by month: a single line, so no legend; the title names it
+      function renderNwHistory() {
+        const hist = nw().history;
+        const months = Object.keys(hist).filter((m) => /^\d{4}-\d{2}$/.test(m)).sort().slice(-24);
+        const wrap = $('nwHistoryWrap');
+        if (months.length < 2) {
+          $('nwHistory').innerHTML = `<p class="text-sm text-slate-500">${months.length
+            ? `Recorded for ${escapeHtml(monthName(months[0]))}: ${fmt0.format(hist[months[0]].assets - hist[months[0]].liabilities)}. Update your balances next month and the trend will appear here.`
+            : 'Add your assets and liabilities to start your history.'}</p>`;
+          return;
+        }
+        const pts = months.map((m) => ({ m, v: hist[m].assets - hist[m].liabilities }));
+        const W = Math.max(300, wrap.clientWidth || 600), H = 200, padL = 56, padR = 32, padT = 22, padB = 26;
+        let lo = Math.min(...pts.map((p) => p.v)), hi = Math.max(...pts.map((p) => p.v));
+        if (hi === lo) { hi += 1000; lo -= 1000; }
+        const pad = (hi - lo) * 0.15; lo -= pad; hi += pad;
+        const x = (i) => padL + (W - padL - padR) * (pts.length === 1 ? 0.5 : i / (pts.length - 1));
+        const y = (v) => padT + (H - padT - padB) * (1 - (v - lo) / (hi - lo));
+        const short = (v) => (Math.abs(v) >= 1e6 ? `$${(v / 1e6).toFixed(2)}M` : `$${Math.round(v / 1000)}k`);
+        let svg = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Net worth by month" style="display:block;max-width:100%">`;
+        for (let k = 0; k <= 3; k++) {
+          const v = lo + ((hi - lo) * k) / 3;
+          svg += `<line x1="${padL}" x2="${W - padR}" y1="${y(v)}" y2="${y(v)}" stroke="#e2e8f0"/>
+            <text x="${padL - 6}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="#64748b">${short(v)}</text>`;
+        }
+        svg += `<polyline fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round" points="${pts.map((p, i) => `${x(i)},${y(p.v)}`).join(' ')}"/>`;
+        pts.forEach((p, i) => {
+          svg += `<circle cx="${x(i)}" cy="${y(p.v)}" r="4" fill="#2a78d6" stroke="#fff" stroke-width="2"><title>${monthName(p.m)}: ${fmt0.format(p.v)}</title></circle>
+            <text x="${x(i)}" y="${H - 8}" text-anchor="middle" font-size="11" fill="#64748b">${new Date(+p.m.slice(0, 4), +p.m.slice(5) - 1, 1).toLocaleString('en-US', { month: 'short' })} ’${p.m.slice(2, 4)}</text>`;
+        });
+        const last = pts[pts.length - 1];
+        svg += `<text x="${Math.min(x(pts.length - 1), W - padR)}" y="${y(last.v) - 10}" text-anchor="end" font-size="11" font-weight="600" fill="#0f172a">${fmt0.format(last.v)}</text></svg>`;
+        $('nwHistory').innerHTML = svg;
+      }
+
+      function addNwItem(name, category, value) {
+        nw().items.push({ id: uid(), name, category, value });
+      }
+      $('nwType').addEventListener('change', renderNetWorth);
+      $('nwAddBtn').addEventListener('click', () => {
+        const name = $('nwName').value.trim(), value = nwAmount($('nwValue').value);
+        if (!name) { $('nwAddMsg').textContent = 'Type a name.'; $('nwName').focus(); return; }
+        if (!Number.isFinite(value)) { $('nwAddMsg').textContent = 'Type the value.'; $('nwValue').focus(); return; }
+        $('nwAddMsg').textContent = '';
+        addNwItem(name, $('nwCategory').value, value);
+        $('nwName').value = ''; $('nwValue').value = '';
+        recordNetWorth(); save(); renderNetWorth();
+        toast(`Added ${name}`);
+        $('nwName').focus();
+      });
+      $('nwAddForm').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.tagName === 'INPUT') { e.preventDefault(); $('nwAddBtn').click(); } });
+      $('nwPasteBtn').addEventListener('click', () => {
+        const lines = $('nwPaste').value.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+        const bad = [];
+        let added = 0;
+        lines.forEach((line) => {
+          // Split on tabs or commas, but not the thousands commas inside an amount like 305,000
+          let parts = line.split(/\t|,(?!\d{3}(?:\D|$))/).map((x) => x.trim()).filter(Boolean);
+          // "Name $1,234" or "Name: 1234" with no commas between name and amount
+          if (parts.length === 1) { const m = line.match(/^(.*?)[\s:=-]*\$?\s*([\d,]+(?:\.\d+)?)\s*$/); if (m) parts = [m[1], m[2]]; }
+          const amount = nwAmount(parts[parts.length - 1]);
+          const name = (parts[0] || '').replace(/[:\-–]+$/, '').trim();
+          if (!name || !Number.isFinite(amount) || parts.length < 2) { bad.push(line); return; }
+          const category = (parts.length >= 3 && matchNwCategory(parts[1])) || guessNwCategory(parts.slice(0, -1).join(' '));
+          addNwItem(name, category, amount);
+          added++;
+        });
+        if (added) { recordNetWorth(); save(); renderNetWorth(); }
+        $('nwPasteMsg').className = 'text-sm mt-1 ' + (bad.length ? 'text-red-600' : 'text-emerald-700');
+        $('nwPasteMsg').textContent = `Added ${added} item${added === 1 ? '' : 's'}.` + (bad.length ? ` Couldn't read: ${bad.slice(0, 3).join(' | ')}` : '');
+        $('nwPaste').value = bad.join('\n');
+      });
+      // Inline edits: totals update as you type; a category change re-sorts the list
+      ['nwAssetRows', 'nwDebtRows'].forEach((id) => {
+        $(id).addEventListener('input', (e) => {
+          const row = e.target.closest('[data-nw-id]');
+          const it = row && nw().items.find((x) => x.id === row.dataset.nwId);
+          if (!it) return;
+          const f = e.target.dataset.f;
+          if (f === 'name') it.name = e.target.value.trim() || 'Untitled';
+          if (f === 'value') it.value = nwAmount(e.target.value) || 0;
+          if (f === 'category') it.category = e.target.value;
+          recordNetWorth(); save();
+          if (f === 'category') renderNetWorth(); else { renderNwTotals(); renderNwHistory(); }
+        });
+        $(id).addEventListener('click', async (e) => {
+          const del = e.target.closest('[data-nw-del]');
+          if (!del) return;
+          const it = nw().items.find((x) => x.id === del.dataset.nwDel);
+          if (!it || !(await askConfirm(`Delete ${it.name} (${fmt0.format(it.value)})?`, 'Delete'))) return;
+          nw().items = nw().items.filter((x) => x !== it);
+          recordNetWorth(); save(); renderNetWorth();
+        });
+      });
+
       // ---------- Month-by-month chart ----------
       const SERIES = { budget: '#2a78d6', actual: '#eb6834' };   // validated pair (light surface)
       const addMonths = (ym, n) => {
@@ -1451,6 +1734,7 @@
       function renderAll() {
         renderRules();
         renderLoan();
+        renderNetWorth();
         $('incomeInput').value = effectiveIncome() || '';
         $('setupMonthLabel').textContent = monthName(selectedMonth);
         renderCustomBadge();
@@ -1670,11 +1954,12 @@
 
       // Tabs
       function showTab(name) {
-        if (!['overview', 'transactions', 'loans', 'setup'].includes(name)) name = 'overview';
+        if (!['overview', 'transactions', 'networth', 'loans', 'setup'].includes(name)) name = 'overview';
         document.querySelectorAll('[data-tabpanel]').forEach((el) => { el.hidden = el.dataset.tabpanel !== name; });
         document.querySelectorAll('[data-tab]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === name)));
         try { localStorage.setItem(STORAGE_KEY + '.tab', name); } catch (e) { /* storage unavailable */ }
         if (name === 'overview' && typeof renderTrend === 'function') renderTrend();
+        if (name === 'networth' && typeof renderNwHistory === 'function') renderNwHistory();
       }
       document.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
 
