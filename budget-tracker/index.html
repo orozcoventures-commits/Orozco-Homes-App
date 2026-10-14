@@ -273,6 +273,30 @@
                    class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>
         </div>
+        <div id="loanLumpForm" class="mt-4 rounded-lg bg-slate-50 border border-slate-200 p-3">
+          <p class="text-sm font-medium text-slate-700 mb-2">One-time payment <span class="font-normal text-slate-500">(optional, e.g. a bonus or sale proceeds)</span></p>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
+            <div>
+              <label for="loanLump" class="block text-xs font-medium text-slate-600 mb-1">Amount ($)</label>
+              <input id="loanLump" type="number" min="0" step="0.01" inputmode="decimal" placeholder="25000"
+                     class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            </div>
+            <div>
+              <label for="loanLumpMonth" class="block text-xs font-medium text-slate-600 mb-1">Paid in</label>
+              <input id="loanLumpMonth" type="month"
+                     class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            </div>
+            <div class="col-span-2">
+              <label for="loanLumpMode" class="block text-xs font-medium text-slate-600 mb-1">After the payment</label>
+              <select id="loanLumpMode"
+                      class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <option value="shorten">Keep the same monthly payment (pay off sooner)</option>
+                <option value="recast">Lower my monthly payment (ask lender to recast)</option>
+              </select>
+            </div>
+          </div>
+          <div id="loanLumpResult" class="text-sm mt-3"></div>
+        </div>
         <div id="loanSummary" class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-5"></div>
         <p id="loanSaving" class="text-sm mt-3"></p>
       </section>
@@ -893,34 +917,74 @@
       // ---------- Loan amortization ----------
       let loanView = 'year';
       const cents = (v) => Math.round(v * 100) / 100;
-      // Standard fixed-rate schedule, rounded to cents each month; extra goes to principal
-      function amortize(amount, ratePct, years, extra) {
+      // Standard fixed-rate schedule, rounded to cents each month; extra goes to principal.
+      // lump = { amount, at: payment number, recast }: a one-time principal payment; with recast the
+      // payment is recalculated over the remaining months, otherwise the loan just ends sooner.
+      const paymentFor = (bal, r, months) => cents(r === 0 ? bal / months : bal * r / (1 - Math.pow(1 + r, -months)));
+      function amortize(amount, ratePct, years, extra, lump) {
         const n = Math.round(years * 12), r = ratePct / 100 / 12;
         if (!(amount > 0) || !(n > 0) || ratePct < 0) return null;
-        const pmt = cents(r === 0 ? amount / n : amount * r / (1 - Math.pow(1 + r, -n)));
+        let pmt = paymentFor(amount, r, n);
+        const first = pmt;
         const rows = [];
-        let bal = amount;
+        let bal = amount, newPmt = null;
         for (let i = 1; i <= n + 600 && bal > 0.004; i++) {
           const interest = cents(bal * r);
-          let principal = cents(pmt - interest + extra);
+          const oneTime = lump && lump.amount > 0 && i === lump.at ? lump.amount : 0;
+          let principal = cents(pmt - interest + extra + oneTime);
           if (principal >= bal || i === n) principal = cents(bal);   // last payment clears the balance
           bal = cents(bal - principal);
-          rows.push({ i, payment: cents(principal + interest), principal, interest, balance: bal });
+          rows.push({ i, payment: cents(principal + interest), principal, interest, balance: bal, lump: oneTime ? Math.min(oneTime, principal) : 0 });
+          if (oneTime && lump.recast && bal > 0.004 && i < n) { pmt = paymentFor(bal, r, n - i); newPmt = pmt; }
         }
-        return { pmt, rows, interest: cents(rows.reduce((s, x) => s + x.interest, 0)) };
+        return { pmt: first, newPmt, rows, interest: cents(rows.reduce((s, x) => s + x.interest, 0)) };
       }
+      const monthsBetween = (a, b) => { const [ya, ma] = a.split('-').map(Number), [yb, mb] = b.split('-').map(Number); return (yb - ya) * 12 + (mb - ma); };
+      const yearsMonths = (m) => [Math.floor(m / 12) && `${Math.floor(m / 12)} year${Math.floor(m / 12) === 1 ? '' : 's'}`,
+        m % 12 && `${m % 12} month${m % 12 === 1 ? '' : 's'}`].filter(Boolean).join(' ') || '0 months';
 
       function renderLoan() {
         const L = state.loan || {};
-        ['Amount', 'Rate', 'Years', 'Start', 'Extra'].forEach((k) => {
+        ['Amount', 'Rate', 'Years', 'Start', 'Extra', 'Lump', 'LumpMonth', 'LumpMode'].forEach((k) => {
           const el = $('loan' + k), v = L[k.toLowerCase()];
-          if (document.activeElement !== el) el.value = v === undefined || v === null ? '' : v;
+          if (document.activeElement !== el) el.value = v === undefined || v === null || v === '' ? (k === 'LumpMode' ? 'shorten' : '') : v;
         });
         const amount = parseFloat(L.amount), rate = parseFloat(L.rate), years = parseFloat(L.years);
         const extra = Math.max(0, parseFloat(L.extra) || 0);
         const start = /^\d{4}-\d{2}$/.test(L.start || '') ? L.start : today().slice(0, 7);
-        const plan = amortize(amount, rate, years, extra);
+        const noLump = amortize(amount, rate, years, extra);
+        const lumpAmt = Math.max(0, parseFloat(L.lump) || 0);
+        const lumpMonth = /^\d{4}-\d{2}$/.test(L.lumpmonth || '') ? L.lumpmonth : start;
+        const lumpAt = Math.max(1, monthsBetween(start, lumpMonth) + 1);
+        const recast = L.lumpmode === 'recast';
+        const withLump = (rc) => amortize(amount, rate, years, extra, { amount: lumpAmt, at: lumpAt, recast: rc });
+        const plan = lumpAmt > 0 && noLump ? withLump(recast) : noLump;
         $('loanScheduleBox').hidden = !plan;
+        $('loanLumpResult').innerHTML = '';
+        if (plan && lumpAmt > 0) {
+          const keep = withLump(false), rc = withLump(true);
+          if (lumpAt > noLump.rows.length) {
+            $('loanLumpResult').innerHTML = '<span class="text-red-600">That month is after the loan is paid off. Pick an earlier month.</span>';
+          } else {
+            const box = (title, chosen, lines) => `<div class="rounded-md border ${chosen ? 'border-indigo-400 bg-white' : 'border-slate-200 bg-white/60'} p-3">
+                <p class="font-medium ${chosen ? 'text-indigo-700' : 'text-slate-700'}">${title}${chosen ? ' \u00b7 shown below' : ''}</p>
+                <ul class="mt-1 space-y-0.5 text-slate-700">${lines.map((l) => `<li>${l}</li>`).join('')}</ul></div>`;
+            const savedKeep = cents(noLump.interest - keep.interest), sooner = noLump.rows.length - keep.rows.length;
+            const savedRc = cents(noLump.interest - rc.interest);
+            const newPay = rc.newPmt !== null ? rc.newPmt : 0;
+            $('loanLumpResult').innerHTML = `<p class="mb-2 text-slate-600">A one-time <strong>${fmt.format(lumpAmt)}</strong> in <strong>${escapeHtml(monthName(lumpMonth))}</strong>:</p>
+              <div class="grid md:grid-cols-2 gap-3">
+                ${box('Keep the same payment', !recast, [
+                  `Payment stays <strong>${fmt.format(noLump.pmt + extra)}</strong>/month`,
+                  `Paid off <strong>${escapeHtml(monthName(addMonths(start, keep.rows.length - 1)))}</strong>, ${yearsMonths(sooner)} sooner`,
+                  `Saves <strong class="text-emerald-700">${fmt.format(savedKeep)}</strong> in interest`])}
+                ${box('Lower my payment (recast)', recast, [
+                  `New payment <strong>${fmt.format(newPay + extra)}</strong>/month, ${fmt.format(cents(noLump.pmt - newPay))} less`,
+                  `Same payoff date: <strong>${escapeHtml(monthName(addMonths(start, rc.rows.length - 1)))}</strong>`,
+                  `Saves <strong class="text-emerald-700">${fmt.format(savedRc)}</strong> in interest`])}
+              </div>`;
+          }
+        }
         if (!plan) {
           $('loanSummary').innerHTML = '<p class="col-span-full text-sm text-slate-400">Enter the loan amount, interest rate and term to see the schedule.</p>';
           $('loanSaving').textContent = '';
@@ -931,7 +995,9 @@
             <p class="text-xs uppercase tracking-wide text-slate-500">${label}</p>
             <p class="text-xl font-semibold mt-1 tabular-nums">${value}</p>${sub ? `<p class="text-xs text-slate-500 mt-0.5">${sub}</p>` : ''}</div>`;
         $('loanSummary').innerHTML =
-          card('Monthly payment', fmt.format(plan.pmt + extra), extra ? `${fmt.format(plan.pmt)} + ${fmt.format(extra)} extra` : 'principal + interest')
+          (plan.newPmt !== null && plan.newPmt !== undefined
+            ? card('Monthly payment', fmt.format(plan.newPmt + extra), `was ${fmt.format(plan.pmt + extra)} before the one-time payment`)
+            : card('Monthly payment', fmt.format(plan.pmt + extra), extra ? `${fmt.format(plan.pmt)} + ${fmt.format(extra)} extra` : 'principal + interest'))
           + card('Total interest', fmt.format(plan.interest))
           + card('Total paid', fmt.format(cents(amount + plan.interest)))
           + card('Paid off', escapeHtml(monthName(payoff)), `${plan.rows.length} payments`);
@@ -949,13 +1015,14 @@
         const dated = plan.rows.map((x) => ({ ...x, m: addMonths(start, x.i - 1) }));
         let rows;
         if (loanView === 'month') {
-          rows = dated.map((x) => ({ label: `${x.i}. ${monthName(x.m)}`, ...x, cur: x.m === selectedMonth }));
+          rows = dated.map((x) => ({ label: `${x.i}. ${monthName(x.m)}${x.lump ? ` (includes ${fmt.format(x.lump)} one-time)` : ''}`, ...x, cur: x.m === selectedMonth }));
         } else {
           const by = {};
           dated.forEach((x) => {
             const y = x.m.slice(0, 4);
             const t = by[y] || (by[y] = { label: y, payment: 0, principal: 0, interest: 0, balance: 0, cur: false });
             t.payment += x.payment; t.principal += x.principal; t.interest += x.interest; t.balance = x.balance;
+            if (x.lump) t.label = `${y} (includes ${fmt.format(x.lump)} one-time)`;
             if (x.m === selectedMonth) t.cur = true;
           });
           rows = Object.values(by);
@@ -974,12 +1041,15 @@
         });
       }
 
-      $('loanForm').addEventListener('input', (e) => {
+      const onLoanInput = (e) => {
+        if (!e.target.id || !e.target.id.startsWith('loan')) return;
         const key = e.target.id.replace('loan', '').toLowerCase();
         state.loan = { ...(state.loan || {}), [key]: e.target.value };
         save();
         renderLoan();
-      });
+      };
+      $('loanForm').addEventListener('input', onLoanInput);
+      $('loanLumpForm').addEventListener('input', onLoanInput);
       document.querySelectorAll('[data-loanview]').forEach((b) => b.addEventListener('click', () => { loanView = b.dataset.loanview; renderLoan(); }));
 
       // ---------- Month-by-month chart ----------
