@@ -344,6 +344,7 @@
           <p class="text-xs uppercase tracking-wide text-slate-300">Net worth</p>
           <p id="nwTotal" class="text-3xl font-bold mt-1 tabular-nums">$0</p>
           <p id="nwEquity" class="text-xs text-slate-300 mt-1"></p>
+          <p id="nwUpdated" class="text-xs text-slate-400 mt-0.5"></p>
         </div>
       </section>
 
@@ -1173,6 +1174,14 @@
           || all.find((c) => c.toLowerCase().startsWith(t) || t.startsWith(c.toLowerCase().split(' ')[0]))
           || '';
       };
+      // "Oct 14, 2026"; balances older than 90 days get a reminder
+      const longDate = (iso) => { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); };
+      const daysSince = (iso) => Math.floor((Date.parse(today()) - Date.parse(iso)) / 86400000);
+      function nwDateHtml(it) {
+        if (!it.updated) return '';
+        const old = daysSince(it.updated) > 90;
+        return `Updated ${escapeHtml(longDate(it.updated))}${old ? ' <span class="text-amber-700">\u00b7 may be out of date</span>' : ''}`;
+      }
       const nwAmount = (v) => { const n = parseFloat(String(v).replace(/[$,\s]/g, '')); return Number.isFinite(n) ? Math.abs(Math.round(n * 100) / 100) : NaN; };
 
       function nwTotals() {
@@ -1199,6 +1208,8 @@
         $('nwAssetsCount').textContent = `${t.nAsset} item${t.nAsset === 1 ? '' : 's'}`;
         $('nwDebtsCount').textContent = `${t.nDebt} item${t.nDebt === 1 ? '' : 's'}`;
         const home = t.byCat['Primary Home'] || 0, mort = t.byCat['Mortgage'] || 0;
+        const dates = nw().items.map((it) => it.updated).filter(Boolean).sort();
+        $('nwUpdated').textContent = dates.length ? `Last updated ${longDate(dates[dates.length - 1])}` : '';
         $('nwEquity').textContent = home ? `Home equity ${fmt0.format(home - mort)} (${Math.round(((home - mort) / home) * 100)}% of home value)` : '';
         document.querySelectorAll('[data-nw-sub]').forEach((el) => { el.textContent = fmt0.format(t.byCat[el.dataset.nwSub] || 0); });
         // Asset mix: share of total assets by category (one hue; this shows size, not identity)
@@ -1219,7 +1230,8 @@
               <th scope="rowgroup" class="py-2 px-2 text-left font-semibold text-slate-700">${escapeHtml(c)}</th>
               <td></td><td class="py-2 px-2 text-right font-semibold tabular-nums" data-nw-sub="${escapeHtml(c)}"></td><td></td></tr>`
           + items.filter((it) => it.category === c).sort((a, b) => (b.value || 0) - (a.value || 0)).map((it) => `<tr class="border-b border-slate-100" data-nw-id="${it.id}">
-              <td class="py-1 pl-4 pr-1"><input type="text" data-f="name" value="${escapeHtml(it.name)}" maxlength="60" aria-label="Name" class="w-full min-w-[9rem] ${field}" /></td>
+              <td class="py-1 pl-4 pr-1"><input type="text" data-f="name" value="${escapeHtml(it.name)}" maxlength="60" aria-label="Name" class="w-full min-w-[9rem] ${field}" />
+                <span class="block px-2 text-[11px] text-slate-400" data-nw-date="${it.id}">${nwDateHtml(it)}</span></td>
               <td class="py-1 px-1"><select data-f="category" aria-label="Category for ${escapeHtml(it.name)}" class="${field}">
                 ${['asset', 'debt'].map((ty) => `<optgroup label="${ty === 'asset' ? 'Assets' : 'Liabilities'}">${NW_CATS[ty].map((x) =>
                   `<option ${x === it.category ? 'selected' : ''}>${escapeHtml(x)}</option>`).join('')}</optgroup>`).join('')}</select></td>
@@ -1276,7 +1288,7 @@
       }
 
       function addNwItem(name, category, value) {
-        nw().items.push({ id: uid(), name, category, value });
+        nw().items.push({ id: uid(), name, category, value, updated: today() });
       }
       $('nwType').addEventListener('change', renderNetWorth);
       $('nwAddBtn').addEventListener('click', () => {
@@ -1322,6 +1334,11 @@
           if (f === 'name') it.name = e.target.value.trim() || 'Untitled';
           if (f === 'value') it.value = nwAmount(e.target.value) || 0;
           if (f === 'category') it.category = e.target.value;
+          if (f === 'value' || f === 'category') {
+            it.updated = today();
+            const d = document.querySelector(`[data-nw-date="${CSS.escape(it.id)}"]`);
+            if (d) d.innerHTML = nwDateHtml(it);
+          }
           recordNetWorth(); save();
           if (f === 'category') renderNetWorth(); else { renderNwTotals(); renderNwHistory(); }
         });
