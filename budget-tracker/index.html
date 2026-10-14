@@ -98,6 +98,34 @@
 
     <!-- OVERVIEW -->
     <div data-tabpanel="overview" class="grid lg:grid-cols-3 gap-6">
+      <section class="lg:col-span-3 bg-white rounded-xl shadow-sm p-5 min-w-0">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 class="text-lg font-semibold">Month by month</h2>
+            <p class="text-xs text-slate-500">Budget vs. actual spending for each month. Click a month to open it.</p>
+          </div>
+          <div class="flex items-center gap-4 text-xs text-slate-600">
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm" style="background:#2a78d6"></span>Budget</span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm" style="background:#eb6834"></span>Actual</span>
+            <span class="flex items-center gap-1 text-red-700">▲ over budget</span>
+          </div>
+        </div>
+        <div id="trendWrap" class="relative mt-3">
+          <div id="trendChart"></div>
+          <div id="trendTip" hidden class="absolute z-10 pointer-events-none rounded-md bg-slate-900 text-white text-xs px-3 py-2 shadow-lg whitespace-nowrap"></div>
+        </div>
+        <details class="mt-2">
+          <summary class="text-sm text-slate-600 cursor-pointer select-none">Show as a table</summary>
+          <div class="overflow-x-auto mt-2">
+            <table class="w-full text-sm">
+              <thead><tr class="text-left text-slate-500 border-b border-slate-200">
+                <th class="py-1.5 pr-2 font-medium">Month</th><th class="py-1.5 px-2 font-medium text-right">Budget</th>
+                <th class="py-1.5 px-2 font-medium text-right">Actual</th><th class="py-1.5 pl-2 font-medium text-right">Difference</th></tr></thead>
+              <tbody id="trendTable"></tbody>
+            </table>
+          </div>
+        </details>
+      </section>
       <div class="lg:col-span-2 min-w-0">
         <section class="bg-white rounded-xl shadow-sm p-5">
           <div class="flex flex-wrap items-start justify-between gap-2">
@@ -798,6 +826,110 @@
       const categoryExpenses = (id) => monthExpenses().filter((e) => (id === '_orphan'
         ? !state.categories.some((c) => c.id === e.categoryId) : e.categoryId === id));
 
+      // ---------- Month-by-month chart ----------
+      const SERIES = { budget: '#2a78d6', actual: '#eb6834' };   // validated pair (light surface)
+      const addMonths = (ym, n) => {
+        const [y, m] = ym.split('-').map(Number);
+        const d = new Date(y, m - 1 + n, 1);
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      };
+      // Same math as the dashboard: budget = each category's amount for that month;
+      // actual = typed amounts + logged/imported purchases in that month
+      function monthTotals(m) {
+        const ov = state.monthBudgets[m] || {};
+        const budget = state.categories.reduce((sum, c) =>
+          sum + toNum(Object.prototype.hasOwnProperty.call(ov, c.id) ? ov[c.id] : c.budget), 0);
+        const typed = Object.values(state.monthActuals[m] || {}).reduce((sum, v) => sum + signedNum(v), 0);
+        const logged = state.expenses.filter((e) => e.date && e.date.slice(0, 7) === m).reduce((sum, e) => sum + e.amount, 0);
+        return { m, budget: Math.round(budget * 100) / 100, actual: Math.round((typed + logged) * 100) / 100 };
+      }
+      // Months that have something in them, plus the month being viewed; the 12 most recent
+      function trendMonths() {
+        const set = new Set([selectedMonth]);
+        state.expenses.forEach((e) => { if (e.date) set.add(e.date.slice(0, 7)); });
+        [state.monthActuals, state.monthBudgets, state.monthIncome].forEach((o) => Object.keys(o).forEach((m) => set.add(m)));
+        const list = [...set].filter((m) => /^\d{4}-\d{2}$/.test(m)).sort();
+        // Fill gaps so months are evenly spaced
+        const full = [];
+        for (let m = list[0]; m <= list[list.length - 1]; m = addMonths(m, 1)) full.push(m);
+        return full.slice(-12);
+      }
+      const shortMoney = (v) => (Math.abs(v) >= 1000 ? `$${(v / 1000).toFixed(v >= 10000 ? 0 : 1)}k` : `$${Math.round(v)}`);
+      const shortMonth = (ym) => { const [y, m] = ym.split('-').map(Number); return new Date(y, m - 1, 1).toLocaleString('en-US', { month: 'short' }); };
+
+      function renderTrend() {
+        const data = trendMonths().map(monthTotals);
+        const wrap = $('trendWrap');
+        const W = Math.max(300, wrap.clientWidth || 700), H = 230;
+        const padL = 46, padR = 6, padT = 22, padB = 26;
+        const max = Math.max(1, ...data.map((d) => Math.max(d.budget, d.actual)));
+        const rawStep = max / 4, mag = 10 ** Math.floor(Math.log10(rawStep));
+        const step = [1, 2, 2.5, 5, 10].map((k) => k * mag).find((k) => k >= rawStep);
+        const top = step * Math.ceil(max / step);
+        const y = (v) => padT + (H - padT - padB) * (1 - Math.max(0, v) / top);
+        const band = (W - padL - padR) / data.length;
+        const barW = Math.max(6, Math.min(26, band * 0.3));
+        // Bar with 4px rounded top, flat on the baseline
+        const bar = (x, v, color) => {
+          const yt = y(v), yb = y(0), h = yb - yt;
+          if (h <= 0.5) return '';
+          const r = Math.min(4, h, barW / 2);
+          return `<path d="M${x},${yb} V${yt + r} Q${x},${yt} ${x + r},${yt} H${x + barW - r} Q${x + barW},${yt} ${x + barW},${yt + r} V${yb} Z" fill="${color}"/>`;
+        };
+        let svg = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Budget versus actual spending by month" style="display:block;max-width:100%">`;
+        for (let v = 0; v <= top + 0.001; v += step) {
+          svg += `<line x1="${padL}" x2="${W - padR}" y1="${y(v)}" y2="${y(v)}" stroke="#e2e8f0" stroke-width="1"/>
+            <text x="${padL - 6}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="#64748b">${shortMoney(v)}</text>`;
+        }
+        data.forEach((d, i) => {
+          const cx = padL + band * i + band / 2;
+          const sel = d.m === selectedMonth;
+          const hw = Math.min(band - 4, barW * 2 + 48);
+          if (sel) svg += `<rect x="${cx - hw / 2}" y="${padT - 18}" width="${hw}" height="${H - padT - padB + 18}" rx="6" fill="#f1f5f9"/>`;
+          svg += bar(cx - barW - 1, d.budget, SERIES.budget) + bar(cx + 1, d.actual, SERIES.actual);
+          if (d.actual > d.budget + 0.005) {
+            svg += `<text x="${cx + 1 + barW / 2}" y="${y(d.actual) - 5}" text-anchor="middle" font-size="10" font-weight="600" fill="#b91c1c">▲ ${shortMoney(d.actual - d.budget)}</text>`;
+          }
+          svg += `<text x="${cx}" y="${H - 8}" text-anchor="middle" font-size="11" fill="${sel ? '#0f172a' : '#64748b'}" font-weight="${sel ? 700 : 400}">${shortMonth(d.m)}${d.m.slice(0, 4) !== selectedMonth.slice(0, 4) ? ' ’' + d.m.slice(2, 4) : ''}</text>`;
+          // Hit area larger than the bars
+          svg += `<rect data-trend="${d.m}" x="${padL + band * i}" y="${padT - 18}" width="${band}" height="${H - padT - padB + 18 + padB}" fill="transparent" style="cursor:pointer"><title>${monthName(d.m)}</title></rect>`;
+        });
+        svg += `<line x1="${padL}" x2="${W - padR}" y1="${y(0)}" y2="${y(0)}" stroke="#94a3b8" stroke-width="1"/></svg>`;
+        $('trendChart').innerHTML = svg;
+        $('trendTable').innerHTML = data.slice().reverse().map((d) => `<tr class="border-b border-slate-100 ${d.m === selectedMonth ? 'font-semibold' : ''}">
+            <td class="py-1.5 pr-2">${escapeHtml(monthName(d.m))}</td>
+            <td class="py-1.5 px-2 text-right tabular-nums">${fmt.format(d.budget)}</td>
+            <td class="py-1.5 px-2 text-right tabular-nums">${fmt.format(d.actual)}</td>
+            <td class="py-1.5 pl-2 text-right tabular-nums">${varianceCell(d.budget - d.actual)}</td></tr>`).join('');
+        renderTrend.data = data;
+      }
+
+      $('trendChart').addEventListener('mousemove', (e) => {
+        const hit = e.target.closest('[data-trend]');
+        const tip = $('trendTip');
+        if (!hit) { tip.hidden = true; return; }
+        const d = (renderTrend.data || []).find((x) => x.m === hit.dataset.trend);
+        if (!d) return;
+        const diff = d.budget - d.actual;
+        tip.innerHTML = `<div class="font-semibold mb-1">${escapeHtml(monthName(d.m))}</div>
+          <div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-sm" style="background:${SERIES.budget}"></span>Budget <span class="ml-auto pl-3 tabular-nums">${fmt.format(d.budget)}</span></div>
+          <div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-sm" style="background:${SERIES.actual}"></span>Actual <span class="ml-auto pl-3 tabular-nums">${fmt.format(d.actual)}</span></div>
+          <div class="mt-1 pt-1 border-t border-slate-700">${diff >= 0 ? fmt.format(diff) + ' left' : '▲ ' + fmt.format(-diff) + ' over'}</div>`;
+        tip.hidden = false;
+        const box = $('trendWrap').getBoundingClientRect();
+        const r = hit.getBoundingClientRect();
+        const left = Math.min(Math.max(0, r.left - box.left + r.width / 2 - tip.offsetWidth / 2), box.width - tip.offsetWidth);
+        tip.style.left = left + 'px';
+        tip.style.top = '0px';
+      });
+      $('trendChart').addEventListener('mouseleave', () => { $('trendTip').hidden = true; });
+      $('trendChart').addEventListener('click', (e) => {
+        const hit = e.target.closest('[data-trend]');
+        if (hit && hit.dataset.trend !== selectedMonth) switchMonth(hit.dataset.trend);
+      });
+      let resizeTimer;
+      window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(renderTrend, 150); });
+
       // ---------- Rendering ----------
       function renderCategorySetup() {
         $('categoryList').innerHTML = state.categories.map((c) => `
@@ -974,6 +1106,8 @@
             </div>
           </div>`;
         }).join('') || `<p class="text-sm text-slate-400">No categories yet.</p>`;
+
+        renderTrend();
 
         // Top vendors this month
         const vendors = groupVendors(monthExpenses()).filter((v) => v.total > 0).slice(0, 8);
@@ -1313,6 +1447,7 @@
         document.querySelectorAll('[data-tabpanel]').forEach((el) => { el.hidden = el.dataset.tabpanel !== name; });
         document.querySelectorAll('[data-tab]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === name)));
         try { localStorage.setItem(STORAGE_KEY + '.tab', name); } catch (e) { /* storage unavailable */ }
+        if (name === 'overview' && typeof renderTrend === 'function') renderTrend();
       }
       document.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
 
