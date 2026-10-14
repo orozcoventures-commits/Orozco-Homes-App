@@ -1054,6 +1054,56 @@
       const isPaymentText = (s) => /payment.*thank|online payment|autopay|auto pay|payment received|mobile payment|e-?payment/i.test(s);
       const isAmazon = (s) => /amazon|amzn/i.test(s);
       const catByName = (name) => state.categories.find((c) => c.name.trim().toLowerCase() === name.toLowerCase());
+      // Other names people give the same budget category
+      const CATEGORY_ALIASES = {
+        Groceries: /grocer|^food/i,
+        'Home Improvement': /home improv|home repair|maintenance/i,
+        Giving: /giving|church|tith|charit|donat/i,
+        Entertainment: /entertain|streaming|dining|restaurant|eating out/i,
+        'Car Repairs': /car repair|auto repair|car maint|auto maint/i,
+        Transportation: /transport|fuel|gasoline/i,
+        Electrical: /electric|dominion|energy|power/i,
+        'Natural Gas': /natural gas/i,
+        Insurance: /insur/i,
+      };
+      const findCategory = (name) => catByName(name)
+        || (CATEGORY_ALIASES[name] && state.categories.find((c) => CATEGORY_ALIASES[name].test(c.name)));
+      const words = (s) => ' ' + String(s).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim() + ' ';
+      // A category named after a payee ("Dominion Energy", "HRSD", "Universal Pest") matches charges from it
+      function categoryNamedInStore(desc) {
+        const text = words(desc);
+        for (const c of state.categories) {
+          const parts = [c.name, ...c.name.split(/\s+-\s+|\s*\/\s*/)];
+          for (const part of parts) {
+            const w = words(part).trim();
+            if (w.length >= 4 && text.includes(' ' + w + ' ')) return c.id;
+          }
+          const first = words(c.name).trim().split(' ')[0];
+          if (first && first.length >= 6 && text.includes(' ' + first + ' ')) return c.id;
+        }
+        return '';
+      }
+
+      // What you chose before: from purchases already imported (including later corrections in the
+      // ledger) and from rules saved at import time
+      function importHistory() {
+        const tally = { store: {}, card: {} };
+        const add = (bucket, key, cid) => {
+          if (!key) return;
+          const t = bucket[key] || (bucket[key] = {});
+          t[cid] = (t[cid] || 0) + 1;
+        };
+        state.expenses.forEach((e) => {
+          if (!e.importKey || / \(part \d+\)$/.test(e.description || '')) return;
+          if (!state.categories.some((c) => c.id === e.categoryId)) return;
+          add(tally.store, merchantKey(e.description || ''), e.categoryId);
+          add(tally.card, e.cardCategory, e.categoryId);
+        });
+        const best = (t) => Object.keys(t).sort((a, b) => t[b] - t[a])[0];
+        const out = { store: {}, card: {} };
+        ['store', 'card'].forEach((k) => Object.keys(tally[k]).forEach((key) => { out[k][key] = best(tally[k][key]); }));
+        return out;
+      }
 
       function loadXlsx() {
         if (window.XLSX) return Promise.resolve(window.XLSX);
@@ -1125,19 +1175,32 @@
         return words[0] === 'the' ? words.slice(0, 2).join(' ') : (words[0] || '');
       }
 
-      function suggestCategory(desc, cardCategory) {
-        if (isAmazon(desc)) return '';   // Amazon orders vary; choose per charge
-        const learned = state.importRules[merchantKey(desc)];
-        if (learned && state.categories.some((c) => c.id === learned)) return learned;
-        for (const [table, text] of [[MERCHANT_MAP, desc], [CARD_CATEGORY_MAP, cardCategory]]) {
-          for (const [re, name] of table) {
-            if (!text || !re.test(text)) continue;
-            const c = catByName(name);
-            if (c) return c.id;
-            if (name === 'Insurance') return NEW_INSURANCE;
-          }
+      const validCat = (cid) => (cid && state.categories.some((c) => c.id === cid) ? cid : '');
+      function fromTable(table, text) {
+        if (!text) return '';
+        for (const [re, name] of table) {
+          if (!re.test(text)) continue;
+          const c = findCategory(name);
+          if (c) return c.id;
+          if (name === 'Insurance') return NEW_INSURANCE;
         }
         return '';
+      }
+
+      function suggestCategory(desc, cardCategory, hist) {
+        const key = merchantKey(desc);
+        // 1. Same store as before (Amazon included: it goes where you usually put it; split as needed)
+        const byStore = validCat(hist.store[key]) || validCat(state.importRules[key]);
+        if (byStore) return byStore;
+        if (isAmazon(desc)) return '';
+        // 2. A category named after this payee, then well-known stores
+        const named = categoryNamedInStore(desc);
+        if (named) return named;
+        const known = fromTable(MERCHANT_MAP, desc);
+        if (known) return known;
+        // 3. Where you put this kind of purchase before (the card's own category), then defaults
+        return validCat(hist.card[cardCategory]) || validCat(state.importRules['card:' + cardCategory])
+          || fromTable(CARD_CATEGORY_MAP, cardCategory);
       }
 
       function buildImportRows(table) {
@@ -1167,6 +1230,7 @@
         // Some cards list purchases as negative numbers; make purchases positive
         if (cAmt >= 0 && raw.filter((x) => x.amount < 0).length > raw.length / 2) raw.forEach((x) => { x.amount = -x.amount; });
 
+        const hist = importHistory();
         const seen = {};
         return raw.map((x) => {
           const base = `${x.date}|${x.desc}|${x.amount.toFixed(2)}`;
@@ -1176,7 +1240,7 @@
           return {
             key, date: x.date, desc: x.desc, store: cleanStore(x.desc), amount: Math.round(x.amount * 100) / 100,
             cardCategory: x.cardCategory, amazon: isAmazon(x.desc), dup, include: !dup,
-            catId: dup ? '' : suggestCategory(x.desc, x.cardCategory), parts: null,
+            catId: dup ? '' : suggestCategory(x.desc, x.cardCategory, hist), parts: null,
           };
         }).sort((a, b) => b.date.localeCompare(a.date));
       }
@@ -1315,10 +1379,15 @@
               id: uid(), date: r.date, categoryId: resolve(p.catId), amount: Math.round(p.amount * 100) / 100,
               description: r.store + (r.parts ? ` (part ${j + 1})` : ''), createdAt: now,
               importKey: r.parts ? `${r.key}#${j + 1}` : r.key,
+              cardCategory: r.cardCategory || undefined,
             });
           });
-          // Remember the choice for this store next time (not Amazon, which varies)
-          if (!r.parts && !r.amazon) { const k = merchantKey(r.desc); if (k) state.importRules[k] = resolve(r.catId); }
+          // Remember the choice for this store and this kind of purchase next time
+          if (!r.parts) {
+            const k = merchantKey(r.desc);
+            if (k) state.importRules[k] = resolve(r.catId);
+            if (r.cardCategory && !r.amazon) state.importRules['card:' + r.cardCategory] = resolve(r.catId);
+          }
         });
         clearTyped.forEach((h) => { if (state.monthActuals[h.m]) delete state.monthActuals[h.m][h.cid]; });
         Object.keys(state.monthActuals).forEach((m) => { if (!Object.keys(state.monthActuals[m]).length) delete state.monthActuals[m]; });
@@ -1345,7 +1414,18 @@
         const r = importRows[+tr.dataset.i];
         const d = e.target.dataset;
         if ('inc' in d) r.include = e.target.checked;
-        else if ('cat' in d) r.catId = e.target.value;
+        else if ('cat' in d) {
+          r.catId = e.target.value;
+          if (r.catId) {
+            const key = merchantKey(r.desc);
+            importRows.forEach((o) => {
+              if (o === r || o.dup || o.parts || o.catId) return;
+              const sameStore = merchantKey(o.desc) === key;
+              const sameKind = !r.amazon && !o.amazon && r.cardCategory && o.cardCategory === r.cardCategory;
+              if (sameStore || sameKind) o.catId = r.catId;
+            });
+          }
+        }
         else if ('pcat' in d) r.parts[+tr.dataset.j].catId = e.target.value;
         else if ('pamt' in d) r.parts[+tr.dataset.j].amount = Math.round((parseFloat(e.target.value) || 0) * 100) / 100;
         $('importMsg').textContent = '';
