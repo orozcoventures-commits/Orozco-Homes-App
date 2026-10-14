@@ -11,6 +11,10 @@
   <style>
     [hidden] { display: none !important; }
     .bar-track { transition: width 0.4s ease; }
+    .tab-btn { padding: 0.5rem 1rem; font-size: 0.875rem; font-weight: 500; color: #475569; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+    .tab-btn:hover { color: #0f172a; }
+    .tab-btn[aria-selected="true"] { color: #0f172a; border-bottom-color: #4f46e5; }
+    .tab-btn:focus-visible { outline: 2px solid #4f46e5; outline-offset: 2px; }
     input[type=number]::-webkit-inner-spin-button { opacity: 0.4; }
   </style>
 </head>
@@ -85,44 +89,66 @@
       </div>
     </section>
 
-    <div class="grid lg:grid-cols-3 gap-6">
-      <!-- Left column: setup + logger -->
-      <div class="space-y-6">
-        <!-- 1. Income & Category Setup -->
+    <!-- Tabs -->
+    <nav class="flex gap-1 border-b border-slate-300" role="tablist" aria-label="Sections">
+      <button type="button" role="tab" data-tab="overview" class="tab-btn">Overview</button>
+      <button type="button" role="tab" data-tab="transactions" class="tab-btn">Transactions</button>
+      <button type="button" role="tab" data-tab="setup" class="tab-btn">Setup</button>
+    </nav>
+
+    <!-- OVERVIEW -->
+    <div data-tabpanel="overview" class="grid lg:grid-cols-3 gap-6">
+      <div class="lg:col-span-2 min-w-0">
         <section class="bg-white rounded-xl shadow-sm p-5">
-          <h2 class="text-lg font-semibold">1. Income &amp; Budget Setup</h2>
-          <p class="text-sm text-slate-500 mb-4">Editing <span id="setupMonthLabel" class="font-medium text-slate-700"></span>
-            <span id="customBadge" class="hidden ml-1 rounded-full bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5">custom</span></p>
-          <label class="block text-sm font-medium text-slate-600 mb-1" for="incomeInput">Income this month ($)</label>
-          <input id="incomeInput" type="number" min="0" step="0.01" placeholder="0.00"
-                 class="w-full rounded-md border border-slate-300 px-3 py-2 mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-sm font-medium text-slate-600">Category budgets</span>
-            <span class="text-xs text-slate-400">Edits save automatically</span>
+          <div class="flex flex-wrap items-start justify-between gap-2">
+            <h2 class="text-lg font-semibold">Budget vs. Actual <span id="monthLabel" class="text-sm font-normal text-slate-500"></span></h2>
+            <div class="flex gap-2 text-xs">
+              <button id="expandAllBtn" type="button" class="rounded-md border border-slate-300 hover:bg-slate-50 px-2.5 py-1">Open all</button>
+              <button id="collapseAllBtn" type="button" class="rounded-md border border-slate-300 hover:bg-slate-50 px-2.5 py-1">Close all</button>
+            </div>
           </div>
-          <div id="categoryList" class="space-y-2"></div>
-
-          <div class="mt-3 flex flex-wrap gap-2 text-xs">
-            <button id="saveDefaultBtn" type="button" title="Months you haven't customized will use these amounts"
-                    class="rounded-md border border-slate-300 hover:bg-slate-50 px-2.5 py-1.5">Save as default for all months</button>
-            <button id="resetMonthBtn" type="button" title="Drop this month's custom amounts and use the defaults"
-                    class="rounded-md border border-slate-300 hover:bg-slate-50 px-2.5 py-1.5">Reset month to defaults</button>
-          </div>
-          <p class="mt-2 text-xs text-slate-400">Changes here apply to this month only. Highlighted amounts differ from your defaults.</p>
-
-          <div id="addCategoryForm" class="mt-4 flex gap-2">
-            <input id="newCategoryName" type="text" placeholder="New category" maxlength="40"
-                   class="flex-1 min-w-0 rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-            <input id="newCategoryBudget" type="number" min="0" step="0.01" placeholder="0.00"
-                   class="w-24 rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-            <button id="addCategoryBtn" type="button" class="rounded-md bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 text-sm font-medium">Add</button>
+          <p class="text-sm text-slate-500 mb-4">Click a group to see its categories, a category to see its vendors, and a vendor to see each purchase.
+            You can type in any <span class="font-medium text-slate-700">Actual</span> box to change the amount.</p>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="text-left text-slate-500 border-b border-slate-200">
+                  <th class="py-2 pr-2 font-medium">Group / category / vendor</th>
+                  <th class="py-2 px-2 font-medium text-right">Budgeted</th>
+                  <th class="py-2 px-2 font-medium text-right">Actual</th>
+                  <th class="py-2 pl-2 font-medium text-right">Variance</th>
+                </tr>
+              </thead>
+              <tbody id="summaryBody"></tbody>
+              <tfoot id="summaryFoot"></tfoot>
+            </table>
           </div>
         </section>
+      </div>
+      <div class="space-y-6 min-w-0">
+        <section class="bg-white rounded-xl shadow-sm p-5">
+          <h2 class="text-lg font-semibold">Top vendors</h2>
+          <p class="text-xs text-slate-500 mb-3">Where the money went this month. Click a vendor to see its purchases.</p>
+          <ol id="topVendors" class="space-y-1"></ol>
+        </section>
+        <section class="bg-white rounded-xl shadow-sm p-5">
+          <h2 class="text-lg font-semibold mb-1">Spending by group</h2>
+          <div class="flex flex-wrap items-center gap-3 text-xs text-slate-500 mb-4">
+            <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-emerald-500"></span>Under 80%</span>
+            <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-amber-500"></span>80–100%</span>
+            <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-red-500"></span>Over</span>
+          </div>
+          <div id="chart" class="space-y-4"></div>
+        </section>
+      </div>
+    </div>
 
+    <!-- TRANSACTIONS -->
+    <div data-tabpanel="transactions" hidden class="grid lg:grid-cols-3 gap-6">
+      <div class="space-y-6 min-w-0">
         <!-- 2. Expense Logger -->
         <section class="bg-white rounded-xl shadow-sm p-5">
-          <h2 class="text-lg font-semibold mb-4">2. Log an Expense</h2>
+          <h2 class="text-lg font-semibold mb-4">Log an Expense</h2>
           <div id="expenseForm" class="space-y-3">
             <div class="grid grid-cols-2 gap-3">
               <div>
@@ -156,64 +182,69 @@
           </div>
         </section>
       </div>
-
-      <!-- Right column: dashboard, chart, ledger -->
-      <div class="lg:col-span-2 space-y-6">
-        <!-- 3. Budget vs Actual -->
-        <section class="bg-white rounded-xl shadow-sm p-5">
-          <h2 class="text-lg font-semibold">3. Budget vs. Actual <span id="monthLabel" class="text-sm font-normal text-slate-500"></span></h2>
-          <p class="text-sm text-slate-500 mb-4">Type what you actually spent in any <span class="font-medium text-slate-700">Actual</span> box. Card imports and logged expenses fill it in automatically, and you can still change the amount.</p>
-          <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-              <thead>
-                <tr class="text-left text-slate-500 border-b border-slate-200">
-                  <th class="py-2 pr-2 font-medium">Category</th>
-                  <th class="py-2 px-2 font-medium text-right">Budgeted</th>
-                  <th class="py-2 px-2 font-medium text-right">Actual</th>
-                  <th class="py-2 pl-2 font-medium text-right">Variance</th>
-                </tr>
-              </thead>
-              <tbody id="summaryBody"></tbody>
-              <tfoot id="summaryFoot"></tfoot>
-            </table>
-          </div>
-        </section>
-
-        <!-- 4. Visual chart -->
-        <section class="bg-white rounded-xl shadow-sm p-5">
-          <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
-            <h2 class="text-lg font-semibold">4. Spending Progress</h2>
-            <div class="flex items-center gap-4 text-xs text-slate-500">
-              <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-emerald-500"></span>Under 80%</span>
-              <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-amber-500"></span>80–100%</span>
-              <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-red-500"></span>Over budget</span>
-            </div>
-          </div>
-          <div id="chart" class="space-y-4"></div>
-        </section>
-
+      <div class="lg:col-span-2 min-w-0">
         <!-- Ledger -->
         <section class="bg-white rounded-xl shadow-sm p-5">
           <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
-            <h2 class="text-lg font-semibold">Expense Ledger</h2>
-            <select id="ledgerFilter" class="rounded-md border border-slate-300 px-2 py-1 text-sm bg-white"></select>
+            <h2 class="text-lg font-semibold">Transactions <span id="ledgerMonthLabel" class="text-sm font-normal text-slate-500"></span></h2>
+            <div class="flex flex-wrap items-center gap-2">
+              <input id="ledgerSearch" type="search" placeholder="Search vendor or description" aria-label="Search vendor or description"
+                     class="rounded-md border border-slate-300 px-2 py-1 text-sm w-56 max-w-full" />
+              <select id="ledgerFilter" aria-label="Filter by group or category" class="rounded-md border border-slate-300 px-2 py-1 text-sm bg-white"></select>
+            </div>
           </div>
-          <div class="overflow-x-auto max-h-96 overflow-y-auto">
+          <div class="overflow-x-auto max-h-[36rem] overflow-y-auto">
             <table class="w-full text-sm">
               <thead class="sticky top-0 bg-white">
                 <tr class="text-left text-slate-500 border-b border-slate-200">
                   <th class="py-2 pr-2 font-medium">Date</th>
                   <th class="py-2 px-2 font-medium">Category</th>
-                  <th class="py-2 px-2 font-medium">Description</th>
+                  <th class="py-2 px-2 font-medium">Vendor / description</th>
                   <th class="py-2 px-2 font-medium text-right">Amount</th>
                   <th class="py-2 pl-2"></th>
                 </tr>
               </thead>
               <tbody id="ledgerBody"></tbody>
+              <tfoot id="ledgerFoot"></tfoot>
             </table>
           </div>
         </section>
       </div>
+    </div>
+
+    <!-- SETUP -->
+    <div data-tabpanel="setup" hidden class="max-w-3xl">
+        <!-- 1. Income & Category Setup -->
+        <section class="bg-white rounded-xl shadow-sm p-5">
+          <h2 class="text-lg font-semibold">Income &amp; Budget Setup</h2>
+          <p class="text-sm text-slate-500 mb-4">Editing <span id="setupMonthLabel" class="font-medium text-slate-700"></span>
+            <span id="customBadge" class="hidden ml-1 rounded-full bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5">custom</span></p>
+          <label class="block text-sm font-medium text-slate-600 mb-1" for="incomeInput">Income this month ($)</label>
+          <input id="incomeInput" type="number" min="0" step="0.01" placeholder="0.00"
+                 class="w-full rounded-md border border-slate-300 px-3 py-2 mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-sm font-medium text-slate-600">Category budgets</span>
+            <span class="text-xs text-slate-400">Name · group · monthly budget. Edits save automatically</span>
+          </div>
+          <div id="categoryList" class="space-y-2"></div>
+
+          <div class="mt-3 flex flex-wrap gap-2 text-xs">
+            <button id="saveDefaultBtn" type="button" title="Months you haven't customized will use these amounts"
+                    class="rounded-md border border-slate-300 hover:bg-slate-50 px-2.5 py-1.5">Save as default for all months</button>
+            <button id="resetMonthBtn" type="button" title="Drop this month's custom amounts and use the defaults"
+                    class="rounded-md border border-slate-300 hover:bg-slate-50 px-2.5 py-1.5">Reset month to defaults</button>
+          </div>
+          <p class="mt-2 text-xs text-slate-400">Changes here apply to this month only. Highlighted amounts differ from your defaults.</p>
+
+          <div id="addCategoryForm" class="mt-4 flex gap-2">
+            <input id="newCategoryName" type="text" placeholder="New category" maxlength="40"
+                   class="flex-1 min-w-0 rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <input id="newCategoryBudget" type="number" min="0" step="0.01" placeholder="0.00"
+                   class="w-24 rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <button id="addCategoryBtn" type="button" class="rounded-md bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 text-sm font-medium">Add</button>
+          </div>
+        </section>
     </div>
   </main>
 
@@ -607,12 +638,106 @@
         showAuth(true);
       }
 
+      // ---------- Groups and vendors ----------
+      const GROUPS = ['Housing', 'Utilities', 'Food', 'Transportation', 'Giving', 'Savings & Debt', 'Lifestyle', 'Other'];
+      // Suggested group from the category name; a choice made in Setup (category.group) wins
+      function defaultGroup(name) {
+        const n = name || '';
+        if (/just one opportunity|giving|church|tith|charit|donat|ministr/i.test(n)) return 'Giving';
+        if (/\bcar\b|auto|transport|fuel|uber|lyft|toll|parking/i.test(n)) return 'Transportation';
+        if (/grocer|food|cafe|restaurant|dining|lunch|meal/i.test(n)) return 'Food';
+        if (/dominion|energy|electric|natural gas|^gas$|hrsd|water|sewer|internet|phone|cable|utilit|trash/i.test(n)) return 'Utilities';
+        if (/mortgage|\brent\b|home|hous|pest|hoa|insur|repair|lawn|maint/i.test(n)) return 'Housing';
+        if (/saving|debt|credit card|loan|tax|retire|invest|emergency/i.test(n)) return 'Savings & Debt';
+        if (/entertain|shop|health|pharm|personal|cloth|gift|subscri|beauty|nail|hobby|fun/i.test(n)) return 'Lifestyle';
+        return 'Other';
+      }
+      const groupOf = (c) => (c && GROUPS.includes(c.group) ? c.group : defaultGroup(c ? c.name : ''));
+      const groupOfCategoryId = (id) => {
+        const c = state.categories.find((x) => x.id === id);
+        return c ? groupOf(c) : 'Other';
+      };
+
+      // Card descriptions -> readable vendor names ("KROGER 5001 ROANOKE VA" -> "Kroger")
+      const PLACE_WORDS = new Set(('va nc sc ny ca wa ar pa fl tx md dc ga oh nj il co az de tn ky virginia beach beac bch '
+        + 'roanoke norfolk chesapeake suffolk hampton newport news portsmouth williamsburg new york asheville '
+        + 'bentonville com www bill na inc llc amzn the').split(' '));
+      // Long place names also show up glued to other text on card statements ("OVIRGINIA")
+      const LONG_PLACES = [...PLACE_WORDS].filter((w) => w.length >= 6);
+      function isPlaceWord(w) {
+        const l = w.toLowerCase();
+        return PLACE_WORDS.has(l) || LONG_PLACES.some((p) => l.endsWith(p) && l.length - p.length <= 2);
+      }
+      function vendorWords(desc) {
+        return cleanStore(String(desc || '').replace(/ \(part \d+\)$/, ''))
+          .replace(/[^A-Za-z' ]/g, ' ').split(/\s+/)
+          .filter((w) => w.length > 1 && !isPlaceWord(w));
+      }
+      function vendorKeyOf(e) {
+        const desc = e.description || '';
+        if (isAmazon(desc)) return 'amazon';
+        const w = vendorWords(desc).map((x) => x.toLowerCase());
+        if (!w.length) return '(none)';
+        return e.importKey ? w[0] : w.join(' ');
+      }
+      const titleCase = (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+      function vendorDisplay(key, members) {
+        if (key === 'amazon') return 'Amazon';
+        if (key === '(none)') return 'No description';
+        const lists = members.map((e) => vendorWords(e.description).slice(0, 3).map((w) => w.toLowerCase()));
+        let prefix = lists[0] || [];
+        lists.forEach((l) => { let i = 0; while (i < prefix.length && l[i] === prefix[i]) i++; prefix = prefix.slice(0, i); });
+        if (!prefix.length) prefix = key.split(' ');
+        return prefix.map(titleCase).join(' ');
+      }
+      // Expenses -> [{ key, name, count, total, items }] biggest first
+      function groupVendors(expenses) {
+        const by = {};
+        expenses.forEach((e) => { const k = vendorKeyOf(e); (by[k] || (by[k] = [])).push(e); });
+        return Object.keys(by).map((k) => ({
+          key: k, name: vendorDisplay(k, by[k]), items: by[k].sort((a, b) => b.date.localeCompare(a.date)),
+          count: by[k].length, total: Math.round(by[k].reduce((s, e) => s + e.amount, 0) * 100) / 100,
+        })).sort((a, b) => b.total - a.total);
+      }
+
+      // Which parts of the Budget vs. Actual table are open
+      const openGroups = new Set((() => { try { return JSON.parse(localStorage.getItem(STORAGE_KEY + '.open')) || []; } catch (e) { return []; } })());
+      const openCats = new Set();
+      const openVendors = new Set();
+      const saveOpen = () => { try { localStorage.setItem(STORAGE_KEY + '.open', JSON.stringify([...openGroups])); } catch (e) { /* storage unavailable */ } };
+
+      function groupTotals(rows) {
+        const out = {};
+        rows.forEach((r) => {
+          const g = r.id === '_orphan' ? 'Other' : groupOfCategoryId(r.id);
+          const t = out[g] || (out[g] = { name: g, budget: 0, actual: 0, rows: [] });
+          t.budget += r.budget; t.actual += r.actual; t.rows.push(r);
+        });
+        return GROUPS.filter((g) => out[g]).map((g) => ({ ...out[g], budget: Math.round(out[g].budget * 100) / 100, actual: Math.round(out[g].actual * 100) / 100 }));
+      }
+      function progress(actual, budget) {
+        const pct = budget > 0 ? (actual / budget) * 100 : (actual > 0 ? 100 : 0);
+        const over = actual > budget + 0.005;
+        return {
+          pct, over, width: Math.min(pct, 100),
+          color: over ? 'bg-red-500' : pct >= 80 ? 'bg-amber-500' : 'bg-emerald-500',
+          label: budget > 0 ? `${Math.round(pct)}%` : (actual > 0 ? 'No budget' : '0%'),
+        };
+      }
+      const caret = (open) => `<span aria-hidden="true" class="inline-block w-4 text-slate-400">${open ? '▾' : '▸'}</span>`;
+      const categoryExpenses = (id) => monthExpenses().filter((e) => (id === '_orphan'
+        ? !state.categories.some((c) => c.id === e.categoryId) : e.categoryId === id));
+
       // ---------- Rendering ----------
       function renderCategorySetup() {
         $('categoryList').innerHTML = state.categories.map((c) => `
-          <div class="flex items-center gap-2" data-id="${c.id}">
-            <input type="text" value="${escapeHtml(c.name)}" maxlength="40" data-field="name"
-                   class="flex-1 min-w-0 rounded-md border border-slate-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          <div class="flex flex-wrap sm:flex-nowrap items-center gap-2" data-id="${c.id}">
+            <input type="text" value="${escapeHtml(c.name)}" maxlength="40" data-field="name" aria-label="Category name"
+                   class="flex-1 min-w-[10rem] rounded-md border border-slate-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <select data-field="group" aria-label="Group for ${escapeHtml(c.name)}"
+                    class="w-36 rounded-md border border-slate-200 px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              ${GROUPS.map((g) => `<option ${g === groupOf(c) ? 'selected' : ''}>${escapeHtml(g)}</option>`).join('')}
+            </select>
             <div class="relative">
               <span class="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
               <input type="number" min="0" step="0.01" value="${effectiveBudget(c)}" data-field="budget"
@@ -625,14 +750,17 @@
       }
 
       function renderCategorySelects() {
-        const opts = state.categories.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+        const used = GROUPS.filter((g) => state.categories.some((c) => groupOf(c) === g));
+        const opts = used.map((g) => `<optgroup label="${escapeHtml(g)}">${state.categories.filter((c) => groupOf(c) === g)
+          .map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')}</optgroup>`).join('');
         const current = $('expCategory').value;
         $('expCategory').innerHTML = opts;
         if (state.categories.some((c) => c.id === current)) $('expCategory').value = current;
 
         const filterCurrent = $('ledgerFilter').value;
-        $('ledgerFilter').innerHTML = `<option value="">All categories</option>` + opts;
-        if (state.categories.some((c) => c.id === filterCurrent)) $('ledgerFilter').value = filterCurrent;
+        $('ledgerFilter').innerHTML = `<option value="">All categories</option>`
+          + `<optgroup label="Whole group">${used.map((g) => `<option value="g:${escapeHtml(g)}">${escapeHtml(g)} (all)</option>`).join('')}</optgroup>` + opts;
+        if ([...$('ledgerFilter').options].some((o) => o.value === filterCurrent)) $('ledgerFilter').value = filterCurrent;
       }
 
       function computeRows() {
@@ -679,13 +807,59 @@
           </div>`;
       }
 
-      function renderSummaryBody(rows) {
-        $('summaryBody').innerHTML = rows.map((r) => `<tr class="${rowClass(r)}" data-row="${r.id}">
-            <td class="py-2 pr-2">${escapeHtml(r.name)}</td>
+      function vendorRowsHtml(r) {
+        let html = '';
+        if (Math.abs(r.typed) >= 0.005) {
+          html += `<tr class="text-slate-600 border-b border-slate-50"><td class="py-1.5 pr-2"><div class="pl-10">${r.typed < 0
+            ? 'Adjusted in the Actual box' : 'Typed in the Actual box'}</div></td><td></td>
+            <td class="py-1.5 px-2 text-right tabular-nums">${fmt.format(r.typed)}</td><td></td></tr>`;
+        }
+        groupVendors(categoryExpenses(r.id)).forEach((v) => {
+          const vk = r.id + '|' + v.key;
+          const open = openVendors.has(vk);
+          html += `<tr class="text-slate-700 border-b border-slate-50 hover:bg-slate-50">
+            <td class="py-1.5 pr-2"><div class="pl-10"><button type="button" data-vtoggle="${escapeHtml(vk)}" aria-expanded="${open}" class="text-left">
+              ${caret(open)}${escapeHtml(v.name)} <span class="text-xs text-slate-400">· ${v.count} purchase${v.count === 1 ? '' : 's'}</span></button></div></td>
+            <td></td><td class="py-1.5 px-2 text-right tabular-nums">${fmt.format(v.total)}</td><td></td></tr>`;
+          if (open) {
+            html += v.items.map((e) => `<tr class="text-xs text-slate-500">
+              <td class="py-1 pr-2"><div class="pl-16">${escapeHtml(e.date)} · ${escapeHtml(e.description || '—')}${e.importKey ? ' · card' : ''}</div></td>
+              <td></td><td class="py-1 px-2 text-right tabular-nums ${e.amount < 0 ? 'text-emerald-700' : ''}">${fmt.format(e.amount)}</td><td></td></tr>`).join('');
+          }
+        });
+        return html;
+      }
+
+      function categoryRowHtml(r) {
+        const detail = r.logged !== 0 || Math.abs(r.typed) >= 0.005;
+        const open = openCats.has(r.id);
+        const name = detail
+          ? `<button type="button" data-ctoggle="${r.id}" aria-expanded="${open}" class="text-left">${caret(open)}${escapeHtml(r.name)}</button>`
+          : `<span class="inline-block w-4"></span>${escapeHtml(r.name)}`;
+        return `<tr class="${rowClass(r)}" data-row="${r.id}">
+            <td class="py-2 pr-2"><div class="pl-5">${name}</div></td>
             <td class="py-2 px-2 text-right tabular-nums">${fmt.format(r.budget)}</td>
             <td class="py-2 px-2 text-right">${actualCell(r)}</td>
             <td class="py-2 pl-2 text-right tabular-nums" data-var="${r.id}">${varianceCell(r.budget - r.actual)}</td>
-          </tr>`).join('') || `<tr><td colspan="4" class="py-4 text-center text-slate-400">Add a category to get started.</td></tr>`;
+          </tr>` + (open && detail ? vendorRowsHtml(r) : '');
+      }
+
+      function renderSummaryBody(rows) {
+        $('summaryBody').innerHTML = groupTotals(rows).map((g) => {
+          const open = openGroups.has(g.name);
+          const pr = progress(g.actual, g.budget);
+          const head = `<tr class="border-b border-slate-200 bg-slate-50 hover:bg-slate-100" data-group="${escapeHtml(g.name)}">
+            <td class="py-2.5 pr-2">
+              <button type="button" data-gtoggle="${escapeHtml(g.name)}" aria-expanded="${open}" class="text-left font-semibold text-slate-800">
+                ${caret(open)}${escapeHtml(g.name)} <span class="text-xs font-normal text-slate-500">· ${g.rows.length} categor${g.rows.length === 1 ? 'y' : 'ies'}</span></button>
+              <div class="h-1.5 rounded-full bg-slate-200 overflow-hidden mt-1.5 ml-4 max-w-xs"><div data-gbar="${escapeHtml(g.name)}" class="bar-track h-full ${pr.color}" style="width:${pr.width}%"></div></div>
+            </td>
+            <td class="py-2.5 px-2 text-right tabular-nums font-semibold" data-gbud="${escapeHtml(g.name)}">${fmt.format(g.budget)}</td>
+            <td class="py-2.5 px-2 text-right tabular-nums font-semibold" data-gact="${escapeHtml(g.name)}">${fmt.format(g.actual)}</td>
+            <td class="py-2.5 pl-2 text-right tabular-nums" data-gvar="${escapeHtml(g.name)}">${varianceCell(g.budget - g.actual)}</td>
+          </tr>`;
+          return head + (open ? g.rows.map(categoryRowHtml).join('') : '');
+        }).join('') || `<tr><td colspan="4" class="py-4 text-center text-slate-400">Add a category in Setup to get started.</td></tr>`;
       }
 
       function renderDashboard() {
@@ -706,24 +880,40 @@
           <td class="py-2 pl-2 text-right tabular-nums">${varianceCell(totalBudget - totalActual)}</td>
         </tr>`;
 
-        // Chart
-        $('chart').innerHTML = rows.map((r) => {
-          const pct = r.budget > 0 ? (r.actual / r.budget) * 100 : (r.actual > 0 ? 100 : 0);
-          const over = r.actual > r.budget + 0.005;
-          const color = over ? 'bg-red-500' : pct >= 80 ? 'bg-amber-500' : 'bg-emerald-500';
-          const width = Math.min(pct, 100);
-          const label = r.budget > 0 ? `${Math.round(pct)}%` : (r.actual > 0 ? 'No budget' : '0%');
+        // Group lines in the table (kept current while typing in an Actual box)
+        const groups = groupTotals(rows);
+        groups.forEach((g) => {
+          const sel = (attr) => document.querySelector(`[${attr}="${CSS.escape(g.name)}"]`);
+          const pr = progress(g.actual, g.budget);
+          if (sel('data-gact')) sel('data-gact').textContent = fmt.format(g.actual);
+          if (sel('data-gvar')) sel('data-gvar').innerHTML = varianceCell(g.budget - g.actual);
+          if (sel('data-gbar')) { sel('data-gbar').style.width = pr.width + '%'; sel('data-gbar').className = 'bar-track h-full ' + pr.color; }
+        });
+
+        // Spending by group
+        $('chart').innerHTML = groups.map((g) => {
+          const pr = progress(g.actual, g.budget);
           return `<div>
-            <div class="flex justify-between text-sm mb-1">
-              <span class="font-medium">${escapeHtml(r.name)}</span>
-              <span class="tabular-nums text-slate-500">${fmt.format(r.actual)} / ${fmt.format(r.budget)}
-                <span class="${over ? 'text-red-600' : 'text-slate-700'} font-semibold ml-1">${label}</span></span>
+            <div class="flex justify-between gap-2 text-sm mb-1">
+              <span class="font-medium">${escapeHtml(g.name)}</span>
+              <span class="tabular-nums text-slate-500 text-right">${fmt.format(g.actual)} / ${fmt.format(g.budget)}
+                <span class="${pr.over ? 'text-red-600' : 'text-slate-700'} font-semibold ml-1">${pr.label}</span></span>
             </div>
-            <div class="h-4 w-full rounded-full bg-slate-200 overflow-hidden">
-              <div class="bar-track h-full ${color} rounded-full" style="width:${width}%"></div>
+            <div class="h-3 w-full rounded-full bg-slate-200 overflow-hidden">
+              <div class="bar-track h-full ${pr.color} rounded-full" style="width:${pr.width}%"></div>
             </div>
           </div>`;
         }).join('') || `<p class="text-sm text-slate-400">No categories yet.</p>`;
+
+        // Top vendors this month
+        const vendors = groupVendors(monthExpenses()).filter((v) => v.total > 0).slice(0, 8);
+        $('topVendors').innerHTML = vendors.map((v, i) => {
+          const cats = [...new Set(v.items.map((e) => categoryName(e.categoryId)))].join(', ');
+          return `<li><button type="button" data-vendor="${escapeHtml(v.name)}" class="w-full flex items-start justify-between gap-3 rounded-md px-2 py-1.5 hover:bg-slate-50 text-left">
+              <span class="min-w-0"><span class="text-slate-400 tabular-nums mr-1">${i + 1}.</span><span class="font-medium">${escapeHtml(v.name)}</span>
+                <span class="block text-xs text-slate-500 truncate pl-5">${escapeHtml(cats)} · ${v.count} purchase${v.count === 1 ? '' : 's'}</span></span>
+              <span class="tabular-nums font-medium whitespace-nowrap">${fmt.format(v.total)}</span></button></li>`;
+        }).join('') || '<li class="text-sm text-slate-400">No purchases logged or imported this month.</li>';
 
         // Cards
         const income = effectiveIncome();
@@ -743,20 +933,31 @@
 
       function renderLedger() {
         const filter = $('ledgerFilter').value;
+        const q = $('ledgerSearch').value.trim().toLowerCase();
+        const names = {};
+        groupVendors(monthExpenses()).forEach((v) => { names[v.key] = v.name; });
+        const vendorOf = (e) => names[vendorKeyOf(e)] || '';
         const list = monthExpenses()
-          .filter((e) => !filter || e.categoryId === filter)
+          .filter((e) => !filter || (filter.startsWith('g:') ? groupOfCategoryId(e.categoryId) === filter.slice(2) : e.categoryId === filter))
+          .filter((e) => !q || (vendorOf(e) + ' ' + (e.description || '')).toLowerCase().includes(q))
           .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
+        $('ledgerMonthLabel').textContent = '\u2014 ' + monthName(selectedMonth);
+        const total = list.reduce((s, e) => s + e.amount, 0);
+        $('ledgerFoot').innerHTML = list.length ? `<tr class="font-semibold border-t-2 border-slate-300">
+            <td class="py-2 pr-2" colspan="3">${list.length} transaction${list.length === 1 ? '' : 's'}${filter || q ? ' (filtered)' : ''}</td>
+            <td class="py-2 px-2 text-right tabular-nums">${fmt.format(total)}</td><td></td></tr>` : '';
         $('ledgerBody').innerHTML = list.map((e) => e.id === editingId ? editRow(e) : `
           <tr class="border-b border-slate-100 hover:bg-slate-50">
             <td class="py-2 pr-2 whitespace-nowrap">${escapeHtml(e.date)}</td>
             <td class="py-2 px-2">${escapeHtml(categoryName(e.categoryId))}</td>
-            <td class="py-2 px-2 text-slate-600">${escapeHtml(e.description || '—')}${e.importKey ? ' <span class="text-[11px] text-slate-400">· card</span>' : ''}</td>
+            <td class="py-2 px-2"><span class="font-medium text-slate-800">${escapeHtml(vendorOf(e))}</span>
+              <span class="block text-[11px] text-slate-400">${escapeHtml(e.description || '—')}${e.importKey ? ' · card' : ''}</span></td>
             <td class="py-2 px-2 text-right tabular-nums ${e.amount < 0 ? 'text-emerald-700' : ''}">${fmt.format(e.amount)}${e.amount < 0 ? ' <span class="text-[11px]">refund</span>' : ''}</td>
             <td class="py-2 pl-2 text-right whitespace-nowrap">
               <button data-edit="${e.id}" class="text-slate-400 hover:text-indigo-600 text-xs mr-2">Edit</button>
               <button data-del="${e.id}" class="text-slate-400 hover:text-red-600 text-xs">Delete</button>
             </td>
-          </tr>`).join('') || `<tr><td colspan="5" class="py-6 text-center text-slate-400">No expenses logged for this month.</td></tr>`;
+          </tr>`).join('') || `<tr><td colspan="5" class="py-6 text-center text-slate-400">${q || filter ? 'No transactions match.' : 'No expenses logged for this month.'}</td></tr>`;
       }
 
       function editRow(e) {
@@ -830,6 +1031,7 @@
         const cat = state.categories.find((c) => c.id === row.dataset.id);
         if (!cat) return;
         if (e.target.dataset.field === 'name') cat.name = e.target.value.trim() || 'Untitled';
+        if (e.target.dataset.field === 'group') { cat.group = e.target.value; openGroups.add(cat.group); }
         if (e.target.dataset.field === 'budget') {
           setBudgetOverride(cat, toNum(e.target.value));
           e.target.classList.toggle('bg-indigo-50', hasBudgetOverride(cat.id));
@@ -867,6 +1069,7 @@
         $('newCategoryBudget').value = '';
         save();
         highlightId = id;
+        openGroups.add(groupOfCategoryId(id));
         renderAll();
         toast(`Added ${name} to Budget vs. Actual`);
         const row = document.querySelector(`[data-row="${CSS.escape(id)}"]`);
@@ -969,6 +1172,51 @@
       });
 
       $('ledgerFilter').addEventListener('change', renderLedger);
+      $('ledgerSearch').addEventListener('input', renderLedger);
+
+      // Tabs
+      function showTab(name) {
+        if (!['overview', 'transactions', 'setup'].includes(name)) name = 'overview';
+        document.querySelectorAll('[data-tabpanel]').forEach((el) => { el.hidden = el.dataset.tabpanel !== name; });
+        document.querySelectorAll('[data-tab]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === name)));
+        try { localStorage.setItem(STORAGE_KEY + '.tab', name); } catch (e) { /* storage unavailable */ }
+      }
+      document.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
+
+      // Open and close groups, categories and vendors in Budget vs. Actual
+      $('summaryBody').addEventListener('click', (e) => {
+        const btn = e.target.closest('button');
+        if (!btn) return;
+        const d = btn.dataset;
+        const flip = (set, key) => { if (set.has(key)) set.delete(key); else set.add(key); };
+        if (d.gtoggle) { flip(openGroups, d.gtoggle); saveOpen(); }
+        else if (d.ctoggle) flip(openCats, d.ctoggle);
+        else if (d.vtoggle) flip(openVendors, d.vtoggle);
+        else return;
+        renderSummaryBody(computeRows());
+      });
+      $('expandAllBtn').addEventListener('click', () => {
+        GROUPS.forEach((g) => openGroups.add(g));
+        state.categories.forEach((c) => openCats.add(c.id));
+        openCats.add('_orphan');
+        saveOpen();
+        renderSummaryBody(computeRows());
+      });
+      $('collapseAllBtn').addEventListener('click', () => {
+        openGroups.clear(); openCats.clear(); openVendors.clear();
+        saveOpen();
+        renderSummaryBody(computeRows());
+      });
+
+      // A top vendor opens its purchases in Transactions
+      $('topVendors').addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-vendor]');
+        if (!btn) return;
+        $('ledgerFilter').value = '';
+        $('ledgerSearch').value = btn.dataset.vendor;
+        showTab('transactions');
+        renderLedger();
+      });
 
       $('monthPicker').addEventListener('change', (e) => {
         if (!e.target.value) return;
@@ -1080,8 +1328,9 @@
             const w = words(part).trim();
             if (w.length >= 4 && text.includes(' ' + w + ' ')) return c.id;
           }
+          // First word alone only if it isn't a place ("Virginia Natural Gas" must not match "VIRGINIA BEACH")
           const first = words(c.name).trim().split(' ')[0];
-          if (first && first.length >= 6 && text.includes(' ' + first + ' ')) return c.id;
+          if (first && first.length >= 6 && !isPlaceWord(first) && text.includes(' ' + first + ' ')) return c.id;
         }
         return '';
       }
@@ -1486,6 +1735,7 @@
       window.addEventListener('online', () => { if (dirty) push(); });
 
       // ---------- Init ----------
+      showTab((() => { try { return localStorage.getItem(STORAGE_KEY + '.tab'); } catch (e) { return null; } })() || 'overview');
       $('monthPicker').value = selectedMonth;
       $('expDate').value = today();
       renderAll();
