@@ -244,6 +244,22 @@
                    class="w-24 rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
             <button id="addCategoryBtn" type="button" class="rounded-md bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 text-sm font-medium">Add</button>
           </div>
+
+          <div class="border-t border-slate-200 mt-6 pt-5">
+            <h3 class="font-semibold">Vendor rules</h3>
+            <p class="text-xs text-slate-500 mt-0.5">Send a store's purchases to a category automatically, for card imports and for purchases already in your budget.
+              Separate several stores with commas. A new category name creates the category.</p>
+            <div id="ruleForm" class="mt-3 grid sm:grid-cols-[1fr_1fr_auto] gap-2">
+              <input id="ruleMatch" type="text" maxlength="200" placeholder="Stores, e.g. Netflix, Hulu, Spotify" aria-label="Store names"
+                     class="min-w-0 rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <input id="ruleCategory" type="text" maxlength="40" list="ruleCatList" placeholder="Category, e.g. Subscriptions" aria-label="Category"
+                     class="min-w-0 rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <datalist id="ruleCatList"></datalist>
+              <button id="addRuleBtn" type="button" class="rounded-md bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 text-sm font-medium">Add rule</button>
+            </div>
+            <p id="ruleMsg" class="text-sm text-red-600 mt-1 min-h-[1.25rem]" aria-live="polite"></p>
+            <ul id="ruleList" class="space-y-1.5"></ul>
+          </div>
         </section>
     </div>
   </main>
@@ -330,6 +346,7 @@
           monthActuals: {},
           importRules: {},
           importedKeys: [],
+          vendorRules: [],
         };
       }
 
@@ -355,6 +372,7 @@
             monthActuals: isObj(data.monthActuals) ? data.monthActuals : {},
             importRules: isObj(data.importRules) ? data.importRules : {},
             importedKeys: Array.isArray(data.importedKeys) ? data.importedKeys : [],
+            vendorRules: Array.isArray(data.vendorRules) ? data.vendorRules : [],
           };
         } catch (e) {
           return freshState();
@@ -432,6 +450,35 @@
             box.hidden = true;
             $('confirmOk').onclick = $('confirmCancel').onclick = box.onkeydown = null;
             resolve(answer);
+          };
+          $('confirmOk').onclick = () => done(true);
+          $('confirmCancel').onclick = () => done(false);
+          box.onkeydown = (e) => { if (e.key === 'Escape') done(false); };
+        });
+      }
+
+      // Lists purchases a new vendor rule would move, each with a checkbox; resolves to the checked ones
+      function askMove(catName, list) {
+        return new Promise((resolve) => {
+          const box = $('confirmBox');
+          const sorted = list.slice().sort((a, b) => b.date.localeCompare(a.date));
+          $('confirmMsg').innerHTML = `<span class="block mb-2">Move these purchases already in your budget to <strong>${escapeHtml(catName)}</strong>?
+              Uncheck any that don't belong.</span>
+            <span class="block max-h-64 overflow-y-auto border border-slate-200 rounded-md divide-y divide-slate-100">${sorted.map((e, i) => `
+              <label class="flex items-start gap-2 px-2 py-1.5 text-sm"><input type="checkbox" data-move="${i}" checked class="mt-1" />
+                <span class="flex-1 min-w-0">${escapeHtml(e.description || 'Purchase')}
+                  <span class="block text-xs text-slate-500">${escapeHtml(e.date)} \u00b7 now in ${escapeHtml(categoryName(e.categoryId))}</span></span>
+                <span class="tabular-nums">${fmt.format(e.amount)}</span></label>`).join('')}</span>`;
+          $('confirmOk').textContent = 'Move checked';
+          $('confirmCancel').textContent = 'Don\u2019t move any';
+          $('confirmOk').className = 'rounded-md text-white px-3 py-1.5 text-sm font-medium bg-sky-600 hover:bg-sky-500';
+          box.hidden = false;
+          $('confirmOk').focus();
+          const done = (ok) => {
+            const picked = ok ? sorted.filter((_, i) => box.querySelector(`[data-move="${i}"]`).checked) : [];
+            box.hidden = true;
+            $('confirmOk').onclick = $('confirmCancel').onclick = box.onkeydown = null;
+            resolve(picked);
           };
           $('confirmOk').onclick = () => done(true);
           $('confirmCancel').onclick = () => done(false);
@@ -638,18 +685,32 @@
         showAuth(true);
       }
 
+      // ---------- Vendor rules ("Netflix" -> Subscriptions) ----------
+      // Letters and digits only, so "Anchor Church" matches "ANCHORCHURCHONLINE" and "HLU*HULUPLUS" matches "Hulu"
+      const compact = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+      const ruleMatches = (rule, text) => compact(rule.match).length >= 3 && compact(text).includes(compact(rule.match));
+      function ruleCategoryFor(text) {
+        const rules = state.vendorRules
+          .filter((r) => state.categories.some((c) => c.id === r.categoryId) && ruleMatches(r, text))
+          .sort((a, b) => compact(b.match).length - compact(a.match).length);   // most specific first
+        return rules.length ? rules[0].categoryId : '';
+      }
+      const ruleText = (e) => (e.description || '') + ' ' + (e.cardCategory || '');
+
       // ---------- Groups and vendors ----------
-      const GROUPS = ['Housing', 'Utilities', 'Food', 'Transportation', 'Giving', 'Savings & Debt', 'Lifestyle', 'Other'];
+      const GROUPS = ['Housing', 'Utilities', 'Food', 'Transportation', 'Family', 'Health & Insurance', 'Giving', 'Savings & Debt', 'Lifestyle', 'Other'];
       // Suggested group from the category name; a choice made in Setup (category.group) wins
       function defaultGroup(name) {
         const n = name || '';
         if (/just one opportunity|giving|church|tith|charit|donat|ministr/i.test(n)) return 'Giving';
         if (/\bcar\b|auto|transport|fuel|uber|lyft|toll|parking/i.test(n)) return 'Transportation';
         if (/grocer|food|cafe|restaurant|dining|lunch|meal/i.test(n)) return 'Food';
+        if (/day ?care|child|\bkids?\b|school|tuition|babysit|nanny/i.test(n)) return 'Family';
         if (/dominion|energy|electric|natural gas|^gas$|hrsd|water|sewer|internet|phone|cable|utilit|trash/i.test(n)) return 'Utilities';
-        if (/mortgage|\brent\b|home|hous|pest|hoa|insur|repair|lawn|maint/i.test(n)) return 'Housing';
+        if (/insur|health|dental|dentist|doctor|medic|pharm|vision|clinic/i.test(n)) return 'Health & Insurance';
+        if (/mortgage|\brent\b|home|hous|pest|hoa|repair|lawn|maint/i.test(n)) return 'Housing';
         if (/saving|debt|credit card|loan|tax|retire|invest|emergency/i.test(n)) return 'Savings & Debt';
-        if (/entertain|shop|health|pharm|personal|cloth|gift|subscri|beauty|nail|hobby|fun/i.test(n)) return 'Lifestyle';
+        if (/entertain|shop|personal|cloth|gift|subscri|streaming|beauty|nail|hobby|fun/i.test(n)) return 'Lifestyle';
         return 'Other';
       }
       const groupOf = (c) => (c && GROUPS.includes(c.group) ? c.group : defaultGroup(c ? c.name : ''));
@@ -673,7 +734,15 @@
           .replace(/[^A-Za-z' ]/g, ' ').split(/\s+/)
           .filter((w) => w.length > 1 && !isPlaceWord(w));
       }
+      // A vendor rule gives the vendor its proper name ("Hulu" instead of "HLU*HULUPLUS")
+      function ruleFor(e) {
+        const text = ruleText(e);
+        return state.vendorRules.filter((r) => ruleMatches(r, text))
+          .sort((a, b) => compact(b.match).length - compact(a.match).length)[0];
+      }
       function vendorKeyOf(e) {
+        const rule = ruleFor(e);
+        if (rule) return 'rule:' + compact(rule.match);
         const desc = e.description || '';
         if (isAmazon(desc)) return 'amazon';
         const w = vendorWords(desc).map((x) => x.toLowerCase());
@@ -682,6 +751,7 @@
       }
       const titleCase = (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
       function vendorDisplay(key, members) {
+        if (key.startsWith('rule:')) { const r = ruleFor(members[0]); if (r) return r.match; }
         if (key === 'amazon') return 'Amazon';
         if (key === '(none)') return 'No description';
         const lists = members.map((e) => vendorWords(e.description).slice(0, 3).map((w) => w.toLowerCase()));
@@ -1001,7 +1071,25 @@
         renderAll();
       }
 
+      function renderRules() {
+        $('ruleCatList').innerHTML = state.categories.map((c) => `<option value="${escapeHtml(c.name)}"></option>`).join('');
+        const byCat = {};
+        state.vendorRules.forEach((r) => { (byCat[r.categoryId] || (byCat[r.categoryId] = [])).push(r); });
+        $('ruleList').innerHTML = Object.keys(byCat).map((cid) => {
+          const cat = state.categories.find((c) => c.id === cid);
+          return `<li class="flex flex-wrap items-center gap-1.5 text-sm">
+              <span class="font-medium ${cat ? 'text-slate-800' : 'text-red-600'}">${escapeHtml(cat ? cat.name : 'Deleted category')}</span><span class="text-slate-400">←</span>
+              ${byCat[cid].map((r) => {
+                const n = state.expenses.filter((e) => e.categoryId === cid && ruleMatches(r, ruleText(e))).length;
+                return `<span class="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5">${escapeHtml(r.match)}
+                  <span class="text-[11px] text-slate-500">${n} purchase${n === 1 ? '' : 's'}</span>
+                  <button type="button" data-rule-del="${r.id}" class="text-slate-400 hover:text-red-600" aria-label="Remove rule ${escapeHtml(r.match)}">&times;</button></span>`;
+              }).join('')}</li>`;
+        }).join('') || '<li class="text-sm text-slate-400">No vendor rules yet.</li>';
+      }
+
       function renderAll() {
+        renderRules();
         $('incomeInput').value = effectiveIncome() || '';
         $('setupMonthLabel').textContent = monthName(selectedMonth);
         renderCustomBadge();
@@ -1082,6 +1170,51 @@
         }, 3000);
       }
       $('addCategoryBtn').addEventListener('click', addCategory);
+
+      async function addRule() {
+        const matches = $('ruleMatch').value.split(',').map((m) => m.trim()).filter(Boolean);
+        const catName = $('ruleCategory').value.trim();
+        if (!matches.length) { $('ruleMsg').textContent = 'Type at least one store name.'; $('ruleMatch').focus(); return; }
+        if (matches.some((m) => compact(m).length < 3)) { $('ruleMsg').textContent = 'Each store name needs at least 3 letters.'; return; }
+        if (!catName) { $('ruleMsg').textContent = 'Type or pick a category.'; $('ruleCategory').focus(); return; }
+        $('ruleMsg').textContent = '';
+        let cat = catByName(catName);
+        let created = false;
+        if (!cat) {
+          cat = { id: uid(), name: catName, budget: 0 };
+          state.categories.push(cat);
+          created = true;
+        }
+        matches.forEach((m) => {
+          const existing = state.vendorRules.find((r) => compact(r.match) === compact(m));
+          if (existing) existing.categoryId = cat.id;
+          else state.vendorRules.push({ id: uid(), match: m, categoryId: cat.id });
+        });
+        // Purchases already in the budget (any month) from these stores
+        const rules = matches.map((m) => ({ match: m }));
+        const toMove = state.expenses.filter((e) => e.categoryId !== cat.id && rules.some((r) => ruleMatches(r, ruleText(e))));
+        let moved = 0;
+        if (toMove.length) {
+          const picked = await askMove(cat.name, toMove);
+          picked.forEach((e) => { e.categoryId = cat.id; });
+          moved = picked.length;
+        }
+        $('ruleMatch').value = '';
+        $('ruleCategory').value = '';
+        openGroups.add(groupOf(cat));
+        save();
+        renderAll();
+        toast(`${created ? `Created ${cat.name}. ` : ''}${matches.join(', ')} → ${cat.name}.` + (moved ? ` Moved ${moved} purchase${moved === 1 ? '' : 's'}.` : ''));
+      }
+      $('addRuleBtn').addEventListener('click', addRule);
+      $('ruleForm').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addRule(); } });
+      $('ruleList').addEventListener('click', (e) => {
+        const id = e.target.closest('[data-rule-del]')?.dataset.ruleDel;
+        if (!id) return;
+        state.vendorRules = state.vendorRules.filter((r) => r.id !== id);
+        save();
+        renderRules();
+      });
       $('addCategoryForm').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addCategory(); } });
 
       function expMsg(text, ok) {
@@ -1439,6 +1572,9 @@
       }
 
       function suggestCategory(desc, cardCategory, hist) {
+        // 0. Your vendor rules always win
+        const ruled = ruleCategoryFor(desc + ' ' + (cardCategory || ''));
+        if (ruled) return ruled;
         const key = merchantKey(desc);
         // 1. Same store as before (Amazon included: it goes where you usually put it; split as needed)
         const byStore = validCat(hist.store[key]) || validCat(state.importRules[key]);
