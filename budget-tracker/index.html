@@ -93,6 +93,7 @@
     <nav class="flex gap-1 border-b border-slate-300" role="tablist" aria-label="Sections">
       <button type="button" role="tab" data-tab="overview" class="tab-btn">Overview</button>
       <button type="button" role="tab" data-tab="transactions" class="tab-btn">Transactions</button>
+      <button type="button" role="tab" data-tab="loans" class="tab-btn">Loans</button>
       <button type="button" role="tab" data-tab="setup" class="tab-btn">Setup</button>
     </nav>
 
@@ -240,6 +241,67 @@
       </div>
     </div>
 
+    <!-- LOANS -->
+    <div data-tabpanel="loans" hidden class="space-y-6">
+      <section class="bg-white rounded-xl shadow-sm p-5">
+        <h2 class="text-lg font-semibold">Amortization schedule</h2>
+        <p class="text-sm text-slate-500 mb-4">Enter a loan (for example your mortgage) to see each payment split into principal and interest. Saved with your budget.</p>
+        <div id="loanForm" class="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div class="col-span-2 md:col-span-1">
+            <label for="loanAmount" class="block text-sm font-medium text-slate-600 mb-1">Loan amount ($)</label>
+            <input id="loanAmount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="300000"
+                   class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label for="loanRate" class="block text-sm font-medium text-slate-600 mb-1">Interest rate (%)</label>
+            <input id="loanRate" type="number" min="0" step="0.001" inputmode="decimal" placeholder="6.5"
+                   class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label for="loanYears" class="block text-sm font-medium text-slate-600 mb-1">Term (years)</label>
+            <input id="loanYears" type="number" min="1" max="50" step="1" inputmode="numeric" placeholder="30"
+                   class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label for="loanStart" class="block text-sm font-medium text-slate-600 mb-1">First payment</label>
+            <input id="loanStart" type="month"
+                   class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label for="loanExtra" class="block text-sm font-medium text-slate-600 mb-1">Extra per month ($)</label>
+            <input id="loanExtra" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0"
+                   class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+        </div>
+        <div id="loanSummary" class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-5"></div>
+        <p id="loanSaving" class="text-sm mt-3"></p>
+      </section>
+
+      <section id="loanScheduleBox" hidden class="bg-white rounded-xl shadow-sm p-5">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <h2 class="text-lg font-semibold">Payment schedule</h2>
+          <div class="flex gap-1 text-sm" role="group" aria-label="Show schedule by">
+            <button type="button" data-loanview="year" class="rounded-md border border-slate-300 px-3 py-1">By year</button>
+            <button type="button" data-loanview="month" class="rounded-md border border-slate-300 px-3 py-1">By month</button>
+          </div>
+        </div>
+        <div class="overflow-x-auto max-h-[36rem] overflow-y-auto">
+          <table class="w-full text-sm">
+            <thead class="sticky top-0 bg-white">
+              <tr class="text-left text-slate-500 border-b border-slate-200">
+                <th class="py-2 pr-2 font-medium" id="loanPeriodHead">Year</th>
+                <th class="py-2 px-2 font-medium text-right">Payment</th>
+                <th class="py-2 px-2 font-medium text-right">Principal</th>
+                <th class="py-2 px-2 font-medium text-right">Interest</th>
+                <th class="py-2 pl-2 font-medium text-right">Balance</th>
+              </tr>
+            </thead>
+            <tbody id="loanBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
     <!-- SETUP -->
     <div data-tabpanel="setup" hidden class="max-w-3xl">
         <!-- 1. Income & Category Setup -->
@@ -375,6 +437,7 @@
           importRules: {},
           importedKeys: [],
           vendorRules: [],
+          loan: {},
         };
       }
 
@@ -401,6 +464,7 @@
             importRules: isObj(data.importRules) ? data.importRules : {},
             importedKeys: Array.isArray(data.importedKeys) ? data.importedKeys : [],
             vendorRules: Array.isArray(data.vendorRules) ? data.vendorRules : [],
+            loan: isObj(data.loan) ? data.loan : {},
           };
         } catch (e) {
           return freshState();
@@ -826,6 +890,98 @@
       const categoryExpenses = (id) => monthExpenses().filter((e) => (id === '_orphan'
         ? !state.categories.some((c) => c.id === e.categoryId) : e.categoryId === id));
 
+      // ---------- Loan amortization ----------
+      let loanView = 'year';
+      const cents = (v) => Math.round(v * 100) / 100;
+      // Standard fixed-rate schedule, rounded to cents each month; extra goes to principal
+      function amortize(amount, ratePct, years, extra) {
+        const n = Math.round(years * 12), r = ratePct / 100 / 12;
+        if (!(amount > 0) || !(n > 0) || ratePct < 0) return null;
+        const pmt = cents(r === 0 ? amount / n : amount * r / (1 - Math.pow(1 + r, -n)));
+        const rows = [];
+        let bal = amount;
+        for (let i = 1; i <= n + 600 && bal > 0.004; i++) {
+          const interest = cents(bal * r);
+          let principal = cents(pmt - interest + extra);
+          if (principal >= bal || i === n) principal = cents(bal);   // last payment clears the balance
+          bal = cents(bal - principal);
+          rows.push({ i, payment: cents(principal + interest), principal, interest, balance: bal });
+        }
+        return { pmt, rows, interest: cents(rows.reduce((s, x) => s + x.interest, 0)) };
+      }
+
+      function renderLoan() {
+        const L = state.loan || {};
+        ['Amount', 'Rate', 'Years', 'Start', 'Extra'].forEach((k) => {
+          const el = $('loan' + k), v = L[k.toLowerCase()];
+          if (document.activeElement !== el) el.value = v === undefined || v === null ? '' : v;
+        });
+        const amount = parseFloat(L.amount), rate = parseFloat(L.rate), years = parseFloat(L.years);
+        const extra = Math.max(0, parseFloat(L.extra) || 0);
+        const start = /^\d{4}-\d{2}$/.test(L.start || '') ? L.start : today().slice(0, 7);
+        const plan = amortize(amount, rate, years, extra);
+        $('loanScheduleBox').hidden = !plan;
+        if (!plan) {
+          $('loanSummary').innerHTML = '<p class="col-span-full text-sm text-slate-400">Enter the loan amount, interest rate and term to see the schedule.</p>';
+          $('loanSaving').textContent = '';
+          return;
+        }
+        const payoff = addMonths(start, plan.rows.length - 1);
+        const card = (label, value, sub = '') => `<div class="rounded-lg border border-slate-200 p-3">
+            <p class="text-xs uppercase tracking-wide text-slate-500">${label}</p>
+            <p class="text-xl font-semibold mt-1 tabular-nums">${value}</p>${sub ? `<p class="text-xs text-slate-500 mt-0.5">${sub}</p>` : ''}</div>`;
+        $('loanSummary').innerHTML =
+          card('Monthly payment', fmt.format(plan.pmt + extra), extra ? `${fmt.format(plan.pmt)} + ${fmt.format(extra)} extra` : 'principal + interest')
+          + card('Total interest', fmt.format(plan.interest))
+          + card('Total paid', fmt.format(cents(amount + plan.interest)))
+          + card('Paid off', escapeHtml(monthName(payoff)), `${plan.rows.length} payments`);
+        $('loanSaving').className = 'text-sm mt-3';
+        if (extra > 0) {
+          const base = amortize(amount, rate, years, 0);
+          const saved = cents(base.interest - plan.interest), months = base.rows.length - plan.rows.length;
+          $('loanSaving').innerHTML = `<span class="text-emerald-700 font-medium">Paying ${fmt.format(extra)} extra each month saves ${fmt.format(saved)} in interest
+            and pays the loan off ${Math.floor(months / 12)} year${Math.floor(months / 12) === 1 ? '' : 's'} ${months % 12} month${months % 12 === 1 ? '' : 's'} sooner.</span>`;
+        } else {
+          $('loanSaving').textContent = 'Tip: add an extra monthly amount to see how much interest you would save.';
+          $('loanSaving').className = 'text-sm mt-3 text-slate-500';
+        }
+        // Schedule, by month or summed by calendar year
+        const dated = plan.rows.map((x) => ({ ...x, m: addMonths(start, x.i - 1) }));
+        let rows;
+        if (loanView === 'month') {
+          rows = dated.map((x) => ({ label: `${x.i}. ${monthName(x.m)}`, ...x, cur: x.m === selectedMonth }));
+        } else {
+          const by = {};
+          dated.forEach((x) => {
+            const y = x.m.slice(0, 4);
+            const t = by[y] || (by[y] = { label: y, payment: 0, principal: 0, interest: 0, balance: 0, cur: false });
+            t.payment += x.payment; t.principal += x.principal; t.interest += x.interest; t.balance = x.balance;
+            if (x.m === selectedMonth) t.cur = true;
+          });
+          rows = Object.values(by);
+        }
+        $('loanPeriodHead').textContent = loanView === 'month' ? 'Payment' : 'Year';
+        $('loanBody').innerHTML = rows.map((x) => `<tr class="border-b border-slate-100 ${x.cur ? 'bg-indigo-50 font-medium' : ''}">
+            <td class="py-1.5 pr-2 whitespace-nowrap">${escapeHtml(x.label)}</td>
+            <td class="py-1.5 px-2 text-right tabular-nums">${fmt.format(x.payment)}</td>
+            <td class="py-1.5 px-2 text-right tabular-nums">${fmt.format(x.principal)}</td>
+            <td class="py-1.5 px-2 text-right tabular-nums">${fmt.format(x.interest)}</td>
+            <td class="py-1.5 pl-2 text-right tabular-nums">${fmt.format(x.balance)}</td></tr>`).join('');
+        document.querySelectorAll('[data-loanview]').forEach((b) => {
+          const on = b.dataset.loanview === loanView;
+          b.setAttribute('aria-pressed', String(on));
+          b.classList.toggle('bg-slate-800', on); b.classList.toggle('text-white', on);
+        });
+      }
+
+      $('loanForm').addEventListener('input', (e) => {
+        const key = e.target.id.replace('loan', '').toLowerCase();
+        state.loan = { ...(state.loan || {}), [key]: e.target.value };
+        save();
+        renderLoan();
+      });
+      document.querySelectorAll('[data-loanview]').forEach((b) => b.addEventListener('click', () => { loanView = b.dataset.loanview; renderLoan(); }));
+
       // ---------- Month-by-month chart ----------
       const SERIES = { budget: '#2a78d6', actual: '#eb6834' };   // validated pair (light surface)
       const addMonths = (ym, n) => {
@@ -1224,6 +1380,7 @@
 
       function renderAll() {
         renderRules();
+        renderLoan();
         $('incomeInput').value = effectiveIncome() || '';
         $('setupMonthLabel').textContent = monthName(selectedMonth);
         renderCustomBadge();
@@ -1443,7 +1600,7 @@
 
       // Tabs
       function showTab(name) {
-        if (!['overview', 'transactions', 'setup'].includes(name)) name = 'overview';
+        if (!['overview', 'transactions', 'loans', 'setup'].includes(name)) name = 'overview';
         document.querySelectorAll('[data-tabpanel]').forEach((el) => { el.hidden = el.dataset.tabpanel !== name; });
         document.querySelectorAll('[data-tab]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === name)));
         try { localStorage.setItem(STORAGE_KEY + '.tab', name); } catch (e) { /* storage unavailable */ }
