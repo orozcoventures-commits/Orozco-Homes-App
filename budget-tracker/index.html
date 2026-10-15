@@ -449,17 +449,17 @@
             <legend class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2 col-span-3">Ages</legend>
             <div>
               <label for="retAge" class="block text-sm font-medium text-slate-600 mb-1">Your age</label>
-              <input id="retAge" type="number" min="0" step="1" inputmode="decimal" placeholder="52" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <input id="retAge" type="text" inputmode="decimal" autocomplete="off" placeholder="52" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               
             </div>
             <div>
               <label for="retRetireAge" class="block text-sm font-medium text-slate-600 mb-1">Retire at</label>
-              <input id="retRetireAge" type="number" min="0" step="1" inputmode="decimal" placeholder="65" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <input id="retRetireAge" type="text" inputmode="decimal" autocomplete="off" placeholder="65" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               
             </div>
             <div>
               <label for="retPlanTo" class="block text-sm font-medium text-slate-600 mb-1">Plan to age</label>
-              <input id="retPlanTo" type="number" min="0" step="1" inputmode="decimal" placeholder="95" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <input id="retPlanTo" type="text" inputmode="decimal" autocomplete="off" placeholder="95" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               
             </div>
           </fieldset>
@@ -467,12 +467,12 @@
             <legend class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Savings</legend>
             <div>
               <label for="retSavings" class="block text-sm font-medium text-slate-600 mb-1">Retirement savings today ($)</label>
-              <input id="retSavings" type="number" min="0" step="1000" inputmode="decimal" placeholder="" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <input id="retSavings" type="text" inputmode="decimal" autocomplete="off" placeholder="" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               <p class="text-xs text-slate-500 mt-1" id="retSavingsHint">Leave empty to use your Net Worth tab.</p>
             </div>
             <div>
               <label for="retContrib" class="block text-sm font-medium text-slate-600 mb-1">Added per year until you retire ($)</label>
-              <input id="retContrib" type="number" min="0" step="1000" inputmode="decimal" placeholder="30000" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <input id="retContrib" type="text" inputmode="decimal" autocomplete="off" placeholder="30000" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               
             </div>
           </fieldset>
@@ -480,25 +480,25 @@
             <legend class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">In retirement</legend>
             <div>
               <label for="retSpend" class="block text-sm font-medium text-slate-600 mb-1">Spending per year, after tax ($)</label>
-              <input id="retSpend" type="number" min="0" step="1000" inputmode="decimal" placeholder="100000" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <input id="retSpend" type="text" inputmode="decimal" autocomplete="off" placeholder="100000" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               
             </div>
             <div class="grid grid-cols-2 gap-3">
             <div>
               <label for="retSsMonthly" class="block text-sm font-medium text-slate-600 mb-1">Social Security / month ($)</label>
-              <input id="retSsMonthly" type="number" min="0" step="50" inputmode="decimal" placeholder="3200" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <input id="retSsMonthly" type="text" inputmode="decimal" autocomplete="off" placeholder="3200" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               
             </div>
             <div>
               <label for="retSsAge" class="block text-sm font-medium text-slate-600 mb-1">Starting at age</label>
-              <input id="retSsAge" type="number" min="0" step="1" inputmode="decimal" placeholder="67" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <input id="retSsAge" type="text" inputmode="decimal" autocomplete="off" placeholder="67" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               
             </div>
             </div>
             <p class="text-xs text-slate-500 -mt-1">Your estimate is at <a class="underline" href="https://www.ssa.gov/myaccount/" target="_blank" rel="noopener">ssa.gov/myaccount</a>. Add a spouse's benefit to the same box.</p>
             <div>
               <label for="retOther" class="block text-sm font-medium text-slate-600 mb-1">Other income per year ($)</label>
-              <input id="retOther" type="number" min="0" step="1000" inputmode="decimal" placeholder="0" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <input id="retOther" type="text" inputmode="decimal" autocomplete="off" placeholder="0" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               <p class="text-xs text-slate-500 mt-1" id="retOtherHint">Rental income, pension, part-time work. Continues for life.</p>
             </div>
           </fieldset>
@@ -507,27 +507,31 @@
             <div class="grid grid-cols-2 gap-3 mt-3">
             <div>
               <label for="retReturnPre" class="block text-sm font-medium text-slate-600 mb-1">Return before retiring (%/yr)</label>
-              <input id="retReturnPre" type="number" min="0" step="0.1" inputmode="decimal" placeholder="7" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <input id="retReturnPre" type="text" inputmode="decimal" autocomplete="off" placeholder="7" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               
             </div>
             <div>
               <label for="retReturnPost" class="block text-sm font-medium text-slate-600 mb-1">Return in retirement (%/yr)</label>
-              <input id="retReturnPost" type="number" min="0" step="0.1" inputmode="decimal" placeholder="5" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <input id="retReturnPost" type="text" inputmode="decimal" autocomplete="off" placeholder="5" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               
             </div>
             <div>
               <label for="retInflation" class="block text-sm font-medium text-slate-600 mb-1">Inflation (%/yr)</label>
-              <input id="retInflation" type="number" min="0" step="0.1" inputmode="decimal" placeholder="3" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <input id="retInflation" type="text" inputmode="decimal" autocomplete="off" placeholder="3" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               
             </div>
             <div>
               <label for="retTax" class="block text-sm font-medium text-slate-600 mb-1">Tax on withdrawals (%)</label>
-              <input id="retTax" type="number" min="0" step="1" inputmode="decimal" placeholder="15" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <input id="retTax" type="text" inputmode="decimal" autocomplete="off" placeholder="15" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               
             </div>
             </div>
             <p class="text-xs text-slate-500 mt-2">Returns vary from year to year in the simulation (about ±15% a year before retiring, ±10% after, like a stock-heavy and then a balanced portfolio).</p>
           </details>
+          <div class="flex flex-wrap items-center gap-3 pt-1">
+            <button id="retRunBtn" type="button" class="rounded-md bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2 font-medium">Run analysis</button>
+            <p id="retFormMsg" class="text-sm text-red-600" aria-live="polite"></p>
+          </div>
         </section>
       </div>
 
@@ -1540,10 +1544,12 @@
       // Retirement + investment balances from the Net Worth tab
       const retAutoSavings = () => nw().items.filter((it) => it.category === 'Retirement' || it.category === 'Investments')
         .reduce((sum, it) => sum + (Number(it.value) || 0), 0);
+      // Accepts "120,000", "$3,200", "7%"; empty or unreadable gives NaN
+      const retNum = (v) => { const t = String(v === undefined || v === null ? '' : v).replace(/[$,%\s]/g, ''); return t === '' ? NaN : parseFloat(t); };
       function retInputs() {
         const raw = state.retirement || {};
-        const num = (k) => { const v = parseFloat(raw[k]); return Number.isFinite(v) ? v : (k in RET_DEFAULTS ? RET_DEFAULTS[k] : NaN); };
-        const savingsTyped = parseFloat(raw.savings);
+        const num = (k) => { const v = retNum(raw[k]); return Number.isFinite(v) ? v : (k in RET_DEFAULTS ? RET_DEFAULTS[k] : NaN); };
+        const savingsTyped = retNum(raw.savings);
         return {
           age: num('age'), retireAge: num('retireage'), planTo: num('planto'),
           savings: Number.isFinite(savingsTyped) ? savingsTyped : retAutoSavings(),
@@ -1631,12 +1637,19 @@
         const valid = !missing.length && p.retireAge > p.age && p.planTo > p.retireAge && p.planTo <= 110;
         ['retChartBox', 'retTableBox'].forEach((id) => { $(id).hidden = !valid; });
         $('retFixBox').hidden = true;
+        ['retAge', 'retSpend', 'retRetireAge', 'retPlanTo'].forEach((id) => $(id).classList.remove('border-red-400', 'ring-2', 'ring-red-200'));
+        const flag = (id) => $(id).classList.add('border-red-400', 'ring-2', 'ring-red-200');
         if (!valid) {
+          if (!(p.age > 0)) flag('retAge');
+          if (!(p.spend > 0)) flag('retSpend');
+          if (!missing.length) { flag('retRetireAge'); flag('retPlanTo'); }
+          $('retFormMsg').textContent = missing.length ? `Please enter ${missing.join(' and ')}.` : 'Retirement age must be after your age, and "plan to age" after retirement.';
           $('retVerdict').innerHTML = `<h2 class="text-lg font-semibold">Are you on track?</h2>
             <p class="text-sm text-slate-500 mt-1">${missing.length ? `Enter ${missing.join(' and ')} to see your results.` : 'Check the ages: retirement must come after today, and the plan must run past retirement.'}</p>`;
           $('retCards').innerHTML = '';
           return;
         }
+        $('retFormMsg').textContent = '';
         const sim = retSimulate(p);
         const steady = retSteady(p);
         const pct = Math.round(sim.success * 100);
@@ -1659,7 +1672,7 @@
             <p class="text-xs uppercase tracking-wide text-slate-500">${label}</p>
             <p class="text-xl font-semibold mt-1 tabular-nums">${value}</p><p class="text-xs text-slate-500 mt-0.5">${sub}</p></div>`;
         $('retCards').innerHTML =
-          card('Savings today', fmt0.format(p.savings), Number.isFinite(parseFloat(raw.savings)) ? 'entered above' : 'from Net Worth')
+          card('Savings today', fmt0.format(p.savings), Number.isFinite(retNum(raw.savings)) ? 'entered above' : 'from Net Worth')
           + card(`Savings at ${p.retireAge}`, fmt0.format(atRet.p50), `typical; ${fmt0.format(atRet.p10)}–${fmt0.format(atRet.p90)} range`)
           + card('First-year withdrawal', fmt0.format(gap / (1 - p.tax)), atRet.p50 > 0 ? `${((gap / (1 - p.tax)) / atRet.p50 * 100).toFixed(1)}% of savings (4% is a common guide)` : 'savings needed')
           + card('Money lasts', lastsTo, 'with steady average returns');
@@ -1745,6 +1758,11 @@
         tip.style.top = '0px';
       });
       $('retChart').addEventListener('mouseleave', () => { $('retTip').hidden = true; });
+      $('retRunBtn').addEventListener('click', () => {
+        clearTimeout(renderRetirement.timer);
+        renderRetirement();
+        $('retVerdict').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
 
       // ---------- Month-by-month chart ----------
       const SERIES = { budget: '#2a78d6', actual: '#eb6834' };   // validated pair (light surface)
