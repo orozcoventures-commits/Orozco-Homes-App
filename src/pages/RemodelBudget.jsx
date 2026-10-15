@@ -12,6 +12,7 @@ import { supabase } from '../lib/supabase';
 import { useProject } from '../context/ProjectContext';
 import { buildContractPrefill, buildProposalPrefill } from '../utils/contractPrefill';
 import { starterScope, MAX_SCOPE } from '../utils/tradeScopes';
+import { coiStatus, formatCoiDate, openCoi } from '../lib/subcontractorDirectory';
 
 // ── Project type groupings ────────────────────────────────────────────────────
 
@@ -102,8 +103,9 @@ function defaultInputs(projectTypeId) {
 //            splits: { wbs: { m, o } },     (cost breakdown %, see below)
 //            allowances: { wbs: { on, amount } },  (client allowances, see below)
 //            trades: { wbs: tradeKey },           (Subs & Materials view, see below)
-//            scopes: { tradeKey: text } }         (this budget's Scope of Work per trade)
-const EMPTY_LAYOUT = { added: [], labels: {}, removed: [], splits: {}, allowances: {}, trades: {}, scopes: {} };
+//            scopes: { tradeKey: text },          (this budget's Scope of Work per trade)
+//            subs: { tradeKey: { id, name } } }   (who performs each trade — subcontractor_directory)
+const EMPTY_LAYOUT = { added: [], labels: {}, removed: [], splits: {}, allowances: {}, trades: {}, scopes: {}, subs: {} };
 const MAX_LABEL = 120;
 
 function normalizeLayout(raw) {
@@ -130,6 +132,9 @@ function normalizeLayout(raw) {
     scopes: Object.fromEntries(Object.entries(l.scopes && typeof l.scopes === 'object' ? l.scopes : {})
       .filter(([k, v]) => TRADE_KEYS.has(k) && typeof v === 'string')
       .map(([k, v]) => [k, v.slice(0, MAX_SCOPE)])),
+    subs: Object.fromEntries(Object.entries(l.subs && typeof l.subs === 'object' ? l.subs : {})
+      .filter(([k, v]) => TRADE_KEYS.has(k) && v && Number.isInteger(v.id))
+      .map(([k, v]) => [k, { id: v.id, name: String(v.name ?? '').slice(0, MAX_LABEL) }])),
   };
 }
 
@@ -813,6 +818,91 @@ function ChangeOrdersSection({ changeOrders, total, cost, margin, marginPct, isO
 // ── Subs & Materials view ─────────────────────────────────────────────────────
 // The same direct costs, grouped the way a GC buys them: work bought from
 // subcontractors (by trade) and materials bought directly (by section).
+// Directory subcontractors that usually do each trade (matched on their
+// trade/specialty text). They are listed first in the "Performed by" picker.
+const TRADE_MATCH = {
+  demolition: /demo|haul|junk|debris/i,
+  concrete:   /concrete|foundation|mason|footing/i,
+  framing:    /fram|carpent|structur/i,
+  roofing:    /roof/i,
+  windows:    /window|door/i,
+  siding:     /siding|exterior|gutter/i,
+  plumbing:   /plumb/i,
+  hvac:       /hvac|heat|air cond|mechanical|mini-split/i,
+  electrical: /electric/i,
+  insulation: /insulat|spray foam/i,
+  drywall:    /drywall|sheetrock/i,
+  tiling:     /tile/i,
+  flooring:   /floor/i,
+  carpentry:  /carpent|cabinet|trim|finish|millwork|countertop/i,
+  painting:   /paint/i,
+};
+const subMatchesTrade = (sub, trade) => !!TRADE_MATCH[trade]?.test(`${sub.service ?? ''} ${sub.specialty ?? ''}`);
+const subLabel = (sub) => sub.display_name || sub.company || sub.name || sub.service || `#${sub.id}`;
+
+// COI status with a 30-day warning: 'active' | 'expiring' | 'expired' | 'none'.
+function coiState(expiresOn) {
+  const status = coiStatus(expiresOn);
+  if (status !== 'active') return status;
+  const [y, m, d] = expiresOn.split('-').map(Number);
+  const days = (new Date(y, m - 1, d) - new Date()) / 86400000;
+  return days <= 30 ? 'expiring' : 'active';
+}
+const COI_CHIP = {
+  active:   { label: 'COI active',        color: '#166534', bg: '#F0FDF4', border: '#BBF7D0' },
+  expiring: { label: 'COI expires soon',  color: '#92400E', bg: '#FFFBEB', border: '#FDE68A' },
+  expired:  { label: 'COI expired',       color: '#991B1B', bg: '#FEF2F2', border: '#FECACA' },
+  none:     { label: 'No COI on file',    color: '#6B7280', bg: '#F9F8F6', border: '#E8E6E1' },
+};
+
+// "Performed by" for one trade: pick a subcontractor from the directory and
+// see their COI status. Saved with the budget (layout_json.subs).
+function TradeSub({ trade, subs }) {
+  const pick = subs.assigned(trade.key);           // { id, name } | undefined
+  const sub = pick ? subs.list?.find((s) => s.id === pick.id) : null;
+  const matching = (subs.list ?? []).filter((s) => subMatchesTrade(s, trade.key));
+  const others = (subs.list ?? []).filter((s) => !subMatchesTrade(s, trade.key));
+  const state = sub ? coiState(sub.coi_expires_on) : null;
+  const chip = state ? COI_CHIP[state] : null;
+  const id = `sub-${trade.key}`;
+  const opt = (s) => (
+    <option key={s.id} value={s.id}>{subLabel(s)}{s.service ? ` — ${s.service}` : ''}{coiState(s.coi_expires_on) === 'expired' ? ' (COI expired)' : ''}</option>
+  );
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-5 py-2 text-xs" style={{ borderTop: '1px solid #F3F4F6' }}>
+      <label htmlFor={id} className="font-bold" style={{ color: '#0369A1' }}>Performed by</label>
+      <select id={id} value={pick ? String(pick.id) : ''} disabled={!subs.list}
+        onChange={(e) => {
+          const s = subs.list.find((x) => String(x.id) === e.target.value);
+          subs.onAssign(trade.key, s ? { id: s.id, name: subLabel(s) } : null);
+        }}
+        className="text-xs rounded-lg px-2 py-1 max-w-full focus:outline-none focus:ring-2 focus:ring-sky-300"
+        style={{ border: '1px solid #D1D5DB', color: pick ? '#002147' : '#6B7280', fontWeight: pick ? 700 : 400, backgroundColor: '#fff' }}>
+        <option value="">{subs.list ? 'Not assigned' : 'Loading subcontractors…'}</option>
+        {pick && !sub && subs.list && <option value={String(pick.id)}>{pick.name} (no longer in directory)</option>}
+        {matching.length > 0 && <optgroup label={`${trade.label} subcontractors`}>{matching.map(opt)}</optgroup>}
+        {others.length > 0 && <optgroup label={matching.length ? 'All other subcontractors' : 'Subcontractors'}>{others.map(opt)}</optgroup>}
+      </select>
+      {chip && (
+        <span className="px-2 py-0.5 rounded-lg font-semibold" data-coi-state={state}
+          style={{ color: chip.color, backgroundColor: chip.bg, border: `1px solid ${chip.border}` }}>
+          {chip.label}{sub.coi_expires_on ? ` · ${state === 'expired' ? 'expired' : 'expires'} ${formatCoiDate(sub.coi_expires_on)}` : ''}
+        </span>
+      )}
+      {sub?.coi_file_path && (
+        <button type="button" onClick={() => openCoi(sub.coi_file_path)} className="font-semibold hover:underline focus:outline-none" style={{ color: '#002147' }}>
+          View COI
+        </button>
+      )}
+      {sub?.phone?.[0] && <a href={`tel:${sub.phone[0]}`} className="hover:underline" style={{ color: '#6B7280' }}>{sub.phone[0]}</a>}
+      {sub?.email?.[0] && <a href={`mailto:${sub.email[0]}`} className="hover:underline" style={{ color: '#6B7280' }}>{sub.email[0]}</a>}
+      {pick && !sub && subs.list && (
+        <span style={{ color: '#B45309' }}>This subcontractor was removed from the directory — pick another.</span>
+      )}
+    </div>
+  );
+}
+
 // Scope of Work for one trade: this budget's copy, or the default (saved
 // default, else the built-in starter). Edits save with the budget.
 function TradeScope({ trade, scope }) {
@@ -868,11 +958,18 @@ function TradeScope({ trade, scope }) {
   );
 }
 
-function SubsMaterialsView({ data, onTradeChange, scope }) {
+function SubsMaterialsView({ data, onTradeChange, scope, subs }) {
   const { trades, materials, fees, designSpecsTotal, changeOrderCost, subTotal, materialTotal, feeTotal, directCosts } = data;
   const used = new Set(trades.map((t) => t.key));
   const notUsed = TRADES.filter((t) => t.key !== 'other' && !used.has(t.key));
   const card = { backgroundColor: '#fff', border: '1.5px solid #E5E7EB', boxShadow: '0 2px 12px rgba(0,33,71,0.05)' };
+  // Who performs the work: assigned trades and COI problems.
+  const assignedSubs = trades.map((t) => subs.assigned(t.key)).filter(Boolean)
+    .map((p) => subs.list?.find((x) => x.id === p.id)).filter(Boolean);
+  const assignedCount = trades.filter((t) => subs.assigned(t.key)).length;
+  const coiExpired = assignedSubs.filter((x) => coiState(x.coi_expires_on) === 'expired').length;
+  const coiSoon = assignedSubs.filter((x) => coiState(x.coi_expires_on) === 'expiring').length;
+  const coiMissing = assignedSubs.filter((x) => coiState(x.coi_expires_on) === 'none').length;
   return (
     <div className="space-y-4" data-testid="subs-materials-view">
       {/* Section 1 — Subcontractor work */}
@@ -884,6 +981,14 @@ function SubsMaterialsView({ data, onTradeChange, scope }) {
           </div>
           <span className="text-sm font-extrabold" style={{ color: '#0369A1' }}>{fmt(subTotal)}</span>
         </div>
+        {trades.length > 0 && (
+          <p className="flex flex-wrap gap-x-3 gap-y-1 px-5 py-2 text-xs" style={{ borderTop: '1px solid #E0F2FE', color: '#6B7280' }} data-testid="sm-sub-summary">
+            <span><b style={{ color: '#002147' }}>{assignedCount} of {trades.length}</b> trades assigned</span>
+            {coiExpired > 0 && <span style={{ color: '#991B1B', fontWeight: 700 }}>{coiExpired} COI expired</span>}
+            {coiSoon > 0 && <span style={{ color: '#92400E', fontWeight: 700 }}>{coiSoon} COI expiring within 30 days</span>}
+            {coiMissing > 0 && <span>{coiMissing} with no COI on file</span>}
+          </p>
+        )}
         {trades.length === 0 ? (
           <p className="px-5 py-4 text-xs" style={{ color: '#9CA3AF' }}>No subcontract amounts in this budget.</p>
         ) : trades.map((t) => (
@@ -892,6 +997,7 @@ function SubsMaterialsView({ data, onTradeChange, scope }) {
               <span className="text-sm font-bold" style={{ color: '#002147' }}>{t.label}</span>
               <span className="text-sm font-extrabold" style={{ color: '#002147' }}>{fmt(t.total)}</span>
             </div>
+            <TradeSub trade={t} subs={subs} />
             <TradeScope trade={t} scope={scope} />
             {t.lines.map((l) => (
               <div key={l.item.wbs} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-2 text-sm" style={{ borderTop: '1px solid #F3F4F6' }}>
@@ -985,7 +1091,8 @@ function SubsMaterialsView({ data, onTradeChange, scope }) {
       <p className="text-xs px-1" style={{ color: '#9CA3AF' }}>
         Internal only. Each line is split into materials and subcontract using its cost breakdown — change a line's
         split on the Estimate tab with "Show cost breakdown" on. Change a line's trade with the drop-down; it saves with the budget.
-        Open "Scope of work" under any trade to describe the work for that subcontractor.
+        Open "Scope of work" under any trade to describe the work for that subcontractor. Pick who performs each trade from
+        your Subcontractors directory under "Performed by".
       </p>
     </div>
   );
@@ -1038,6 +1145,8 @@ export default function RemodelBudget() {
   const [actualsError,   setActualsError]   = useState('');
   const [scopeDefaults,  setScopeDefaults]  = useState({});      // trade → saved default Scope of Work
   const [scopeSave,      setScopeSave]      = useState({});      // trade → { status, msg }
+  const [subDirectory,   setSubDirectory]   = useState(null);    // subcontractor_directory rows (null = loading)
+  const [subDirError,    setSubDirError]    = useState('');
   const actualVals = useMemo(
     () => Object.fromEntries(Object.entries(actualParts).map(([wbs, p]) => [wbs, partsTotal(p)])),
     [actualParts]
@@ -1279,7 +1388,7 @@ export default function RemodelBudget() {
   function changeProjectType(typeId) {
     if (typeId !== projectType && !layoutIsEmpty(layout)
       && !confirm('Changing the project type starts a new list of lines. Your added, renamed and removed lines will be cleared. Continue?')) return;
-    setLayout((l) => ({ ...EMPTY_LAYOUT, scopes: l.scopes ?? {} }));   // scopes are per trade, not per line
+    setLayout((l) => ({ ...EMPTY_LAYOUT, scopes: l.scopes ?? {}, subs: l.subs ?? {} }));   // scopes and subs are per trade, not per line
     setProjectType(typeId);
     setInputs(defaultInputs(typeId));
     setPctRates(DEFAULT_PCT_RATES);
@@ -1430,6 +1539,33 @@ export default function RemodelBudget() {
     });
     return () => { live = false; };
   }, []);
+  // Subcontractor directory for "Performed by" (only when the Subs & Materials tab is used).
+  const needSubs = viewMode === 'trade' && subDirectory === null;
+  useEffect(() => {
+    if (!needSubs) return undefined;
+    let live = true;
+    supabase.from('subcontractor_directory')
+      .select('id, display_name, company, name, service, specialty, phone, email, coi_expires_on, coi_file_path')
+      .order('display_name')
+      .then(({ data, error }) => {
+        if (!live) return;
+        if (error) { setSubDirectory([]); setSubDirError('Could not load the Subcontractors directory.'); return; }
+        setSubDirectory(data ?? []); setSubDirError('');
+      });
+    return () => { live = false; };
+  }, [needSubs]);
+  function assignTradeSub(trade, pick) {
+    setLayout((l) => {
+      const subs = { ...(l.subs ?? {}) };
+      if (pick) subs[trade] = pick; else delete subs[trade];
+      return { ...l, subs };
+    });
+  }
+  const subsApi = {
+    list: subDirectory,
+    assigned: (trade) => layout.subs?.[trade],
+    onAssign: assignTradeSub,
+  };
   const defaultScopeOf = (trade) => scopeDefaults[trade] ?? starterScope(trade);
   function setTradeScope(trade, text) {
     setLayout((l) => ({ ...l, scopes: { ...(l.scopes ?? {}), [trade]: String(text).slice(0, MAX_SCOPE) } }));
@@ -2289,7 +2425,10 @@ export default function RemodelBudget() {
           {layoutError && (
             <p role="alert" className="px-4 mb-2 text-xs font-semibold" style={{ color: '#DC2626' }}>{layoutError}</p>
           )}
-          <SubsMaterialsView data={subsMaterials} onTradeChange={setLineTrade} scope={scopeApi} />
+          {subDirError && (
+            <p role="alert" className="px-4 mb-2 text-xs font-semibold" style={{ color: '#DC2626' }}>{subDirError}</p>
+          )}
+          <SubsMaterialsView data={subsMaterials} onTradeChange={setLineTrade} scope={scopeApi} subs={subsApi} />
         </>
       )}
 
