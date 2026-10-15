@@ -15,6 +15,10 @@
     .tab-btn:hover { color: #0f172a; }
     .tab-btn[aria-selected="true"] { color: #0f172a; border-bottom-color: #4f46e5; }
     .tab-btn:focus-visible { outline: 2px solid #4f46e5; outline-offset: 2px; }
+    .subtab-btn { padding: 0.25rem 0.875rem; font-size: 0.8125rem; font-weight: 500; color: #475569; border-radius: 9999px; border: 1px solid #cbd5e1; background: #fff; }
+    .subtab-btn:hover { color: #0f172a; border-color: #94a3b8; }
+    .subtab-btn[aria-selected="true"] { color: #fff; background: #334155; border-color: #334155; }
+    .subtab-btn:focus-visible { outline: 2px solid #4f46e5; outline-offset: 2px; }
     input[type=number]::-webkit-inner-spin-button { opacity: 0.4; }
   </style>
 </head>
@@ -68,8 +72,23 @@
       <button id="authSkipBtn" type="button" class="text-sm text-slate-500 underline hover:text-slate-700">Not now, keep it on this device only</button>
     </section>
 
-    <!-- Summary cards -->
-    <section class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <!-- Main tabs, with Budget's own sub-tabs -->
+    <div class="space-y-3">
+      <nav class="flex flex-wrap gap-1 border-b border-slate-300" role="tablist" aria-label="Sections">
+        <button type="button" role="tab" data-tab="budget" class="tab-btn">Budget</button>
+        <button type="button" role="tab" data-tab="loans" class="tab-btn">Loans</button>
+        <button type="button" role="tab" data-tab="networth" class="tab-btn">Net Worth</button>
+        <button type="button" role="tab" data-tab="retirement" class="tab-btn">Retirement</button>
+      </nav>
+      <nav id="budgetSubnav" class="flex flex-wrap gap-2" aria-label="Budget sections">
+        <button type="button" data-tab="overview" class="subtab-btn">Overview</button>
+        <button type="button" data-tab="transactions" class="subtab-btn">Transactions</button>
+        <button type="button" data-tab="setup" class="subtab-btn">Setup</button>
+      </nav>
+    </div>
+
+    <!-- Summary cards (Budget only) -->
+    <section id="budgetCards" class="grid grid-cols-2 lg:grid-cols-4 gap-4">
       <div class="bg-white rounded-xl shadow-sm p-4">
         <p class="text-xs uppercase tracking-wide text-slate-500">Monthly Income</p>
         <p id="cardIncome" class="text-2xl font-semibold mt-1">$0.00</p>
@@ -88,16 +107,6 @@
         <p id="cardLeft" class="text-2xl font-semibold mt-1">$0.00</p>
       </div>
     </section>
-
-    <!-- Tabs -->
-    <nav class="flex gap-1 border-b border-slate-300" role="tablist" aria-label="Sections">
-      <button type="button" role="tab" data-tab="overview" class="tab-btn">Overview</button>
-      <button type="button" role="tab" data-tab="transactions" class="tab-btn">Transactions</button>
-      <button type="button" role="tab" data-tab="setup" class="tab-btn">Setup</button>
-      <span aria-hidden="true" class="self-center mx-2 h-5 w-px bg-slate-300"></span>
-      <button type="button" role="tab" data-tab="loans" class="tab-btn">Loans</button>
-      <button type="button" role="tab" data-tab="networth" class="tab-btn">Net Worth</button>
-    </nav>
 
     <!-- OVERVIEW -->
     <div data-tabpanel="overview" class="grid lg:grid-cols-3 gap-6">
@@ -428,6 +437,145 @@
       </div>
     </div>
 
+    <!-- RETIREMENT -->
+    <div data-tabpanel="retirement" hidden class="grid lg:grid-cols-3 gap-6">
+      <div class="space-y-6 min-w-0">
+        <section id="retForm" class="bg-white rounded-xl shadow-sm p-5 space-y-5">
+          <div>
+            <h2 class="text-lg font-semibold">Your plan</h2>
+            <p class="text-xs text-slate-500">All amounts are in <strong>today's dollars</strong>. Changes save automatically.</p>
+          </div>
+          <fieldset class="grid grid-cols-3 gap-3">
+            <legend class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2 col-span-3">Ages</legend>
+            <div>
+              <label for="retAge" class="block text-sm font-medium text-slate-600 mb-1">Your age</label>
+              <input id="retAge" type="number" min="0" step="1" inputmode="decimal" placeholder="52" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              
+            </div>
+            <div>
+              <label for="retRetireAge" class="block text-sm font-medium text-slate-600 mb-1">Retire at</label>
+              <input id="retRetireAge" type="number" min="0" step="1" inputmode="decimal" placeholder="65" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              
+            </div>
+            <div>
+              <label for="retPlanTo" class="block text-sm font-medium text-slate-600 mb-1">Plan to age</label>
+              <input id="retPlanTo" type="number" min="0" step="1" inputmode="decimal" placeholder="95" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              
+            </div>
+          </fieldset>
+          <fieldset class="space-y-3">
+            <legend class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Savings</legend>
+            <div>
+              <label for="retSavings" class="block text-sm font-medium text-slate-600 mb-1">Retirement savings today ($)</label>
+              <input id="retSavings" type="number" min="0" step="1000" inputmode="decimal" placeholder="" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <p class="text-xs text-slate-500 mt-1" id="retSavingsHint">Leave empty to use your Net Worth tab.</p>
+            </div>
+            <div>
+              <label for="retContrib" class="block text-sm font-medium text-slate-600 mb-1">Added per year until you retire ($)</label>
+              <input id="retContrib" type="number" min="0" step="1000" inputmode="decimal" placeholder="30000" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              
+            </div>
+          </fieldset>
+          <fieldset class="space-y-3">
+            <legend class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">In retirement</legend>
+            <div>
+              <label for="retSpend" class="block text-sm font-medium text-slate-600 mb-1">Spending per year, after tax ($)</label>
+              <input id="retSpend" type="number" min="0" step="1000" inputmode="decimal" placeholder="100000" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label for="retSsMonthly" class="block text-sm font-medium text-slate-600 mb-1">Social Security / month ($)</label>
+              <input id="retSsMonthly" type="number" min="0" step="50" inputmode="decimal" placeholder="3200" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              
+            </div>
+            <div>
+              <label for="retSsAge" class="block text-sm font-medium text-slate-600 mb-1">Starting at age</label>
+              <input id="retSsAge" type="number" min="0" step="1" inputmode="decimal" placeholder="67" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              
+            </div>
+            </div>
+            <p class="text-xs text-slate-500 -mt-1">Your estimate is at <a class="underline" href="https://www.ssa.gov/myaccount/" target="_blank" rel="noopener">ssa.gov/myaccount</a>. Add a spouse's benefit to the same box.</p>
+            <div>
+              <label for="retOther" class="block text-sm font-medium text-slate-600 mb-1">Other income per year ($)</label>
+              <input id="retOther" type="number" min="0" step="1000" inputmode="decimal" placeholder="0" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <p class="text-xs text-slate-500 mt-1" id="retOtherHint">Rental income, pension, part-time work. Continues for life.</p>
+            </div>
+          </fieldset>
+          <details class="rounded-lg border border-slate-200 p-3">
+            <summary class="text-sm font-medium text-slate-700 cursor-pointer select-none">Assumptions</summary>
+            <div class="grid grid-cols-2 gap-3 mt-3">
+            <div>
+              <label for="retReturnPre" class="block text-sm font-medium text-slate-600 mb-1">Return before retiring (%/yr)</label>
+              <input id="retReturnPre" type="number" min="0" step="0.1" inputmode="decimal" placeholder="7" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              
+            </div>
+            <div>
+              <label for="retReturnPost" class="block text-sm font-medium text-slate-600 mb-1">Return in retirement (%/yr)</label>
+              <input id="retReturnPost" type="number" min="0" step="0.1" inputmode="decimal" placeholder="5" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              
+            </div>
+            <div>
+              <label for="retInflation" class="block text-sm font-medium text-slate-600 mb-1">Inflation (%/yr)</label>
+              <input id="retInflation" type="number" min="0" step="0.1" inputmode="decimal" placeholder="3" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              
+            </div>
+            <div>
+              <label for="retTax" class="block text-sm font-medium text-slate-600 mb-1">Tax on withdrawals (%)</label>
+              <input id="retTax" type="number" min="0" step="1" inputmode="decimal" placeholder="15" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              
+            </div>
+            </div>
+            <p class="text-xs text-slate-500 mt-2">Returns vary from year to year in the simulation (about ±15% a year before retiring, ±10% after, like a stock-heavy and then a balanced portfolio).</p>
+          </details>
+        </section>
+      </div>
+
+      <div class="lg:col-span-2 space-y-6 min-w-0">
+        <section class="bg-white rounded-xl shadow-sm p-5">
+          <div id="retVerdict"></div>
+          <div id="retCards" class="grid grid-cols-2 xl:grid-cols-4 gap-4 mt-4"></div>
+        </section>
+        <section id="retChartBox" class="bg-white rounded-xl shadow-sm p-5" hidden>
+          <div class="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <h2 class="text-lg font-semibold">Savings by age</h2>
+              <p class="text-xs text-slate-500">1,000 simulated market futures, in today's dollars.</p>
+            </div>
+            <div class="flex items-center gap-4 text-xs text-slate-600">
+              <span class="flex items-center gap-1.5"><span class="w-4 h-0.5" style="background:#2a78d6"></span>Typical outcome</span>
+              <span class="flex items-center gap-1.5"><span class="w-4 h-3 rounded-sm" style="background:rgba(42,120,214,.18)"></span>Bad to good markets (10th–90th percentile)</span>
+            </div>
+          </div>
+          <div id="retChartWrap" class="relative mt-3">
+            <div id="retChart"></div>
+            <div id="retTip" hidden class="absolute z-10 pointer-events-none rounded-md bg-slate-900 text-white text-xs px-3 py-2 shadow-lg whitespace-nowrap"></div>
+          </div>
+        </section>
+        <section id="retFixBox" class="bg-white rounded-xl shadow-sm p-5" hidden>
+          <h2 class="text-lg font-semibold">Ways to reach 85% confidence</h2>
+          <p class="text-xs text-slate-500 mb-3">Any one of these on its own would get you there.</p>
+          <ul id="retFixes" class="space-y-2"></ul>
+        </section>
+        <section id="retTableBox" class="bg-white rounded-xl shadow-sm p-5" hidden>
+          <details>
+            <summary class="text-lg font-semibold cursor-pointer select-none">Year by year <span class="text-sm font-normal text-slate-500">(steady average returns)</span></summary>
+            <div class="overflow-x-auto max-h-[32rem] overflow-y-auto mt-3">
+              <table class="w-full text-sm">
+                <thead class="sticky top-0 bg-white"><tr class="text-left text-slate-500 border-b border-slate-200">
+                  <th class="py-2 pr-2 font-medium">Age</th><th class="py-2 px-2 font-medium text-right">Added</th>
+                  <th class="py-2 px-2 font-medium text-right">Social Security + other</th><th class="py-2 px-2 font-medium text-right">Withdrawn</th>
+                  <th class="py-2 pl-2 font-medium text-right">Savings at year end</th></tr></thead>
+                <tbody id="retTable"></tbody>
+              </table>
+            </div>
+          </details>
+        </section>
+        <p class="text-xs text-slate-500 px-1">This is a planning estimate, not financial advice. It uses simplified taxes and assumes Social Security and other income keep pace with inflation.
+          Review big decisions with a financial planner or CPA.</p>
+      </div>
+    </div>
+
     <!-- SETUP -->
     <div data-tabpanel="setup" hidden class="max-w-3xl">
         <!-- 1. Income & Category Setup -->
@@ -565,6 +713,7 @@
           vendorRules: [],
           loan: {},
           netWorth: { items: [], history: {} },
+          retirement: {},
         };
       }
 
@@ -596,6 +745,7 @@
               items: Array.isArray(data.netWorth.items) ? data.netWorth.items : [],
               history: isObj(data.netWorth.history) ? data.netWorth.history : {},
             } : { items: [], history: {} },
+            retirement: isObj(data.retirement) ? data.retirement : {},
           };
         } catch (e) {
           return freshState();
@@ -1381,6 +1531,221 @@
         });
       });
 
+      // ---------- Retirement planner ----------
+      const RET_FIELDS = ['Age', 'RetireAge', 'PlanTo', 'Savings', 'Contrib', 'Spend', 'SsMonthly', 'SsAge', 'Other', 'ReturnPre', 'ReturnPost', 'Inflation', 'Tax'];
+      const RET_DEFAULTS = { retireage: 65, planto: 95, contrib: 0, ssmonthly: 0, ssage: 67, other: 0, returnpre: 7, returnpost: 5, inflation: 3, tax: 15 };
+      const RET_VOL = { pre: 0.15, post: 0.10 };
+      const RET_TARGET = 0.85;
+      const RET_RUNS = 1000;
+      // Retirement + investment balances from the Net Worth tab
+      const retAutoSavings = () => nw().items.filter((it) => it.category === 'Retirement' || it.category === 'Investments')
+        .reduce((sum, it) => sum + (Number(it.value) || 0), 0);
+      function retInputs() {
+        const raw = state.retirement || {};
+        const num = (k) => { const v = parseFloat(raw[k]); return Number.isFinite(v) ? v : (k in RET_DEFAULTS ? RET_DEFAULTS[k] : NaN); };
+        const savingsTyped = parseFloat(raw.savings);
+        return {
+          age: num('age'), retireAge: num('retireage'), planTo: num('planto'),
+          savings: Number.isFinite(savingsTyped) ? savingsTyped : retAutoSavings(),
+          contrib: num('contrib'), spend: num('spend'), ss: num('ssmonthly') * 12, ssAge: num('ssage'), other: num('other'),
+          rPre: num('returnpre') / 100, rPost: num('returnpost') / 100, infl: num('inflation') / 100, tax: Math.min(0.6, Math.max(0, num('tax') / 100)),
+        };
+      }
+      // Small seeded random generator so results don't jump around between renders
+      function rng(seed) {
+        let a = seed >>> 0;
+        return () => { a += 0x6D2B79F5; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+      }
+      function normal(rand) { let u = 0, v = 0; while (u === 0) u = rand(); while (v === 0) v = rand(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+
+      // One path, year by year in today's dollars. returnsFor(age) gives that year's nominal return.
+      function retPath(p, returnsFor) {
+        let bal = p.savings;
+        const path = [];
+        let depletedAt = null;
+        for (let age = p.age; age < p.planTo; age++) {
+          const real = (1 + returnsFor(age)) / (1 + p.infl) - 1;
+          const row = { age, added: 0, income: 0, withdrawn: 0 };
+          if (age < p.retireAge) {
+            bal = bal * (1 + real) + p.contrib;
+            row.added = p.contrib;
+          } else {
+            const income = (age >= p.ssAge ? p.ss : 0) + p.other;
+            const need = p.spend - income;
+            // Withdrawals are taxed, so take out a bit more than the after-tax amount needed
+            const gross = need > 0 ? need / (1 - p.tax) : need;
+            row.income = income; row.withdrawn = Math.max(0, gross);
+            bal = (bal - gross) * (1 + real);
+          }
+          if (bal <= 0) { bal = 0; if (depletedAt === null && age >= p.retireAge) depletedAt = age + 1; }
+          row.balance = bal;
+          path.push(row);
+        }
+        return { path, depletedAt };
+      }
+      function retSimulate(p, runs = RET_RUNS) {
+        const rand = rng(20261015);
+        const years = p.planTo - p.age;
+        const balances = Array.from({ length: years }, () => []);
+        let ok = 0;
+        for (let k = 0; k < runs; k++) {
+          const { path, depletedAt } = retPath(p, (age) => {
+            const pre = age < p.retireAge;
+            return Math.max(-0.9, (pre ? p.rPre : p.rPost) + (pre ? RET_VOL.pre : RET_VOL.post) * normal(rand));
+          });
+          if (depletedAt === null) ok++;
+          path.forEach((row, i) => balances[i].push(row.balance));
+        }
+        const pct = (arr, q) => { const a = arr.slice().sort((x, y) => x - y); return a[Math.min(a.length - 1, Math.floor(q * a.length))]; };
+        const bands = balances.map((arr, i) => ({ age: p.age + i + 1, p10: pct(arr, 0.1), p50: pct(arr, 0.5), p90: pct(arr, 0.9) }));
+        return { success: ok / runs, bands };
+      }
+      const retSteady = (p) => retPath(p, (age) => (age < p.retireAge ? p.rPre : p.rPost));
+      // Smallest change that reaches the target, by bisection on one input
+      function retSolve(p, key, lo, hi, increasing) {
+        const okAt = (v) => retSimulate({ ...p, [key]: v }, 400).success >= RET_TARGET;
+        if (!okAt(increasing ? hi : lo)) return null;
+        for (let i = 0; i < 18; i++) {
+          const mid = (lo + hi) / 2;
+          if (okAt(mid) === increasing) hi = mid; else lo = mid;
+        }
+        return increasing ? hi : lo;
+      }
+
+      function renderRetirement() {
+        const raw = state.retirement || {};
+        RET_FIELDS.forEach((k) => {
+          const el = $('ret' + k), v = raw[k.toLowerCase()];
+          if (document.activeElement !== el) el.value = v === undefined || v === null ? '' : v;
+        });
+        $('retRetireAge').placeholder = '65'; $('retPlanTo').placeholder = '95';
+        const auto = retAutoSavings();
+        $('retSavingsHint').textContent = auto
+          ? `Leave empty to use your Net Worth tab: ${fmt0.format(auto)} (Retirement + Investments).`
+          : 'Leave empty to use your Net Worth tab (Retirement + Investments).';
+        $('retSavings').placeholder = auto ? String(Math.round(auto)) : '0';
+        const p = retInputs();
+        const missing = [];
+        if (!(p.age > 0)) missing.push('your age');
+        if (!(p.spend > 0)) missing.push('your yearly spending in retirement');
+        const valid = !missing.length && p.retireAge > p.age && p.planTo > p.retireAge && p.planTo <= 110;
+        ['retChartBox', 'retTableBox'].forEach((id) => { $(id).hidden = !valid; });
+        $('retFixBox').hidden = true;
+        if (!valid) {
+          $('retVerdict').innerHTML = `<h2 class="text-lg font-semibold">Are you on track?</h2>
+            <p class="text-sm text-slate-500 mt-1">${missing.length ? `Enter ${missing.join(' and ')} to see your results.` : 'Check the ages: retirement must come after today, and the plan must run past retirement.'}</p>`;
+          $('retCards').innerHTML = '';
+          return;
+        }
+        const sim = retSimulate(p);
+        const steady = retSteady(p);
+        const pct = Math.round(sim.success * 100);
+        const status = sim.success >= RET_TARGET ? { label: 'On track', icon: '✓', cls: 'bg-emerald-50 text-emerald-800 border-emerald-200' }
+          : sim.success >= 0.7 ? { label: 'Borderline', icon: '!', cls: 'bg-amber-50 text-amber-800 border-amber-200' }
+          : { label: 'At risk', icon: '✕', cls: 'bg-red-50 text-red-800 border-red-200' };
+        $('retVerdict').innerHTML = `<div class="flex flex-wrap items-center gap-4">
+            <div class="rounded-xl border ${status.cls} px-4 py-3 flex items-center gap-3">
+              <span class="text-2xl font-bold" aria-hidden="true">${status.icon}</span>
+              <div><p class="text-xs uppercase tracking-wide font-semibold">${status.label}</p>
+                <p class="text-3xl font-bold tabular-nums">${pct}%</p></div>
+            </div>
+            <p class="text-sm text-slate-700 max-w-md">Your money lasts to age <strong>${p.planTo}</strong> in <strong>${pct}%</strong> of ${RET_RUNS.toLocaleString()} simulated market futures.
+              Planners usually aim for <strong>85% or more</strong>.</p></div>`;
+        const atRet = sim.bands.find((b) => b.age === p.retireAge) || sim.bands[0];
+        const firstYearIncome = (p.retireAge >= p.ssAge ? p.ss : 0) + p.other;
+        const gap = Math.max(0, p.spend - firstYearIncome);
+        const lastsTo = steady.depletedAt ? `age ${steady.depletedAt}` : `past ${p.planTo}`;
+        const card = (label, value, sub) => `<div class="rounded-lg border border-slate-200 p-3">
+            <p class="text-xs uppercase tracking-wide text-slate-500">${label}</p>
+            <p class="text-xl font-semibold mt-1 tabular-nums">${value}</p><p class="text-xs text-slate-500 mt-0.5">${sub}</p></div>`;
+        $('retCards').innerHTML =
+          card('Savings today', fmt0.format(p.savings), Number.isFinite(parseFloat(raw.savings)) ? 'entered above' : 'from Net Worth')
+          + card(`Savings at ${p.retireAge}`, fmt0.format(atRet.p50), `typical; ${fmt0.format(atRet.p10)}–${fmt0.format(atRet.p90)} range`)
+          + card('First-year withdrawal', fmt0.format(gap / (1 - p.tax)), atRet.p50 > 0 ? `${((gap / (1 - p.tax)) / atRet.p50 * 100).toFixed(1)}% of savings (4% is a common guide)` : 'savings needed')
+          + card('Money lasts', lastsTo, 'with steady average returns');
+        renderRetChart(p, sim.bands);
+        // Year-by-year table (steady returns)
+        $('retTable').innerHTML = steady.path.map((r) => `<tr class="border-b border-slate-100 ${r.age === p.retireAge ? 'bg-indigo-50 font-medium' : ''}">
+            <td class="py-1.5 pr-2">${r.age}${r.age === p.retireAge ? ' · retire' : ''}</td>
+            <td class="py-1.5 px-2 text-right tabular-nums">${r.added ? fmt0.format(r.added) : '—'}</td>
+            <td class="py-1.5 px-2 text-right tabular-nums">${r.income ? fmt0.format(r.income) : '—'}</td>
+            <td class="py-1.5 px-2 text-right tabular-nums">${r.withdrawn ? fmt0.format(r.withdrawn) : '—'}</td>
+            <td class="py-1.5 pl-2 text-right tabular-nums ${r.balance <= 0 ? 'text-red-700 font-medium' : ''}">${fmt0.format(r.balance)}</td></tr>`).join('');
+        // What would close the gap
+        if (sim.success < RET_TARGET) {
+          const fixes = [];
+          const more = retSolve(p, 'contrib', p.contrib, p.contrib + 500000, true);
+          if (more !== null && p.retireAge > p.age) fixes.push(`<strong>Save ${fmt0.format(Math.ceil((more - p.contrib) / 1000) * 1000)} more per year</strong> until you retire (${fmt0.format(Math.ceil(more / 1000) * 1000)} a year in total).`);
+          for (let y = 1; y <= 10; y++) {
+            if (p.retireAge + y >= p.planTo) break;
+            if (retSimulate({ ...p, retireAge: p.retireAge + y }, 400).success >= RET_TARGET) { fixes.push(`<strong>Retire at ${p.retireAge + y}</strong> instead of ${p.retireAge} (${y} year${y === 1 ? '' : 's'} later).`); break; }
+          }
+          const less = retSolve(p, 'spend', 0, p.spend, false);
+          if (less !== null && less > 0) fixes.push(`<strong>Spend ${fmt0.format(Math.floor(less / 1000) * 1000)} a year</strong> in retirement (${fmt0.format(Math.ceil((p.spend - less) / 1000) * 1000)} less).`);
+          $('retFixes').innerHTML = fixes.map((f) => `<li class="flex gap-2 text-sm"><span class="text-indigo-600" aria-hidden="true">→</span><span>${f}</span></li>`).join('')
+            || '<li class="text-sm text-slate-600">No single change gets there within a reasonable range. Try combining a few: saving more, retiring later and spending less.</li>';
+          $('retFixBox').hidden = false;
+        }
+      }
+
+      function renderRetChart(p, bands) {
+        const wrap = $('retChartWrap');
+        const W = Math.max(300, wrap.clientWidth || 700), H = 260, padL = 58, padR = 16, padT = 14, padB = 28;
+        const pts = [{ age: p.age, p10: p.savings, p50: p.savings, p90: p.savings }, ...bands];
+        const max = Math.max(1, ...pts.map((b) => b.p90));
+        const rawStep = max / 4, mag = 10 ** Math.floor(Math.log10(rawStep));
+        const step = [1, 2, 2.5, 5, 10].map((k) => k * mag).find((k) => k >= rawStep);
+        const top = step * Math.ceil(max / step);
+        const x = (age) => padL + (W - padL - padR) * ((age - p.age) / (p.planTo - p.age));
+        const y = (v) => padT + (H - padT - padB) * (1 - Math.max(0, v) / top);
+        const short = (v) => (v >= 1e6 ? `$${(v / 1e6).toFixed(v >= 1e7 ? 0 : 1)}M` : `$${Math.round(v / 1000)}k`);
+        let svg = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Projected savings by age" style="display:block;max-width:100%">`;
+        for (let v = 0; v <= top + 1; v += step) {
+          svg += `<line x1="${padL}" x2="${W - padR}" y1="${y(v)}" y2="${y(v)}" stroke="#e2e8f0"/>
+            <text x="${padL - 6}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="#64748b">${v ? short(v) : '$0'}</text>`;
+        }
+        const tickEvery = (p.planTo - p.age) > 40 ? 10 : 5;
+        for (let a = Math.ceil(p.age / tickEvery) * tickEvery; a <= p.planTo; a += tickEvery) {
+          svg += `<text x="${x(a)}" y="${H - 8}" text-anchor="middle" font-size="11" fill="#64748b">${a}</text>`;
+        }
+        // Retirement marker
+        svg += `<line x1="${x(p.retireAge)}" x2="${x(p.retireAge)}" y1="${padT}" y2="${H - padB}" stroke="#94a3b8" stroke-dasharray="4 4"/>
+          <text x="${x(p.retireAge) + 4}" y="${padT + 10}" font-size="11" fill="#475569">Retire at ${p.retireAge}</text>`;
+        const band = pts.map((b) => `${x(b.age)},${y(b.p90)}`).join(' ') + ' ' + pts.slice().reverse().map((b) => `${x(b.age)},${y(b.p10)}`).join(' ');
+        svg += `<polygon points="${band}" fill="rgba(42,120,214,0.18)"/>`;
+        svg += `<polyline fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round" points="${pts.map((b) => `${x(b.age)},${y(b.p50)}`).join(' ')}"/>`;
+        svg += `<line x1="${padL}" x2="${W - padR}" y1="${y(0)}" y2="${y(0)}" stroke="#94a3b8"/>`;
+        const colW = (W - padL - padR) / (p.planTo - p.age);
+        pts.forEach((b) => { svg += `<rect data-retage="${b.age}" x="${x(b.age) - colW / 2}" y="${padT}" width="${colW}" height="${H - padT - padB}" fill="transparent"/>`; });
+        svg += '</svg>';
+        $('retChart').innerHTML = svg;
+        renderRetChart.pts = pts;
+      }
+
+      $('retForm').addEventListener('input', (e) => {
+        if (!e.target.id || !e.target.id.startsWith('ret')) return;
+        state.retirement = { ...(state.retirement || {}), [e.target.id.slice(3).toLowerCase()]: e.target.value };
+        save();
+        clearTimeout(renderRetirement.timer);
+        renderRetirement.timer = setTimeout(renderRetirement, 250);
+      });
+      $('retChart').addEventListener('mousemove', (e) => {
+        const hit = e.target.closest('[data-retage]');
+        const tip = $('retTip');
+        if (!hit) { tip.hidden = true; return; }
+        const b = (renderRetChart.pts || []).find((x) => String(x.age) === hit.dataset.retage);
+        if (!b) return;
+        tip.innerHTML = `<div class="font-semibold mb-1">Age ${b.age}</div>
+          <div>Good markets <span class="float-right pl-4 tabular-nums">${fmt0.format(b.p90)}</span></div>
+          <div class="font-semibold">Typical <span class="float-right pl-4 tabular-nums">${fmt0.format(b.p50)}</span></div>
+          <div>Bad markets <span class="float-right pl-4 tabular-nums">${fmt0.format(b.p10)}</span></div>`;
+        tip.hidden = false;
+        const box = $('retChartWrap').getBoundingClientRect(), r = hit.getBoundingClientRect();
+        tip.style.left = Math.min(Math.max(0, r.left - box.left + r.width / 2 - tip.offsetWidth / 2), box.width - tip.offsetWidth) + 'px';
+        tip.style.top = '0px';
+      });
+      $('retChart').addEventListener('mouseleave', () => { $('retTip').hidden = true; });
+
       // ---------- Month-by-month chart ----------
       const SERIES = { budget: '#2a78d6', actual: '#eb6834' };   // validated pair (light surface)
       const addMonths = (ym, n) => {
@@ -1483,7 +1848,10 @@
         if (hit && hit.dataset.trend !== selectedMonth) switchMonth(hit.dataset.trend);
       });
       let resizeTimer;
-      window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(renderTrend, 150); });
+      window.addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => { renderTrend(); if (!$('retChartBox').hidden) renderRetirement(); }, 150);
+      });
 
       // ---------- Rendering ----------
       function renderCategorySetup() {
@@ -1781,6 +2149,7 @@
         renderRules();
         renderLoan();
         renderNetWorth();
+        if (!$('retChartBox').closest('[data-tabpanel]').hidden) renderRetirement();
         $('incomeInput').value = effectiveIncome() || '';
         $('setupMonthLabel').textContent = monthName(selectedMonth);
         renderCustomBadge();
@@ -1999,11 +2368,21 @@
       $('ledgerSearch').addEventListener('input', renderLedger);
 
       // Tabs
+      // Budget is a main tab with its own sub-tabs (Overview, Transactions, Setup)
+      const BUDGET_TABS = ['overview', 'transactions', 'setup'];
+      let lastBudgetTab = 'overview';
       function showTab(name) {
-        if (!['overview', 'transactions', 'networth', 'loans', 'setup'].includes(name)) name = 'overview';
+        if (name === 'budget') name = lastBudgetTab;
+        if (![...BUDGET_TABS, 'networth', 'loans', 'retirement'].includes(name)) name = 'overview';
+        const inBudget = BUDGET_TABS.includes(name);
+        if (inBudget) lastBudgetTab = name;
         document.querySelectorAll('[data-tabpanel]').forEach((el) => { el.hidden = el.dataset.tabpanel !== name; });
-        document.querySelectorAll('[data-tab]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === name)));
+        document.querySelectorAll('[data-tab]').forEach((b) => b.setAttribute('aria-selected',
+          String(b.dataset.tab === name || (b.dataset.tab === 'budget' && inBudget))));
+        $('budgetSubnav').hidden = !inBudget;
+        $('budgetCards').hidden = !inBudget;
         try { localStorage.setItem(STORAGE_KEY + '.tab', name); } catch (e) { /* storage unavailable */ }
+        if (name === 'retirement' && typeof renderRetirement === 'function') renderRetirement();
         if (name === 'overview' && typeof renderTrend === 'function') renderTrend();
         if (name === 'networth' && typeof renderNwHistory === 'function') renderNwHistory();
       }
