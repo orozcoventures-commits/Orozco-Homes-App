@@ -984,7 +984,7 @@ function SubsMaterialsView({ data, onTradeChange, scope }) {
       </div>
       <p className="text-xs px-1" style={{ color: '#9CA3AF' }}>
         Internal only. Each line is split into materials and subcontract using its cost breakdown — change a line's
-        split in the Phase view with "Show cost breakdown" on. Change a line's trade with the drop-down; it saves with the budget.
+        split on the Estimate tab with "Show cost breakdown" on. Change a line's trade with the drop-down; it saves with the budget.
         Open "Scope of work" under any trade to describe the work for that subcontractor.
       </p>
     </div>
@@ -2268,11 +2268,11 @@ export default function RemodelBudget() {
         </div>
       )}
 
-      {/* View by: Phase (the budget sections) | Subs & Materials (by trade) */}
+      {/* View by: Estimate (the budget sections) | Subs & Materials (by trade) */}
       <div className="flex items-center gap-3 px-1 mb-3 flex-wrap">
         <span className="text-xs font-bold uppercase tracking-wide" style={{ color: '#6B7280' }} id="rb-view-label">View by</span>
         <div role="radiogroup" aria-labelledby="rb-view-label" className="inline-flex rounded-xl p-0.5" style={{ backgroundColor: '#EEF0F3' }}>
-          {[['phase', 'Phase'], ['trade', 'Subs & Materials']].map(([mode, label]) => (
+          {[['phase', 'Estimate'], ['trade', 'Subs & Materials']].map(([mode, label]) => (
             <button key={mode} type="button" role="radio" aria-checked={viewMode === mode} onClick={() => changeViewMode(mode)}
               className="px-3.5 py-1.5 text-xs font-bold rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-sky-300"
               style={viewMode === mode
