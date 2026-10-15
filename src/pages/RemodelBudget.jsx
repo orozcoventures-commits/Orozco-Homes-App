@@ -105,8 +105,9 @@ function defaultInputs(projectTypeId) {
 //            allowances: { wbs: { on, amount } },  (client allowances, see below)
 //            trades: { wbs: tradeKey },           (Subs & Materials view, see below)
 //            scopes: { tradeKey: text },          (this budget's Scope of Work per trade)
-//            subs: { tradeKey: { id, name } } }   (who performs each trade — subcontractor_directory)
-const EMPTY_LAYOUT = { added: [], labels: {}, removed: [], splits: {}, allowances: {}, trades: {}, scopes: {}, subs: {} };
+//            subs: { tradeKey: { id, name } },    (who performs each trade — subcontractor_directory)
+//            factors: { wbs: n } }                (price adjustment × built-in price, from "My template")
+const EMPTY_LAYOUT = { added: [], labels: {}, removed: [], splits: {}, allowances: {}, trades: {}, scopes: {}, subs: {}, factors: {} };
 const MAX_LABEL = 120;
 
 function normalizeLayout(raw) {
@@ -136,6 +137,9 @@ function normalizeLayout(raw) {
     subs: Object.fromEntries(Object.entries(l.subs && typeof l.subs === 'object' ? l.subs : {})
       .filter(([k, v]) => TRADE_KEYS.has(k) && v && Number.isInteger(v.id))
       .map(([k, v]) => [k, { id: v.id, name: String(v.name ?? '').slice(0, MAX_LABEL) }])),
+    factors: Object.fromEntries(Object.entries(l.factors && typeof l.factors === 'object' ? l.factors : {})
+      .filter(([, v]) => Number.isFinite(Number(v)) && Number(v) >= 0 && Number(v) <= 100)
+      .map(([k, v]) => [k, Number(v)])),
   };
 }
 
@@ -1248,6 +1252,11 @@ export default function RemodelBudget() {
         }),
     ]);
 
+    if (!budget) {
+      // New budget: start from "My template" for the default type, if saved.
+      const tpl = templatesRef.current?.['bathroom-medium'];
+      if (tpl) applyTemplateRef.current?.('bathroom-medium', tpl.template, EMPTY_LAYOUT);
+    }
     if (budget) {
       const type = budget.project_type || 'bathroom-medium';
       setProjectType(type);
@@ -1407,6 +1416,103 @@ export default function RemodelBudget() {
     return Object.fromEntries(config.divisions.map((d) => [d.key, true]));
   }, [config, openDivs]);
 
+  // ── My templates (migration 054) ────────────────────────────────────────────
+  // "Save as my template" stores this budget's setup for its project type; new
+  // budgets of that type start from it. Typed prices on built-in lines are kept
+  // as adjustments (× the built-in price), so they follow the job size.
+  // Size, actuals, scopes and subcontractors stay with each budget.
+  const [myTemplates,    setMyTemplates]    = useState({});      // project_type → { template, updatedAt }
+  const [templateMsg,    setTemplateMsg]    = useState(null);    // { status, msg }
+  useEffect(() => {
+    let live = true;
+    supabase.from('remodel_budget_templates').select('project_type, template_json, updated_at').then(({ data, error }) => {
+      if (live && !error && Array.isArray(data)) {
+        setMyTemplates(Object.fromEntries(data.map((r) => [r.project_type, { template: r.template_json, updatedAt: r.updated_at }])));
+      }
+    });
+    return () => { live = false; };
+  }, []);
+
+  const templatesRef = useRef({});
+  const applyTemplateRef = useRef(null);
+  useEffect(() => { templatesRef.current = myTemplates; applyTemplateRef.current = applyTemplate; });
+
+  function buildTemplate() {
+    const formula = computeBaseLineValues(projectType, inputs, specLevel);
+    const factors = { ...(layout.factors ?? {}) };
+    const amounts = {};
+    for (const div of config.divisions) {
+      for (const item of div.items) {
+        if (item.unit === 'pct') continue;
+        if (item.custom) { amounts[item.wbs] = Math.round(userVals[item.wbs] ?? 0); continue; }
+        if (!overrideFlags[item.wbs]) continue;
+        const base = formula[item.wbs] ?? 0;
+        const val = Number(userVals[item.wbs]) || 0;
+        if (base > 0) {
+          const f = Math.round((val / base) * 10000) / 10000;
+          if (f === 1) delete factors[item.wbs]; else factors[item.wbs] = f;
+        } else {
+          delete factors[item.wbs];
+          amounts[item.wbs] = Math.round(val);
+        }
+      }
+    }
+    const { added, labels, removed, splits, allowances, trades } = layout;
+    return { version: 1, specLevel, pctRates, layout: { added, labels, removed, splits, allowances, trades, factors }, amounts };
+  }
+
+  // Starts this budget from a saved template (keeps size, scopes and subs).
+  // Lines with actual costs entered are never removed.
+  function applyTemplate(typeId, tpl, keep) {
+    const cfg = getProjectConfig(typeId);
+    if (!cfg || !tpl || typeof tpl !== 'object') return;
+    const l = normalizeLayout(tpl.layout);
+    l.removed = l.removed.filter((w) => !((actualVals[w] ?? 0) > 0));
+    l.scopes = keep.scopes ?? {};
+    l.subs = keep.subs ?? {};
+    const valid = new Set([...cfg.divisions.flatMap((d) => d.items.filter((it) => it.unit !== 'pct').map((it) => it.wbs)), ...l.added.map((a) => a.id)]);
+    const amounts = Object.fromEntries(Object.entries(tpl.amounts && typeof tpl.amounts === 'object' ? tpl.amounts : {})
+      .filter(([w, v]) => valid.has(w) && Number.isFinite(Number(v)) && Number(v) >= 0)
+      .map(([w, v]) => [w, Math.round(Number(v))]));
+    for (const a of l.added) if (amounts[a.id] == null) amounts[a.id] = 0;
+    const rate = (v, d) => (Number.isFinite(Number(v)) && Number(v) >= 0 && Number(v) < 100 ? Number(v) : d);
+    setLayout(l);
+    setSpecLevel(SPEC_LEVELS.includes(tpl.specLevel) ? tpl.specLevel : 'mid');
+    setPctRates({
+      profitPct: rate(tpl.pctRates?.profitPct, DEFAULT_PCT_RATES.profitPct),
+      contingencyPct: rate(tpl.pctRates?.contingencyPct, DEFAULT_PCT_RATES.contingencyPct),
+    });
+    setUserVals(amounts);
+    setOverrideFlags(Object.fromEntries(Object.keys(amounts).map((w) => [w, true])));
+  }
+
+  const templateErr = (error) => (/remodel_budget_templates|schema cache|does not exist/i.test(error?.message ?? '')
+    ? 'Not saved — run migration 054 in Supabase first.'
+    : `Not saved: ${error?.message ?? 'unknown error'}`);
+  async function saveMyTemplate() {
+    if (myTemplates[projectType] && !confirm(`Replace your saved template for ${config.label} with this budget's setup?`)) return;
+    const template = buildTemplate();
+    setTemplateMsg({ status: 'saving', msg: 'Saving…' });
+    const { error } = await supabase.from('remodel_budget_templates')
+      .upsert({ project_type: projectType, template_json: template }, { onConflict: 'project_type' });
+    if (error) { setTemplateMsg({ status: 'error', msg: templateErr(error) }); return; }
+    setMyTemplates((t) => ({ ...t, [projectType]: { template, updatedAt: new Date().toISOString() } }));
+    setTemplateMsg({ status: 'saved', msg: `Saved. New ${config.label} budgets will start from your template.` });
+  }
+  function applyMyTemplate() {
+    const t = myTemplates[projectType];
+    if (!t || !confirm('Replace this budget\'s lines, prices, splits and margin with your template? Size, actual costs, scopes and subcontractors stay.')) return;
+    applyTemplate(projectType, t.template, layout);
+    setTemplateMsg({ status: 'saved', msg: 'Your template was applied to this budget.' });
+  }
+  async function deleteMyTemplate() {
+    if (!myTemplates[projectType] || !confirm(`Delete your template for ${config.label}? New budgets will start from the Orozco Homes built-in prices. Budgets already made don't change.`)) return;
+    const { error } = await supabase.from('remodel_budget_templates').delete().eq('project_type', projectType);
+    if (error) { setTemplateMsg({ status: 'error', msg: templateErr(error).replace('Not saved', 'Not deleted') }); return; }
+    setMyTemplates((t) => { const n = { ...t }; delete n[projectType]; return n; });
+    setTemplateMsg({ status: 'saved', msg: 'Template deleted.' });
+  }
+
   // ── Project type change ─────────────────────────────────────────────────────
   function changeProjectType(typeId) {
     if (typeId !== projectType && !layoutIsEmpty(layout)
@@ -1417,6 +1523,8 @@ export default function RemodelBudget() {
     setPctRates(DEFAULT_PCT_RATES);
     setUserVals({});
     setOverrideFlags({});
+    setTemplateMsg(null);
+    if (myTemplates[typeId]) applyTemplate(typeId, myTemplates[typeId].template, layout);   // start from "My template"
     const cfg = getProjectConfig(typeId);
     if (cfg) setOpenDivs(Object.fromEntries(cfg.divisions.map((d) => [d.key, true])));
   }
@@ -1445,7 +1553,7 @@ export default function RemodelBudget() {
         else if (item.custom) vals[item.wbs] = userVals[item.wbs] ?? 0;
         else vals[item.wbs] = overrideFlags[item.wbs]
           ? (userVals[item.wbs] ?? formulaVals[item.wbs] ?? 0)
-          : (formulaVals[item.wbs] ?? 0);
+          : (formulaVals[item.wbs] ?? 0) * (layout.factors?.[item.wbs] ?? 1);
       }
     }
     const nonPctWbs = allNonPctWbs(config);
@@ -1457,7 +1565,7 @@ export default function RemodelBudget() {
       ? (userVals['M.2'] ?? 0)
       : grossMarginAmount(baseSum + vals['M.3'], pctRates.profitPct);
     return vals;
-  }, [config, projectType, inputs, specLevel, pctRates, userVals, overrideFlags, designSpecsTotal]);
+  }, [config, projectType, inputs, specLevel, pctRates, userVals, overrideFlags, designSpecsTotal, layout.factors]);
 
   // ── Aggregate totals (budget + actual) ──────────────────────────────────────
   const totals = useMemo(() => {
@@ -1508,12 +1616,16 @@ export default function RemodelBudget() {
 
   // ── Event handlers ──────────────────────────────────────────────────────────
   function handleLineChange(wbs, num)  { setUserVals((p) => ({ ...p, [wbs]: num })); setOverrideFlags((p) => ({ ...p, [wbs]: true })); }
-  function resetLine(wbs)              { setOverrideFlags((p) => ({ ...p, [wbs]: false })); setUserVals((p) => { const n = { ...p }; delete n[wbs]; return n; }); }
+  function resetLine(wbs)              {
+    setOverrideFlags((p) => ({ ...p, [wbs]: false })); setUserVals((p) => { const n = { ...p }; delete n[wbs]; return n; });
+    setLayout((l) => { if (l.factors?.[wbs] == null) return l; const factors = { ...l.factors }; delete factors[wbs]; return { ...l, factors }; });
+  }
   // Amounts of added lines are their own values, not overrides: keep them.
   const isCustomWbs = (w) => layout.added.some((a) => a.id === w);
   function resetAll() {
     setOverrideFlags((p) => Object.fromEntries(Object.entries(p).filter(([w]) => isCustomWbs(w))));
     setUserVals((p) => Object.fromEntries(Object.entries(p).filter(([w]) => isCustomWbs(w))));
+    setLayout((l) => ({ ...l, factors: {} }));
   }
   function addLine(divKey, label, amount) {
     const id = newLineId();
@@ -1660,7 +1772,7 @@ export default function RemodelBudget() {
 
   // The Project Type drop-downs show the group that holds the current type.
   const currentGroup = PROJECT_GROUPS.find((g) => g.types.includes(projectType)) ?? PROJECT_GROUPS[0];
-  const hasOverrides = Object.entries(overrideFlags).some(([w, on]) => on && !isCustomWbs(w));
+  const hasOverrides = Object.entries(overrideFlags).some(([w, on]) => on && !isCustomWbs(w)) || Object.keys(layout.factors ?? {}).length > 0;
   const showActuals  = !!currentProjectId && actualsOn;
   const actualByType = Object.entries(actualParts).reduce((acc, [wbs, p]) => {
     if (wbs === 'M.2') return acc;
@@ -2335,11 +2447,48 @@ ${sheets}
               className="w-full px-3 py-2.5 rounded-xl text-sm font-semibold focus:outline-none"
               style={{ backgroundColor: '#F9FAFB', border: '1.5px solid #E5E7EB', color: '#002147' }}>
               {(currentGroup?.types ?? []).map((typeId) => (
-                <option key={typeId} value={typeId}>{getProjectConfig(typeId)?.label ?? TYPE_BUTTON_LABELS[typeId]}</option>
+                <option key={typeId} value={typeId}>{getProjectConfig(typeId)?.label ?? TYPE_BUTTON_LABELS[typeId]}{myTemplates[typeId] ? ' — my template' : ''}</option>
               ))}
             </select>
           </div>
         </div>
+        {/* My template for this project type */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mt-4 pt-4 text-xs" style={{ borderTop: '1px solid #F3F4F6' }} data-testid="my-template">
+          {myTemplates[projectType] ? (
+            <span style={{ color: '#059669' }} className="font-semibold">
+              ✓ My template saved for {config.label}
+              {myTemplates[projectType].updatedAt ? ` (${new Date(myTemplates[projectType].updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })})` : ''}
+            </span>
+          ) : (
+            <span style={{ color: '#6B7280' }}>Using the Orozco Homes built-in template.</span>
+          )}
+          <button type="button" onClick={saveMyTemplate} disabled={templateMsg?.status === 'saving'}
+            className="px-3 py-1.5 rounded-lg font-bold focus:outline-none focus:ring-2 focus:ring-sky-300 disabled:opacity-60"
+            style={{ backgroundColor: '#002147', color: '#fff' }}>
+            {myTemplates[projectType] ? 'Update my template' : 'Save as my template'}
+          </button>
+          {myTemplates[projectType] && (
+            <>
+              <button type="button" onClick={applyMyTemplate}
+                className="px-3 py-1.5 rounded-lg font-bold focus:outline-none focus:ring-2 focus:ring-sky-300"
+                style={{ border: '1px solid #002147', color: '#002147', backgroundColor: '#fff' }}>
+                Apply my template
+              </button>
+              <button type="button" onClick={deleteMyTemplate} className="font-semibold hover:underline focus:outline-none" style={{ color: '#9CA3AF' }}>
+                Delete template
+              </button>
+            </>
+          )}
+          {templateMsg?.msg && templateMsg.status !== 'saving' && (
+            <span role={templateMsg.status === 'error' ? 'alert' : 'status'} className="font-semibold"
+              style={{ color: templateMsg.status === 'error' ? '#DC2626' : '#059669' }}>{templateMsg.msg}</span>
+          )}
+          <p className="w-full" style={{ color: '#9CA3AF' }}>
+            Your template keeps this budget's lines, names, prices, cost splits, trades, allowances, margin and contingency.
+            New {config.label} budgets start from it; size, actual costs, scopes and subcontractors stay with each job.
+          </p>
+        </div>
+
       </div>
 
       {/* Project parameters */}
@@ -2682,7 +2831,7 @@ ${sheets}
                       item={item}
                       divStyle={ds}
                       value={lineVals[item.wbs] ?? 0}
-                      isOverridden={!item.custom && !!overrideFlags[item.wbs]}
+                      isOverridden={!item.custom && (!!overrideFlags[item.wbs] || layout.factors?.[item.wbs] != null)}
                       onChange={(num) => handleLineChange(item.wbs, num)}
                       onReset={() => resetLine(item.wbs)}
                       pctRate={item.pctKey ? pctRates[item.pctKey] : null}
