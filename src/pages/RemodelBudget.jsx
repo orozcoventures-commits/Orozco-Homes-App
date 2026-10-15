@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { useSelectOnFocus } from '../hooks/useSelectOnFocus';
 import {
   REMODEL_CONFIGS,
   SPEC_LEVELS,
@@ -318,11 +319,12 @@ function NumberInput({ label, value, onChange, min, max, step, suffix }) {
 function DollarCell({ value, isOverridden, onChange, width = 110 }) {
   const [focused, setFocused] = useState(false);
   const [raw, setRaw]         = useState('');
+  const inputRef = useSelectOnFocus(focused);
   return (
     <div className="relative shrink-0" style={{ width }}>
       <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs pointer-events-none" style={{ color: '#9CA3AF' }}>$</span>
       <input
-        type="text" inputMode="numeric"
+        ref={inputRef} type="text" inputMode="numeric"
         value={focused ? raw : (Number(value) || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}
         onFocus={() => { setFocused(true); setRaw(String(Math.round(Number(value) || 0))); }}
         onBlur={() => setFocused(false)}
@@ -346,12 +348,13 @@ function DollarCell({ value, isOverridden, onChange, width = 110 }) {
 function ActualCell({ value, onChange, width = 110 }) {
   const [focused, setFocused] = useState(false);
   const [raw, setRaw]         = useState('');
+  const inputRef = useSelectOnFocus(focused);
   const filled = (Number(value) || 0) > 0;
   return (
     <div className="relative shrink-0" style={{ width }}>
       <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs pointer-events-none" style={{ color: '#9CA3AF' }}>$</span>
       <input
-        type="text" inputMode="numeric"
+        ref={inputRef} type="text" inputMode="numeric"
         value={focused ? raw : filled ? (Number(value) || 0).toLocaleString('en-US', { maximumFractionDigits: 0 }) : ''}
         placeholder="0"
         onFocus={() => { setFocused(true); setRaw(filled ? String(Math.round(Number(value))) : ''); }}

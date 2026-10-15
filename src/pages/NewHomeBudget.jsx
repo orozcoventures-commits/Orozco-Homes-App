@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useSelectOnFocus } from '../hooks/useSelectOnFocus';
 import { calculateNewHomeBudget, flattenBreakdown, SPEC_LEVELS } from '../utils/newHomeBudgetCalculator';
 
 // ── Static metadata ───────────────────────────────────────────────────────────
@@ -62,13 +63,14 @@ function sumKeys(obj, keys) { return keys.reduce((s, k) => s + (Number(obj[k]) |
 function TopCurrencyInput({ label, value, onChange, hint }) {
   const [focused, setFocused] = useState(false);
   const [raw, setRaw] = useState('');
+  const inputRef = useSelectOnFocus(focused);
   return (
     <div className="flex flex-col gap-1">
       <label className="text-xs font-semibold" style={{ color: '#374151' }}>{label}</label>
       <div className="relative">
         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium" style={{ color: '#9CA3AF' }}>$</span>
         <input
-          type="text" inputMode="numeric"
+          ref={inputRef} type="text" inputMode="numeric"
           value={focused ? raw : value.toLocaleString('en-US')}
           onFocus={() => { setFocused(true); setRaw(String(value || '')); }}
           onBlur={() => setFocused(false)}
@@ -103,12 +105,13 @@ function TopNumberInput({ label, value, onChange, min, max, step = 1, suffix }) 
 function DollarCell({ value, isOverridden, onChange }) {
   const [focused, setFocused] = useState(false);
   const [raw, setRaw]         = useState('');
+  const inputRef = useSelectOnFocus(focused);
 
   return (
     <div className="relative" style={{ width: '128px' }}>
       <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs pointer-events-none" style={{ color: '#9CA3AF' }}>$</span>
       <input
-        type="text" inputMode="numeric"
+        ref={inputRef} type="text" inputMode="numeric"
         value={focused ? raw : (Number(value) || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}
         onFocus={() => { setFocused(true); setRaw(String(Math.round(Number(value) || 0))); }}
         onBlur={() => setFocused(false)}
