@@ -99,8 +99,9 @@ function defaultInputs(projectTypeId) {
 // Each saved budget can rename or remove the built-in lines and add its own.
 // layout = { added: [{ id, div, label }], labels: { wbs: label }, removed: [wbs],
 //            splits: { wbs: { m, o } },     (cost breakdown %, see below)
-//            allowances: { wbs: { on, amount } } }  (client allowances, see below)
-const EMPTY_LAYOUT = { added: [], labels: {}, removed: [], splits: {}, allowances: {} };
+//            allowances: { wbs: { on, amount } },  (client allowances, see below)
+//            trades: { wbs: tradeKey } }          (Subs & Materials view, see below)
+const EMPTY_LAYOUT = { added: [], labels: {}, removed: [], splits: {}, allowances: {}, trades: {} };
 const MAX_LABEL = 120;
 
 function normalizeLayout(raw) {
@@ -122,6 +123,8 @@ function normalizeLayout(raw) {
         on: !!v.on,
         amount: v.amount == null || v.amount === '' || !Number.isFinite(Number(v.amount)) ? null : Math.max(0, Math.round(Number(v.amount))),
       }])),
+    trades: Object.fromEntries(Object.entries(l.trades && typeof l.trades === 'object' ? l.trades : {})
+      .filter(([, v]) => TRADE_KEYS.has(v))),
   };
 }
 
@@ -175,6 +178,63 @@ const roundTo50 = (n) => Math.round((Number(n) || 0) / 50) * 50;
 
 const lineSplit = (item, layout) => layout.splits?.[item.wbs] ?? defaultCostSplit(item.originalLabel ?? item.label);
 const splitAmounts = (value, sp) => ({ m: value * sp.m / 100, o: value * sp.o / 100, s: value * (100 - sp.m - sp.o) / 100 });
+
+// ── Subs & Materials view: trades ─────────────────────────────────────────────
+// Each line's Subcontract amount goes to one trade. The default comes from the
+// line's name (then its section's name); it can be changed per line and is
+// saved in layout.trades { wbs: tradeKey }. Listed in construction order.
+const TRADES = [
+  { key: 'demolition', label: 'Demolition' },
+  { key: 'concrete',   label: 'Concrete / Foundation' },
+  { key: 'framing',    label: 'Framing' },
+  { key: 'roofing',    label: 'Roofing' },
+  { key: 'windows',    label: 'Windows & Doors' },
+  { key: 'siding',     label: 'Siding & Exterior' },
+  { key: 'plumbing',   label: 'Plumbing (Rough-In + Finish)' },
+  { key: 'hvac',       label: 'HVAC' },
+  { key: 'electrical', label: 'Electrical (Rough-In + Finish)' },
+  { key: 'insulation', label: 'Insulation' },
+  { key: 'drywall',    label: 'Drywall' },
+  { key: 'tiling',     label: 'Tiling' },
+  { key: 'flooring',   label: 'Flooring' },
+  { key: 'carpentry',  label: 'Finish Carpentry / Cabinets' },
+  { key: 'painting',   label: 'Painting' },
+  { key: 'other',      label: 'Other sub work' },
+];
+const TRADE_KEYS = new Set(TRADES.map((t) => t.key));
+
+// First matching rule wins: [pattern, trade].
+const TRADE_RULES = [
+  [/permit|engineering|asbestos test|inspection/i,                                 'other'],
+  [/insulation [+&] drywall/i,                                                     'drywall'],
+  [/install, flash/i,                                                              'windows'],
+  [/demo|tear-out|haul|remov|scrape|debris|protection|masking|dust/i,              'demolition'],
+  [/tile|backsplash|shower pan|waterproof|cement board/i,                          'tiling'],
+  [/glass/i,                                                                       'other'],
+  [/footing|slab|concrete|foundation|paver|masonry|structural column/i,            'concrete'],
+  [/insulat|spray foam|vapor barrier|encapsul|seal vents/i,                        'insulation'],
+  [/fram|joist|beam|header|blocking|sheathing|subfloor|structural|shoring|widen doorway|infill/i, 'framing'],
+  [/hvac|mini-split|dehumidifier/i,                                                'hvac'],
+  [/casing/i,                                                                      'carpentry'],
+  [/window|door unit|exterior door|screen door|sill pan/i,                         'windows'],
+  [/countertop|vanity/i,                                                           'carpentry'],
+  [/plumb|drain|valve|faucet|toilet|\btub\b|sink|washer box|shower trim|handheld shower/i, 'plumbing'],
+  [/electric|circuit|outlet|light|switch|gfci|exhaust fan|pendant|ceiling fan|data/i, 'electrical'],
+  [/drywall|skim/i,                                                                'drywall'],
+  [/paint|stain|caulk|prime|sealer/i,                                              'painting'],
+  [/siding|housewrap|flashing|exterior finish|exterior trim|corners/i,             'siding'],
+  [/roof|soffit|fascia|chimney|gutter/i,                                           'roofing'],
+  [/floor|lvp|hardwood|transition|threshold|deck coating/i,                        'flooring'],
+  [/cabinet|millwork|trim|baseboard|molding|crown|wainscot|accent wall|shelving|closet|drawer|built-in|bench|hardware|lockset|stair|tread|riser|newel|railing|baluster|desk|mirror|accessor|grab bar|end panel|beadboard|door|decking|package/i, 'carpentry'],
+];
+function defaultTrade(label, divLabel) {
+  if (/^painting$/i.test(divLabel ?? '')) return 'painting';
+  const byName = TRADE_RULES.find(([re]) => re.test(label ?? ''));
+  if (byName) return byName[1];
+  const byDiv = TRADE_RULES.find(([re]) => re.test(divLabel ?? ''));
+  return byDiv ? byDiv[1] : 'other';
+}
+const lineTrade = (item, div, layout) => layout.trades?.[item.wbs] ?? defaultTrade(item.originalLabel ?? item.label, div.label);
 
 const layoutIsEmpty = (l) => !l.added.length && !l.removed.length && !Object.keys(l.labels).length;
 
@@ -745,6 +805,130 @@ function ChangeOrdersSection({ changeOrders, total, cost, margin, marginPct, isO
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
+// ── Subs & Materials view ─────────────────────────────────────────────────────
+// The same direct costs, grouped the way a GC buys them: work bought from
+// subcontractors (by trade) and materials bought directly (by section).
+function SubsMaterialsView({ data, onTradeChange }) {
+  const { trades, materials, fees, designSpecsTotal, changeOrderCost, subTotal, materialTotal, feeTotal, directCosts } = data;
+  const used = new Set(trades.map((t) => t.key));
+  const notUsed = TRADES.filter((t) => t.key !== 'other' && !used.has(t.key));
+  const card = { backgroundColor: '#fff', border: '1.5px solid #E5E7EB', boxShadow: '0 2px 12px rgba(0,33,71,0.05)' };
+  return (
+    <div className="space-y-4" data-testid="subs-materials-view">
+      {/* Section 1 — Subcontractor work */}
+      <section className="rounded-2xl overflow-hidden" style={{ ...card, borderColor: '#BAE6FD' }} aria-labelledby="sm-subs">
+        <div className="flex items-center justify-between gap-3 px-5 py-4" style={{ backgroundColor: '#F0F9FF' }}>
+          <div className="flex items-center gap-3">
+            <span className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-extrabold shrink-0" style={{ backgroundColor: '#0369A1', color: '#fff' }}>1</span>
+            <h2 id="sm-subs" className="text-sm font-bold" style={{ color: '#0369A1' }}>Subcontractor Work — by trade</h2>
+          </div>
+          <span className="text-sm font-extrabold" style={{ color: '#0369A1' }}>{fmt(subTotal)}</span>
+        </div>
+        {trades.length === 0 ? (
+          <p className="px-5 py-4 text-xs" style={{ color: '#9CA3AF' }}>No subcontract amounts in this budget.</p>
+        ) : trades.map((t) => (
+          <div key={t.key} style={{ borderTop: '1px solid #E0F2FE' }}>
+            <div className="flex items-center justify-between px-5 py-2.5" style={{ backgroundColor: '#FAFDFF' }}>
+              <span className="text-sm font-bold" style={{ color: '#002147' }}>{t.label}</span>
+              <span className="text-sm font-extrabold" style={{ color: '#002147' }}>{fmt(t.total)}</span>
+            </div>
+            {t.lines.map((l) => (
+              <div key={l.item.wbs} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-2 text-sm" style={{ borderTop: '1px solid #F3F4F6' }}>
+                <div className="flex-1 min-w-[10rem]">
+                  <span style={{ color: '#374151' }}>{l.item.label}</span>
+                  <span className="text-xs" style={{ color: '#9CA3AF' }}> · {l.div.label}{l.pct < 100 ? ` · ${l.pct}% of ${fmt(l.lineTotal)} line` : ''}</span>
+                </div>
+                <label className="sr-only" htmlFor={`trade-${l.item.wbs}`}>Trade for {l.item.label}</label>
+                <select id={`trade-${l.item.wbs}`} value={t.key} onChange={(e) => onTradeChange(l.item, l.div, e.target.value)}
+                  className="text-xs rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-sky-300"
+                  style={{ border: '1px solid #D1D5DB', color: l.isDefault ? '#6B7280' : '#0369A1', fontWeight: l.isDefault ? 400 : 700, backgroundColor: '#fff' }}>
+                  {TRADES.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
+                </select>
+                <span className="w-24 text-right font-semibold" style={{ color: '#002147' }}>{fmt(l.amount)}</span>
+              </div>
+            ))}
+          </div>
+        ))}
+        {notUsed.length > 0 && (
+          <p className="px-5 py-2.5 text-xs" style={{ borderTop: '1px solid #E0F2FE', color: '#9CA3AF' }}>
+            Not in this budget: {notUsed.map((t) => t.label).join(', ')}.
+          </p>
+        )}
+      </section>
+
+      {/* Section 2 — Materials */}
+      <section className="rounded-2xl overflow-hidden" style={{ ...card, borderColor: '#FDE68A' }} aria-labelledby="sm-mats">
+        <div className="flex items-center justify-between gap-3 px-5 py-4" style={{ backgroundColor: '#FFFBEB' }}>
+          <div className="flex items-center gap-3">
+            <span className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-extrabold shrink-0" style={{ backgroundColor: '#B45309', color: '#fff' }}>2</span>
+            <h2 id="sm-mats" className="text-sm font-bold" style={{ color: '#B45309' }}>Materials — by section</h2>
+          </div>
+          <span className="text-sm font-extrabold" style={{ color: '#B45309' }}>{fmt(materialTotal)}</span>
+        </div>
+        {materials.length === 0 && designSpecsTotal <= 0 ? (
+          <p className="px-5 py-4 text-xs" style={{ color: '#9CA3AF' }}>No material amounts in this budget.</p>
+        ) : (
+          <>
+            {materials.map((g) => (
+              <div key={g.div.key} style={{ borderTop: '1px solid #FEF3C7' }}>
+                <div className="flex items-center justify-between px-5 py-2.5" style={{ backgroundColor: '#FFFDF7' }}>
+                  <span className="text-sm font-bold" style={{ color: '#002147' }}>{g.div.label}</span>
+                  <span className="text-sm font-extrabold" style={{ color: '#002147' }}>{fmt(g.total)}</span>
+                </div>
+                {g.lines.map((l) => (
+                  <div key={l.item.wbs} className="flex items-center gap-3 px-5 py-2 text-sm" style={{ borderTop: '1px solid #F3F4F6' }}>
+                    <span className="flex-1" style={{ color: '#374151' }}>{l.item.label}</span>
+                    <span className="w-24 text-right font-semibold" style={{ color: '#002147' }}>{fmt(l.amount)}</span>
+                  </div>
+                ))}
+              </div>
+            ))}
+            {designSpecsTotal > 0 && (
+              <div className="flex items-center justify-between px-5 py-2.5" style={{ borderTop: '1px solid #FEF3C7', backgroundColor: '#FFFDF7' }}>
+                <span className="text-sm font-bold" style={{ color: '#002147' }}>Approved Design Selections</span>
+                <span className="text-sm font-extrabold" style={{ color: '#002147' }}>{fmt(designSpecsTotal)}</span>
+              </div>
+            )}
+          </>
+        )}
+      </section>
+
+      {/* Other costs, so the two sections add up to Direct Costs */}
+      {(feeTotal > 0 || changeOrderCost > 0) && (
+        <section className="rounded-2xl overflow-hidden" style={card} aria-labelledby="sm-other">
+          <div className="flex items-center justify-between gap-3 px-5 py-3" style={{ backgroundColor: '#F9FAFB' }}>
+            <h2 id="sm-other" className="text-sm font-bold" style={{ color: '#4B5563' }}>Other Costs — permits, fees &amp; change orders</h2>
+            <span className="text-sm font-extrabold" style={{ color: '#4B5563' }}>{fmt(feeTotal + changeOrderCost)}</span>
+          </div>
+          {fees.map((l) => (
+            <div key={l.item.wbs} className="flex items-center gap-3 px-5 py-2 text-sm" style={{ borderTop: '1px solid #F3F4F6' }}>
+              <span className="flex-1" style={{ color: '#374151' }}>{l.item.label} <span className="text-xs" style={{ color: '#9CA3AF' }}>· {l.div.label}</span></span>
+              <span className="w-24 text-right font-semibold" style={{ color: '#002147' }}>{fmt(l.amount)}</span>
+            </div>
+          ))}
+          {changeOrderCost > 0 && (
+            <div className="flex items-center gap-3 px-5 py-2 text-sm" style={{ borderTop: '1px solid #F3F4F6' }}>
+              <span className="flex-1" style={{ color: '#374151' }}>Approved change orders (cost)</span>
+              <span className="w-24 text-right font-semibold" style={{ color: '#002147' }}>{fmt(changeOrderCost)}</span>
+            </div>
+          )}
+        </section>
+      )}
+
+      <div className="flex items-center justify-between px-5 py-3 rounded-2xl" style={{ backgroundColor: '#F8F9FB', border: '1px solid #E5E7EB' }}>
+        <span className="text-xs font-bold tracking-wide" style={{ color: '#002147' }}>
+          Subcontractors + Materials{feeTotal + changeOrderCost > 0 ? ' + Other' : ''} = Direct Costs
+        </span>
+        <span className="text-sm font-extrabold" style={{ color: '#002147' }} data-testid="sm-direct-total">{fmt(directCosts)}</span>
+      </div>
+      <p className="text-xs px-1" style={{ color: '#9CA3AF' }}>
+        Internal only. Each line is split into materials and subcontract using its cost breakdown — change a line's
+        split in the Phase view with "Show cost breakdown" on. Change a line's trade with the drop-down; it saves with the budget.
+      </p>
+    </div>
+  );
+}
+
 export default function RemodelBudget() {
   const { state: projectState, dispatch } = useProject();
   // Used only to pre-populate the picker when admin arrives from a project view
@@ -786,6 +970,9 @@ export default function RemodelBudget() {
   const [openActual,     setOpenActual]     = useState(null); // wbs whose breakdown is open
   const [actualsOn,      setActualsOn]      = useState(true);
   const [breakdownOn,    setBreakdownOn]    = useState(false);   // Materials / Subcontract / Other view
+  const [viewMode,       setViewMode]       = useState(() => {   // 'phase' | 'trade' (Subs & Materials)
+    try { return localStorage.getItem('rb-view-mode') === 'trade' ? 'trade' : 'phase'; } catch { return 'phase'; }
+  });
   const [actualsError,   setActualsError]   = useState('');
   const actualVals = useMemo(
     () => Object.fromEntries(Object.entries(actualParts).map(([wbs, p]) => [wbs, partsTotal(p)])),
@@ -1170,6 +1357,19 @@ export default function RemodelBudget() {
       return { ...l, allowances };
     });
   }
+  function changeViewMode(mode) {
+    setViewMode(mode);
+    try { localStorage.setItem('rb-view-mode', mode); } catch { /* storage unavailable */ }
+  }
+  function setLineTrade(item, div, trade) {
+    if (!TRADE_KEYS.has(trade)) return;
+    const def = defaultTrade(item.originalLabel ?? item.label, div.label);
+    setLayout((l) => {
+      const trades = { ...(l.trades ?? {}) };
+      if (trade === def) delete trades[item.wbs]; else trades[item.wbs] = trade;
+      return { ...l, trades };
+    });
+  }
   function setLineSplit(item, split) {
     const sp = clampSplit(split);
     const def = defaultCostSplit(item.originalLabel ?? item.label);
@@ -1206,6 +1406,36 @@ export default function RemodelBudget() {
     const b = divBreakdown(div);
     return { m: acc.m + b.m, s: acc.s + b.s, o: acc.o + b.o };
   }, { m: designSpecsTotal, s: 0, o: 0 }) : { m: 0, s: 0, o: 0 };
+  // Subs & Materials view: subcontract amounts by trade, materials by section.
+  const subsMaterials = (() => {
+    if (!config) return null;
+    const byTrade = {}; const materials = []; const fees = [];
+    for (const div of config.divisions) {
+      const mats = [];
+      for (const item of div.items) {
+        if (item.unit === 'pct') continue;
+        const lineTotal = lineVals[item.wbs] ?? 0;
+        const sp = lineSplit(item, layout);
+        const b = splitAmounts(lineTotal, sp);
+        if (b.s > 0) {
+          const trade = lineTrade(item, div, layout);
+          (byTrade[trade] ??= []).push({ item, div, amount: b.s, lineTotal, pct: 100 - sp.m - sp.o, isDefault: !layout.trades?.[item.wbs] });
+        }
+        if (b.m > 0) mats.push({ item, amount: b.m });
+        if (b.o > 0) fees.push({ item, div, amount: b.o });
+      }
+      if (mats.length) materials.push({ div, lines: mats, total: mats.reduce((s, l) => s + l.amount, 0) });
+    }
+    const trades = TRADES.filter((t) => byTrade[t.key]).map((t) => ({
+      ...t, lines: byTrade[t.key], total: byTrade[t.key].reduce((s, l) => s + l.amount, 0),
+    }));
+    const sum = (arr) => arr.reduce((s, x) => s + (x.total ?? x.amount), 0);
+    return {
+      trades, materials, fees, designSpecsTotal, changeOrderCost: totals.changeOrderCost || 0,
+      subTotal: sum(trades), materialTotal: sum(materials) + designSpecsTotal, feeTotal: sum(fees),
+      directCosts: totals.directCosts,
+    };
+  })();
   const spentByType = { m: actualByType.material, s: actualByType.sub + actualByType.labor, o: actualByType.other };
 
   // Client allowances (shown on proposals and contracts).
@@ -1931,6 +2161,32 @@ export default function RemodelBudget() {
         </div>
       )}
 
+      {/* View by: Phase (the budget sections) | Subs & Materials (by trade) */}
+      <div className="flex items-center gap-3 px-1 mb-3 flex-wrap">
+        <span className="text-xs font-bold uppercase tracking-wide" style={{ color: '#6B7280' }} id="rb-view-label">View by</span>
+        <div role="radiogroup" aria-labelledby="rb-view-label" className="inline-flex rounded-xl p-0.5" style={{ backgroundColor: '#EEF0F3' }}>
+          {[['phase', 'Phase'], ['trade', 'Subs & Materials']].map(([mode, label]) => (
+            <button key={mode} type="button" role="radio" aria-checked={viewMode === mode} onClick={() => changeViewMode(mode)}
+              className="px-3.5 py-1.5 text-xs font-bold rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-sky-300"
+              style={viewMode === mode
+                ? { backgroundColor: '#002147', color: '#fff' }
+                : { backgroundColor: 'transparent', color: '#4B5563' }}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {viewMode === 'trade' && subsMaterials && (
+        <>
+          {layoutError && (
+            <p role="alert" className="px-4 mb-2 text-xs font-semibold" style={{ color: '#DC2626' }}>{layoutError}</p>
+          )}
+          <SubsMaterialsView data={subsMaterials} onTradeChange={setLineTrade} />
+        </>
+      )}
+
+      {viewMode === 'phase' && (<>
       {/* Actuals + cost breakdown switches, column headers (headers on desktop only) */}
       <div className="flex items-center gap-4 px-4 pb-1 mb-0.5 flex-wrap">
         {currentProjectId && (
@@ -2140,6 +2396,7 @@ export default function RemodelBudget() {
           );
         })}
       </div>
+      </>)}
 
       {/* Grand total footer — reads left to right like the pricing formula:
           Direct + Contingency = Total Project Cost; ÷ (1 − margin) = Client Price */}
