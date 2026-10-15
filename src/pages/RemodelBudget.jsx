@@ -11,6 +11,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { useProject } from '../context/ProjectContext';
 import { buildContractPrefill, buildProposalPrefill } from '../utils/contractPrefill';
+import { starterScope, MAX_SCOPE } from '../utils/tradeScopes';
 
 // ── Project type groupings ────────────────────────────────────────────────────
 
@@ -100,8 +101,9 @@ function defaultInputs(projectTypeId) {
 // layout = { added: [{ id, div, label }], labels: { wbs: label }, removed: [wbs],
 //            splits: { wbs: { m, o } },     (cost breakdown %, see below)
 //            allowances: { wbs: { on, amount } },  (client allowances, see below)
-//            trades: { wbs: tradeKey } }          (Subs & Materials view, see below)
-const EMPTY_LAYOUT = { added: [], labels: {}, removed: [], splits: {}, allowances: {}, trades: {} };
+//            trades: { wbs: tradeKey },           (Subs & Materials view, see below)
+//            scopes: { tradeKey: text } }         (this budget's Scope of Work per trade)
+const EMPTY_LAYOUT = { added: [], labels: {}, removed: [], splits: {}, allowances: {}, trades: {}, scopes: {} };
 const MAX_LABEL = 120;
 
 function normalizeLayout(raw) {
@@ -125,6 +127,9 @@ function normalizeLayout(raw) {
       }])),
     trades: Object.fromEntries(Object.entries(l.trades && typeof l.trades === 'object' ? l.trades : {})
       .filter(([, v]) => TRADE_KEYS.has(v))),
+    scopes: Object.fromEntries(Object.entries(l.scopes && typeof l.scopes === 'object' ? l.scopes : {})
+      .filter(([k, v]) => TRADE_KEYS.has(k) && typeof v === 'string')
+      .map(([k, v]) => [k, v.slice(0, MAX_SCOPE)])),
   };
 }
 
@@ -808,7 +813,62 @@ function ChangeOrdersSection({ changeOrders, total, cost, margin, marginPct, isO
 // ── Subs & Materials view ─────────────────────────────────────────────────────
 // The same direct costs, grouped the way a GC buys them: work bought from
 // subcontractors (by trade) and materials bought directly (by section).
-function SubsMaterialsView({ data, onTradeChange }) {
+// Scope of Work for one trade: this budget's copy, or the default (saved
+// default, else the built-in starter). Edits save with the budget.
+function TradeScope({ trade, scope }) {
+  const [open, setOpen] = useState(false);
+  const text = scope.of(trade.key);
+  const edited = scope.isEdited(trade.key);
+  const save = scope.saveState[trade.key];
+  const id = `scope-${trade.key}`;
+  return (
+    <div className="px-5 py-2" style={{ borderTop: '1px solid #F3F4F6', backgroundColor: open ? '#FAFDFF' : '#fff' }}>
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-controls={id}
+        className="flex items-center gap-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-sky-300 rounded" style={{ color: '#0369A1' }}>
+        <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+          style={{ transition: 'transform 0.2s', transform: open ? 'rotate(90deg)' : 'none' }} aria-hidden="true"><polyline points="4 1 8 6 4 11" /></svg>
+        Scope of work
+        <span className="font-semibold px-1.5 py-0.5 rounded" style={edited
+          ? { backgroundColor: '#E0F2FE', color: '#0369A1' }
+          : { backgroundColor: '#F3F4F6', color: '#6B7280' }}>
+          {edited ? 'Edited for this budget' : (scope.hasSavedDefault(trade.key) ? 'My default' : 'Starter')}
+        </span>
+      </button>
+      {open && (
+        <div id={id} className="mt-2">
+          <label className="sr-only" htmlFor={`${id}-text`}>Scope of work for {trade.label}</label>
+          <textarea id={`${id}-text`} value={text} maxLength={MAX_SCOPE} rows={9}
+            onChange={(e) => scope.onChange(trade.key, e.target.value)}
+            className="w-full text-sm rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-300"
+            style={{ border: '1px solid #D1D5DB', color: '#374151', lineHeight: 1.5 }} />
+          <div className="flex flex-wrap items-center gap-2 mt-1.5">
+            <button type="button" onClick={() => scope.onSaveDefault(trade.key)} disabled={save?.status === 'saving'}
+              className="px-3 py-1.5 rounded-lg text-xs font-bold focus:outline-none focus:ring-2 focus:ring-sky-300 disabled:opacity-60"
+              style={{ backgroundColor: '#0369A1', color: '#fff' }}>
+              {save?.status === 'saving' ? 'Saving…' : 'Save as my default scope'}
+            </button>
+            {edited && (
+              <button type="button" onClick={() => scope.onReset(trade.key)}
+                className="px-3 py-1.5 rounded-lg text-xs font-bold focus:outline-none focus:ring-2 focus:ring-sky-300"
+                style={{ border: '1px solid #D1D5DB', color: '#4B5563', backgroundColor: '#fff' }}>
+                Use my default
+              </button>
+            )}
+            {save?.msg && (
+              <span role={save.status === 'error' ? 'alert' : 'status'} className="text-xs font-semibold"
+                style={{ color: save.status === 'error' ? '#DC2626' : '#059669' }}>{save.msg}</span>
+            )}
+          </div>
+          <p className="text-xs mt-1" style={{ color: '#9CA3AF' }}>
+            Changes here save with this budget only. "Save as my default scope" makes this the starting scope for {trade.label} on every budget you haven't edited.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SubsMaterialsView({ data, onTradeChange, scope }) {
   const { trades, materials, fees, designSpecsTotal, changeOrderCost, subTotal, materialTotal, feeTotal, directCosts } = data;
   const used = new Set(trades.map((t) => t.key));
   const notUsed = TRADES.filter((t) => t.key !== 'other' && !used.has(t.key));
@@ -832,6 +892,7 @@ function SubsMaterialsView({ data, onTradeChange }) {
               <span className="text-sm font-bold" style={{ color: '#002147' }}>{t.label}</span>
               <span className="text-sm font-extrabold" style={{ color: '#002147' }}>{fmt(t.total)}</span>
             </div>
+            <TradeScope trade={t} scope={scope} />
             {t.lines.map((l) => (
               <div key={l.item.wbs} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-2 text-sm" style={{ borderTop: '1px solid #F3F4F6' }}>
                 <div className="flex-1 min-w-[10rem]">
@@ -924,6 +985,7 @@ function SubsMaterialsView({ data, onTradeChange }) {
       <p className="text-xs px-1" style={{ color: '#9CA3AF' }}>
         Internal only. Each line is split into materials and subcontract using its cost breakdown — change a line's
         split in the Phase view with "Show cost breakdown" on. Change a line's trade with the drop-down; it saves with the budget.
+        Open "Scope of work" under any trade to describe the work for that subcontractor.
       </p>
     </div>
   );
@@ -974,6 +1036,8 @@ export default function RemodelBudget() {
     try { return localStorage.getItem('rb-view-mode') === 'trade' ? 'trade' : 'phase'; } catch { return 'phase'; }
   });
   const [actualsError,   setActualsError]   = useState('');
+  const [scopeDefaults,  setScopeDefaults]  = useState({});      // trade → saved default Scope of Work
+  const [scopeSave,      setScopeSave]      = useState({});      // trade → { status, msg }
   const actualVals = useMemo(
     () => Object.fromEntries(Object.entries(actualParts).map(([wbs, p]) => [wbs, partsTotal(p)])),
     [actualParts]
@@ -1215,7 +1279,7 @@ export default function RemodelBudget() {
   function changeProjectType(typeId) {
     if (typeId !== projectType && !layoutIsEmpty(layout)
       && !confirm('Changing the project type starts a new list of lines. Your added, renamed and removed lines will be cleared. Continue?')) return;
-    setLayout(EMPTY_LAYOUT);
+    setLayout((l) => ({ ...EMPTY_LAYOUT, scopes: l.scopes ?? {} }));   // scopes are per trade, not per line
     setProjectType(typeId);
     setInputs(defaultInputs(typeId));
     setPctRates(DEFAULT_PCT_RATES);
@@ -1357,6 +1421,49 @@ export default function RemodelBudget() {
       return { ...l, allowances };
     });
   }
+  // Default Scope of Work per trade (migration 053). Without the table the
+  // built-in starter scopes are used.
+  useEffect(() => {
+    let live = true;
+    supabase.from('trade_scope_templates').select('trade_key, scope').then(({ data, error }) => {
+      if (live && !error && Array.isArray(data)) setScopeDefaults(Object.fromEntries(data.map((r) => [r.trade_key, r.scope])));
+    });
+    return () => { live = false; };
+  }, []);
+  const defaultScopeOf = (trade) => scopeDefaults[trade] ?? starterScope(trade);
+  function setTradeScope(trade, text) {
+    setLayout((l) => ({ ...l, scopes: { ...(l.scopes ?? {}), [trade]: String(text).slice(0, MAX_SCOPE) } }));
+    setScopeSave((p) => ({ ...p, [trade]: undefined }));
+  }
+  function resetTradeScope(trade) {
+    setLayout((l) => {
+      const scopes = { ...(l.scopes ?? {}) };
+      delete scopes[trade];
+      return { ...l, scopes };
+    });
+  }
+  async function saveDefaultScope(trade) {
+    const text = layout.scopes?.[trade] ?? defaultScopeOf(trade);
+    setScopeSave((p) => ({ ...p, [trade]: { status: 'saving' } }));
+    const { error } = await supabase.from('trade_scope_templates').upsert({ trade_key: trade, scope: text }, { onConflict: 'trade_key' });
+    if (error) {
+      const missing = /trade_scope_templates|schema cache|does not exist/i.test(error.message ?? '');
+      setScopeSave((p) => ({ ...p, [trade]: { status: 'error', msg: missing ? 'Not saved — run migration 053 in Supabase first.' : `Not saved: ${error.message}` } }));
+      return;
+    }
+    setScopeDefaults((d) => ({ ...d, [trade]: text }));
+    resetTradeScope(trade);   // this budget now follows the new default
+    setScopeSave((p) => ({ ...p, [trade]: { status: 'saved', msg: 'Saved as your default scope.' } }));
+  }
+  const scopeApi = {
+    of: (trade) => layout.scopes?.[trade] ?? defaultScopeOf(trade),
+    isEdited: (trade) => layout.scopes?.[trade] != null,
+    hasSavedDefault: (trade) => scopeDefaults[trade] != null,
+    saveState: scopeSave,
+    onChange: setTradeScope,
+    onReset: resetTradeScope,
+    onSaveDefault: saveDefaultScope,
+  };
   function changeViewMode(mode) {
     setViewMode(mode);
     try { localStorage.setItem('rb-view-mode', mode); } catch { /* storage unavailable */ }
@@ -2182,7 +2289,7 @@ export default function RemodelBudget() {
           {layoutError && (
             <p role="alert" className="px-4 mb-2 text-xs font-semibold" style={{ color: '#DC2626' }}>{layoutError}</p>
           )}
-          <SubsMaterialsView data={subsMaterials} onTradeChange={setLineTrade} />
+          <SubsMaterialsView data={subsMaterials} onTradeChange={setLineTrade} scope={scopeApi} />
         </>
       )}
 
