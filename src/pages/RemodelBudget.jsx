@@ -13,6 +13,7 @@ import { useProject } from '../context/ProjectContext';
 import { buildContractPrefill, buildProposalPrefill } from '../utils/contractPrefill';
 import { starterScope, MAX_SCOPE } from '../utils/tradeScopes';
 import { coiStatus, formatCoiDate, openCoi } from '../lib/subcontractorDirectory';
+import { PROPOSAL_FIELDS } from '../utils/proposalTemplate';
 
 // ── Project type groupings ────────────────────────────────────────────────────
 
@@ -958,7 +959,7 @@ function TradeScope({ trade, scope }) {
   );
 }
 
-function SubsMaterialsView({ data, onTradeChange, scope, subs }) {
+function SubsMaterialsView({ data, onTradeChange, scope, subs, sheets }) {
   const { trades, materials, fees, designSpecsTotal, changeOrderCost, subTotal, materialTotal, feeTotal, directCosts } = data;
   const used = new Set(trades.map((t) => t.key));
   const notUsed = TRADES.filter((t) => t.key !== 'other' && !used.has(t.key));
@@ -989,13 +990,32 @@ function SubsMaterialsView({ data, onTradeChange, scope, subs }) {
             {coiMissing > 0 && <span>{coiMissing} with no COI on file</span>}
           </p>
         )}
+        {trades.length > 0 && (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-5 py-2 text-xs" style={{ borderTop: '1px solid #E0F2FE' }}>
+            <button type="button" onClick={() => sheets.print(trades.map((t) => t.key))}
+              className="px-3 py-1.5 rounded-lg font-bold focus:outline-none focus:ring-2 focus:ring-sky-300"
+              style={{ border: '1px solid #0369A1', color: '#0369A1', backgroundColor: '#fff' }}>
+              Print all trade sheets
+            </button>
+            <label className="flex items-center gap-1.5" style={{ color: '#4B5563' }}>
+              <input type="checkbox" checked={sheets.amounts} onChange={(e) => sheets.setAmounts(e.target.checked)} />
+              Show amounts on trade sheets
+            </label>
+          </div>
+        )}
         {trades.length === 0 ? (
           <p className="px-5 py-4 text-xs" style={{ color: '#9CA3AF' }}>No subcontract amounts in this budget.</p>
         ) : trades.map((t) => (
           <div key={t.key} style={{ borderTop: '1px solid #E0F2FE' }}>
             <div className="flex items-center justify-between px-5 py-2.5" style={{ backgroundColor: '#FAFDFF' }}>
               <span className="text-sm font-bold" style={{ color: '#002147' }}>{t.label}</span>
-              <span className="text-sm font-extrabold" style={{ color: '#002147' }}>{fmt(t.total)}</span>
+              <span className="flex items-center gap-3">
+                <button type="button" onClick={() => sheets.print([t.key])} aria-label={`Print trade sheet for ${t.label}`}
+                  className="text-xs font-bold hover:underline focus:outline-none focus:ring-2 focus:ring-sky-300 rounded" style={{ color: '#0369A1' }}>
+                  Trade sheet
+                </button>
+                <span className="text-sm font-extrabold" style={{ color: '#002147' }}>{fmt(t.total)}</span>
+              </span>
             </div>
             <TradeSub trade={t} subs={subs} />
             <TradeScope trade={t} scope={scope} />
@@ -1147,6 +1167,9 @@ export default function RemodelBudget() {
   const [scopeSave,      setScopeSave]      = useState({});      // trade → { status, msg }
   const [subDirectory,   setSubDirectory]   = useState(null);    // subcontractor_directory rows (null = loading)
   const [subDirError,    setSubDirError]    = useState('');
+  const [showSheetAmounts, setShowSheetAmounts] = useState(() => {   // budget amounts on trade sheets (off by default)
+    try { return localStorage.getItem('rb-sheet-amounts') === '1'; } catch { return false; }
+  });
   const actualVals = useMemo(
     () => Object.fromEntries(Object.entries(actualParts).map(([wbs, p]) => [wbs, partsTotal(p)])),
     [actualParts]
@@ -1565,6 +1588,14 @@ export default function RemodelBudget() {
     list: subDirectory,
     assigned: (trade) => layout.subs?.[trade],
     onAssign: assignTradeSub,
+  };
+  const sheetsApi = {
+    amounts: showSheetAmounts,
+    setAmounts: (on) => {
+      setShowSheetAmounts(on);
+      try { localStorage.setItem('rb-sheet-amounts', on ? '1' : '0'); } catch { /* storage unavailable */ }
+    },
+    print: (keys) => handleTradeSheets(keys),
   };
   const defaultScopeOf = (trade) => scopeDefaults[trade] ?? starterScope(trade);
   function setTradeScope(trade, text) {
@@ -2078,6 +2109,99 @@ export default function RemodelBudget() {
     if (win) { win.document.write(html); win.document.close(); }
   }
 
+  // ── Trade sheets (Subs & Materials) ─────────────────────────────────────────
+  // One printable page per trade for the subcontractor: project, scope of
+  // work, work items, who supplies materials, acceptance lines. Budget amounts
+  // only when "Show amounts on trade sheets" is ticked.
+  function handleTradeSheets(tradeKeys) {
+    if (!subsMaterials) return;
+    const dateStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    const money = (n) => '$' + Math.round(Number(n) || 0).toLocaleString('en-US');
+    const company = Object.fromEntries(PROPOSAL_FIELDS.filter((f) => f.section === 'company').map((f) => [f.key, f.defaultValue ?? '']));
+    const projectName = currentProjectName ?? config.label;
+    const trades = subsMaterials.trades.filter((t) => tradeKeys.includes(t.key));
+    if (!trades.length) return;
+    const sheets = trades.map((t) => {
+      const pick = layout.subs?.[t.key];
+      const sub = pick ? subDirectory?.find((s) => s.id === pick.id) : null;
+      const coi = sub ? coiState(sub.coi_expires_on) : null;
+      const subName = sub ? subLabel(sub) : pick?.name ?? '';
+      const subHTML = subName
+        ? `<strong>${escHtml(subName)}</strong>${sub?.name && sub.name !== subName ? `<br>${escHtml(sub.name)}` : ''}
+           ${sub?.phone?.[0] ? `<br>${escHtml(sub.phone[0])}` : ''}${sub?.email?.[0] ? `<br>${escHtml(sub.email[0])}` : ''}
+           ${sub ? `<br><span class="coi ${coi}">${escHtml(COI_CHIP[coi].label)}${sub.coi_expires_on ? ` · ${coi === 'expired' ? 'expired' : 'expires'} ${escHtml(formatCoiDate(sub.coi_expires_on))}` : ''}</span>` : ''}`
+        : '<span class="blank">Not assigned</span>';
+      const rows = t.lines.map((l) => {
+        const m = lineBreakdown(l.item).m;
+        return `<tr><td>${escHtml(l.item.label)}</td><td class="muted">${escHtml(l.div.label)}</td>
+          <td>${m > 0.5 ? 'Orozco Homes' : 'Subcontractor'}</td>${showSheetAmounts ? `<td class="amount">${money(l.amount)}</td>` : ''}</tr>`;
+      }).join('');
+      return `<section class="sheet">
+  <div class="header">
+    <div><div class="brand-name">Orozco Homes</div><div class="brand-sub">Design &amp; Construction · Virginia Beach, VA</div></div>
+    <div class="doc-meta"><strong>Trade Sheet — ${escHtml(t.label)}</strong>${dateStr}</div>
+  </div>
+  <div class="info">
+    <div><div class="label">Project</div><strong>${escHtml(projectName)}</strong><br><span class="muted">${escHtml(config.label)}</span></div>
+    <div><div class="label">Subcontractor</div>${subHTML}</div>
+    <div><div class="label">Orozco Homes contact</div>${escHtml(company.company_rep_name)}${company.company_rep_title ? `, ${escHtml(company.company_rep_title)}` : ''}<br>${escHtml(company.company_phone)}<br>${escHtml(company.company_email)}</div>
+  </div>
+  <h2>Scope of Work</h2>
+  <div class="scope">${escHtml(scopeApi.of(t.key)) || '<span class="blank">No scope written yet.</span>'}</div>
+  <h2>Work Items</h2>
+  <table>
+    <thead><tr><th>Item</th><th>Section</th><th>Materials supplied by</th>${showSheetAmounts ? '<th class="amount">Amount</th>' : ''}</tr></thead>
+    <tbody>${rows}</tbody>
+    ${showSheetAmounts ? `<tfoot><tr><td colspan="3" class="amount-label">Total — ${escHtml(t.label)}</td><td class="amount">${money(t.total)}</td></tr></tfoot>` : ''}
+  </table>
+  <h2>Acceptance</h2>
+  <p class="small">The subcontractor agrees to perform the scope above in a workmanlike manner, per code and manufacturer instructions, and to keep a current certificate of insurance on file with Orozco Homes.</p>
+  <div class="sign">
+    <div><div class="line"></div>Subcontractor signature</div>
+    <div><div class="line"></div>Printed name</div>
+    <div><div class="line"></div>Date</div>
+  </div>
+  <p class="foot">Orozco Homes · ${escHtml(company.company_license)} · ${escHtml(company.company_phone)} · ${escHtml(company.company_email)}</p>
+</section>`;
+    }).join('');
+    const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Orozco Homes — Trade Sheet${trades.length > 1 ? 's' : ''}</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:10.5pt;color:#1A1A1A;padding:40px 48px;max-width:820px;margin:0 auto}
+  .sheet + .sheet{margin-top:48px;padding-top:40px;border-top:1px dashed #D1D5DB}
+  .header{display:flex;align-items:center;justify-content:space-between;padding-bottom:16px;border-bottom:2.5px solid #002147;margin-bottom:16px}
+  .brand-name{font-size:17pt;font-weight:900;color:#002147}
+  .brand-sub{font-size:8pt;color:#6B7280;text-transform:uppercase;letter-spacing:.12em;font-weight:600}
+  .doc-meta{text-align:right;font-size:8pt;color:#6B7280}
+  .doc-meta strong{display:block;font-size:11pt;color:#002147;margin-bottom:2px}
+  .info{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;padding:12px 14px;background:#F8F9FB;border:1px solid #E5E7EB;border-radius:8px;font-size:9.5pt;line-height:1.45}
+  .label{font-size:7.5pt;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#6B7280;margin-bottom:3px}
+  .muted{color:#6B7280}
+  .blank{color:#9CA3AF;font-style:italic}
+  .coi{font-size:8pt;font-weight:700}
+  .coi.active{color:#166534}.coi.expiring{color:#92400E}.coi.expired{color:#991B1B}.coi.none{color:#6B7280}
+  h2{font-size:10pt;font-weight:800;color:#002147;text-transform:uppercase;letter-spacing:.1em;margin:18px 0 8px;border-left:3px solid #D4AF37;padding-left:8px}
+  .scope{white-space:pre-wrap;font-size:10pt;line-height:1.55}
+  table{width:100%;border-collapse:collapse;font-size:9.5pt}
+  th{text-align:left;font-size:8pt;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#6B7280;border-bottom:1.5px solid #E5E7EB;padding:5px 6px}
+  td{padding:5px 6px;border-bottom:1px solid #F3F4F6;vertical-align:top}
+  .amount{text-align:right;font-variant-numeric:tabular-nums}
+  .amount-label{text-align:right;font-weight:700;color:#002147}
+  tfoot td{font-weight:700;border-top:1.5px solid #D1D5DB;background:#F9FAFB}
+  .small{font-size:9pt;color:#374151;line-height:1.5}
+  .sign{display:grid;grid-template-columns:2fr 2fr 1fr;gap:24px;margin-top:34px;font-size:8pt;color:#6B7280}
+  .line{border-bottom:1px solid #1A1A1A;height:22px;margin-bottom:4px}
+  .foot{margin-top:28px;font-size:7.5pt;color:#9CA3AF;text-align:center}
+  @media print{body{padding:0}.sheet + .sheet{margin-top:0;padding-top:0;border-top:none;break-before:page}@page{margin:.6in;size:letter portrait}}
+</style></head><body>
+${sheets}
+  <script>window.onload=function(){window.print()}</script>
+</body></html>`;
+    const win = window.open('', '_blank');
+    if (win) { win.document.write(html); win.document.close(); }
+  }
+
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -2428,7 +2552,7 @@ export default function RemodelBudget() {
           {subDirError && (
             <p role="alert" className="px-4 mb-2 text-xs font-semibold" style={{ color: '#DC2626' }}>{subDirError}</p>
           )}
-          <SubsMaterialsView data={subsMaterials} onTradeChange={setLineTrade} scope={scopeApi} subs={subsApi} />
+          <SubsMaterialsView data={subsMaterials} onTradeChange={setLineTrade} scope={scopeApi} subs={subsApi} sheets={sheetsApi} />
         </>
       )}
 
