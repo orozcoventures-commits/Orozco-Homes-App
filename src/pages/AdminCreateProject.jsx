@@ -18,6 +18,12 @@ const CATEGORY_OPTIONS = [
   { value: 'full-renovation',   label: 'Full House Renovation' },
 ];
 
+// "+ Add a new project type…": the typed name is saved as the project's label,
+// and a slug of it as its category. Types used before are offered again.
+const NEW_TYPE = '__new__';
+const MAX_TYPE_NAME = 60;
+const typeSlug = (name) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
+
 const STATUS_OPTIONS = [
   { value: 'on-track',  label: 'On Track' },
   { value: 'attention', label: 'Needs Attention' },
@@ -83,6 +89,8 @@ export default function AdminCreateProject() {
   const [clientsLoading, setClientsLoading] = useState(true);
   const [clientId, setClientId]       = useState('');
   const [category, setCategory]       = useState('');
+  const [newTypeName, setNewTypeName] = useState('');
+  const [customTypes, setCustomTypes] = useState([]);   // [{ value, label }] used on earlier projects
   const [projectTitle, setProjectTitle] = useState('');
   const [status, setStatus]           = useState('on-track');
   const [submitting, setSubmitting]   = useState(false);
@@ -108,16 +116,37 @@ export default function AdminCreateProject() {
       setClientsLoading(false);
     }
     fetchClients();
+    // Project types added before (anything not in the built-in list).
+    supabase.from('projects').select('category, label').then(({ data }) => {
+      const seen = new Map();
+      for (const p of data ?? []) {
+        if (!p.category || CATEGORY_OPTIONS.some((o) => o.value === p.category) || seen.has(p.category)) continue;
+        seen.set(p.category, p.label || p.category);
+      }
+      setCustomTypes([...seen].map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label)));
+    });
   }, []);
+
+  const typeReady = !!category && (category !== NEW_TYPE || !!newTypeName.trim());
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!clientId || !category || !projectTitle.trim()) return;
+    if (!clientId || !typeReady || !projectTitle.trim()) return;
+
+    // A new type: reuse an existing one with the same name, else make a slug.
+    let categoryValue = category;
+    let categoryLabel = [...CATEGORY_OPTIONS, ...customTypes].find((c) => c.value === category)?.label ?? category;
+    if (category === NEW_TYPE) {
+      const name = newTypeName.trim();
+      const existing = [...CATEGORY_OPTIONS, ...customTypes].find((c) => c.label.toLowerCase() === name.toLowerCase() || c.value === typeSlug(name));
+      categoryValue = existing?.value ?? typeSlug(name);
+      categoryLabel = existing?.label ?? name;
+      if (!categoryValue) { setError('Enter a project type name with letters or numbers.'); return; }
+    }
 
     setError('');
     setSubmitting(true);
 
-    const categoryLabel = CATEGORY_OPTIONS.find((c) => c.value === category)?.label ?? category;
     const clientName    = clients.find((c) => c.id === clientId)?.full_name ?? 'Client';
 
     const pin = generateUniquePin();
@@ -128,7 +157,7 @@ export default function AdminCreateProject() {
         managed_client_id: clientId,
         label:             categoryLabel,
         project_name:      projectTitle.trim(),
-        category,
+        category:          categoryValue,
         project_pin:       pin,
       })
       .select()
@@ -144,7 +173,11 @@ export default function AdminCreateProject() {
     // Use the PIN returned by the DB in case a trigger overwrote it
     setSuccess({ clientName, projectTitle: projectTitle.trim(), id: data.id, pin: data.project_pin ?? pin });
     setClientId('');
+    if (category === NEW_TYPE && !customTypes.some((c) => c.value === categoryValue) && !CATEGORY_OPTIONS.some((c) => c.value === categoryValue)) {
+      setCustomTypes((t) => [...t, { value: categoryValue, label: categoryLabel }].sort((a, b) => a.label.localeCompare(b.label)));
+    }
     setCategory('');
+    setNewTypeName('');
     setProjectTitle('');
     setStatus('on-track');
   }
@@ -274,7 +307,23 @@ export default function AdminCreateProject() {
               {CATEGORY_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>{o.label}</option>
               ))}
+              {customTypes.length > 0 && (
+                <optgroup label="Added by you">
+                  {customTypes.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </optgroup>
+              )}
+              <option value={NEW_TYPE}>+ Add a new project type…</option>
             </StyledSelect>
+            {category === NEW_TYPE && (
+              <div className="mt-3">
+                <StyledInput
+                  value={newTypeName}
+                  onChange={(e) => setNewTypeName(e.target.value.slice(0, MAX_TYPE_NAME))}
+                  placeholder="New project type, e.g. Basement Finish"
+                />
+                <p className="text-xs mt-1.5" style={{ color: '#9CA3AF' }}>It will be in this list next time.</p>
+              </div>
+            )}
           </Field>
 
           {/* Project title */}
@@ -312,15 +361,15 @@ export default function AdminCreateProject() {
           <div className="pt-2">
             <button
               type="submit"
-              disabled={submitting || !clientId || !category || !projectTitle.trim() || clients.length === 0}
+              disabled={submitting || !clientId || !typeReady || !projectTitle.trim() || clients.length === 0}
               className="w-full py-3 rounded-xl text-sm font-bold transition-all duration-150 focus:outline-none flex items-center justify-center gap-2"
               style={{
-                backgroundColor: submitting || !clientId || !category || !projectTitle.trim() ? '#E5E3DF' : '#002147',
-                color:           submitting || !clientId || !category || !projectTitle.trim() ? '#9CA3AF' : '#D4AF37',
-                cursor:          submitting || !clientId || !category || !projectTitle.trim() ? 'not-allowed' : 'pointer',
+                backgroundColor: submitting || !clientId || !typeReady || !projectTitle.trim() ? '#E5E3DF' : '#002147',
+                color:           submitting || !clientId || !typeReady || !projectTitle.trim() ? '#9CA3AF' : '#D4AF37',
+                cursor:          submitting || !clientId || !typeReady || !projectTitle.trim() ? 'not-allowed' : 'pointer',
               }}
-              onMouseEnter={(e) => { if (!submitting && clientId && category && projectTitle.trim()) e.currentTarget.style.backgroundColor = '#003166'; }}
-              onMouseLeave={(e) => { if (!submitting && clientId && category && projectTitle.trim()) e.currentTarget.style.backgroundColor = '#002147'; }}
+              onMouseEnter={(e) => { if (!submitting && clientId && typeReady && projectTitle.trim()) e.currentTarget.style.backgroundColor = '#003166'; }}
+              onMouseLeave={(e) => { if (!submitting && clientId && typeReady && projectTitle.trim()) e.currentTarget.style.backgroundColor = '#002147'; }}
             >
               {submitting ? (
                 <>
