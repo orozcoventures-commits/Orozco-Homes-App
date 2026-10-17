@@ -42,11 +42,19 @@ export const REMODEL_CONFIGS = {
     ],
     divisions: [
       {
-        key: 'div1', num: '1', label: 'Demo & Prep',
+        key: 'div1', num: '1', label: 'Demo',
         items: [
           { wbs: '1.1', label: 'Demo & Haul',                       unit: 'sqft',   rates: { standard: 12,    mid: 14,    custom: 17    } },
-          { wbs: '1.2', label: 'Waterproofing Membrane',            unit: 'sqft',   rates: { standard:  5,    mid:  7,    custom:  9    } },
-          { wbs: '1.3', label: 'Cement Board & Drywall Prep',       unit: 'sqft',   rates: { standard:  5.50, mid:  7,    custom:  9    } },
+        ],
+      },
+      {
+        // Site Prep — split out of "Demo & Prep". New lines are keyed 'S.n';
+        // budgets saved before this start with them removed (see RemodelBudget).
+        key: 'divS', num: 'S', label: 'Site Prep',
+        items: [
+          { wbs: 'S.1', label: 'Dumpster (Roll-Off, Haul & Disposal)', unit: 'flat',   rates: { standard:  425,  mid:  475,  custom:  550  } },
+          { wbs: 'S.2', label: 'Porta Potty (Rental + Weekly Service)', unit: 'flat',  rates: { standard:  185,  mid:  210,  custom:  265  } },
+          { wbs: 'S.3', label: 'Site Protection & Dust Barriers',   unit: 'flat',   rates: { standard:  225,  mid:  300,  custom:  425  } },
         ],
       },
       {
@@ -76,6 +84,9 @@ export const REMODEL_CONFIGS = {
           { wbs: '3.1', label: 'Floor Tile (Mat + Labor)',           unit: 'sqft',      rates: { standard: 18,    mid: 30,    custom: 50    } },
           { wbs: '3.2', label: 'Wall Tile (Mat + Labor)',            unit: 'wall_sqft', rates: { standard: 15,    mid: 24,    custom: 42    } },
           { wbs: '3.3', label: 'Shower Pan + Glass Enclosure',       unit: 'flat',      rates: { standard: 2400,  mid: 5000,  custom: 10000 } },
+          // Moved here from "Demo & Prep" (same wbs, so saved amounts stay on it).
+          { wbs: '1.2', badge: '3.4', label: 'Waterproofing Membrane',            unit: 'sqft',   rates: { standard:  5,    mid:  7,    custom:  9    } },
+          { wbs: '1.3', badge: '3.5', label: 'Cement Board & Drywall Prep',       unit: 'sqft',   rates: { standard:  5.50, mid:  7,    custom:  9    } },
         ],
       },
       {
@@ -116,11 +127,19 @@ export const REMODEL_CONFIGS = {
     ],
     divisions: [
       {
-        key: 'div1', num: '1', label: 'Demo & Prep',
+        key: 'div1', num: '1', label: 'Demo',
         items: [
           { wbs: '1.1', label: 'Demo & Haul',                       unit: 'sqft',   rates: { standard: 12,    mid: 14,    custom: 17    } },
-          { wbs: '1.2', label: 'Waterproofing Membrane',            unit: 'sqft',   rates: { standard:  5,    mid:  7,    custom:  9    } },
-          { wbs: '1.3', label: 'Cement Board & Drywall Prep',       unit: 'sqft',   rates: { standard:  5.50, mid:  7,    custom:  9    } },
+        ],
+      },
+      {
+        // Site Prep — split out of "Demo & Prep". New lines are keyed 'S.n';
+        // budgets saved before this start with them removed (see RemodelBudget).
+        key: 'divS', num: 'S', label: 'Site Prep',
+        items: [
+          { wbs: 'S.1', label: 'Dumpster (Roll-Off, Haul & Disposal)', unit: 'flat',   rates: { standard:  475,  mid:  550,  custom:  650  } },
+          { wbs: 'S.2', label: 'Porta Potty (Rental + Weekly Service)', unit: 'flat',  rates: { standard:  185,  mid:  210,  custom:  265  } },
+          { wbs: 'S.3', label: 'Site Protection & Dust Barriers',   unit: 'flat',   rates: { standard:  250,  mid:  325,  custom:  450  } },
         ],
       },
       {
@@ -150,6 +169,9 @@ export const REMODEL_CONFIGS = {
           { wbs: '3.1', label: 'Floor Tile (Mat + Labor)',           unit: 'sqft',      rates: { standard: 18,    mid: 30,    custom: 50    } },
           { wbs: '3.2', label: 'Wall Tile (Mat + Labor)',            unit: 'wall_sqft', rates: { standard: 15,    mid: 24,    custom: 42    } },
           { wbs: '3.3', label: 'Shower Pan + Glass Enclosure',       unit: 'flat',      rates: { standard: 2400,  mid: 5000,  custom: 10000 } },
+          // Moved here from "Demo & Prep" (same wbs, so saved amounts stay on it).
+          { wbs: '1.2', badge: '3.4', label: 'Waterproofing Membrane',            unit: 'sqft',   rates: { standard:  5,    mid:  7,    custom:  9    } },
+          { wbs: '1.3', badge: '3.5', label: 'Cement Board & Drywall Prep',       unit: 'sqft',   rates: { standard:  5.50, mid:  7,    custom:  9    } },
         ],
       },
       {
@@ -191,11 +213,19 @@ export const REMODEL_CONFIGS = {
     ],
     divisions: [
       {
-        key: 'div1', num: '1', label: 'Demo & Prep',
+        key: 'div1', num: '1', label: 'Demo',
         items: [
           { wbs: '1.1', label: 'Demo & Haul',                       unit: 'sqft',   rates: { standard: 12,    mid: 14,    custom: 17    } },
-          { wbs: '1.2', label: 'Waterproofing Membrane',            unit: 'sqft',   rates: { standard:  5,    mid:  7,    custom:  9    } },
-          { wbs: '1.3', label: 'Cement Board & Drywall Prep',       unit: 'sqft',   rates: { standard:  5.50, mid:  7,    custom:  9    } },
+        ],
+      },
+      {
+        // Site Prep — split out of "Demo & Prep". New lines are keyed 'S.n';
+        // budgets saved before this start with them removed (see RemodelBudget).
+        key: 'divS', num: 'S', label: 'Site Prep',
+        items: [
+          { wbs: 'S.1', label: 'Dumpster (Roll-Off, Haul & Disposal)', unit: 'flat',   rates: { standard:  550,  mid:  625,  custom:  750  } },
+          { wbs: 'S.2', label: 'Porta Potty (Rental + Weekly Service)', unit: 'flat',  rates: { standard:  370,  mid:  420,  custom:  530  } },
+          { wbs: 'S.3', label: 'Site Protection & Dust Barriers',   unit: 'flat',   rates: { standard:  300,  mid:  400,  custom:  550  } },
         ],
       },
       {
@@ -225,6 +255,9 @@ export const REMODEL_CONFIGS = {
           { wbs: '3.1', label: 'Floor Tile (Mat + Labor)',           unit: 'sqft',      rates: { standard: 18,    mid: 30,    custom: 50    } },
           { wbs: '3.2', label: 'Wall Tile (Mat + Labor)',            unit: 'wall_sqft', rates: { standard: 15,    mid: 24,    custom: 42    } },
           { wbs: '3.3', label: 'Shower Pan + Glass Enclosure',       unit: 'flat',      rates: { standard: 2400,  mid: 5000,  custom: 10000 } },
+          // Moved here from "Demo & Prep" (same wbs, so saved amounts stay on it).
+          { wbs: '1.2', badge: '3.4', label: 'Waterproofing Membrane',            unit: 'sqft',   rates: { standard:  5,    mid:  7,    custom:  9    } },
+          { wbs: '1.3', badge: '3.5', label: 'Cement Board & Drywall Prep',       unit: 'sqft',   rates: { standard:  5.50, mid:  7,    custom:  9    } },
         ],
       },
       {
@@ -268,10 +301,19 @@ export const REMODEL_CONFIGS = {
     ],
     divisions: [
       {
-        key: 'div1', num: '1', label: 'Demo & Prep',
+        key: 'div1', num: '1', label: 'Demo',
         items: [
           { wbs: '1.1', label: 'Demo & Haul',                       unit: 'sqft', rates: { standard:  9,    mid: 11,    custom: 14    } },
-          { wbs: '1.2', label: 'Drywall Repair & Prep',             unit: 'sqft', rates: { standard:  5,    mid:  6.50, custom:  8    } },
+        ],
+      },
+      {
+        // Site Prep — split out of "Demo & Prep". New lines are keyed 'S.n';
+        // budgets saved before this start with them removed (see RemodelBudget).
+        key: 'divS', num: 'S', label: 'Site Prep',
+        items: [
+          { wbs: 'S.1', label: 'Dumpster (Roll-Off, Haul & Disposal)', unit: 'flat',   rates: { standard:  550,  mid:  625,  custom:  750  } },
+          { wbs: 'S.2', label: 'Porta Potty (Rental + Weekly Service)', unit: 'flat',  rates: { standard:  370,  mid:  420,  custom:  530  } },
+          { wbs: 'S.3', label: 'Site Protection & Dust Barriers',   unit: 'flat',   rates: { standard:  300,  mid:  400,  custom:  550  } },
         ],
       },
       {
@@ -320,6 +362,8 @@ export const REMODEL_CONFIGS = {
           { wbs: '5.1', label: 'Flooring (LVP / Hardwood)',         unit: 'sqft', rates: { standard:   8,   mid:  14,   custom:  24   } },
           { wbs: '5.2', label: 'Lighting',                          unit: 'flat', rates: { standard:  800,  mid: 1600,  custom:  3500 } },
           { wbs: '5.3', label: 'Paint',                             unit: 'sqft', rates: { standard:   4,   mid:   5,   custom:   7   } },
+          // Moved here from "Demo & Prep" (same wbs, so saved amounts stay on it).
+          { wbs: '1.2', badge: '5.4', label: 'Drywall Repair & Prep',             unit: 'sqft', rates: { standard:  5,    mid:  6.50, custom:  8    } },
         ],
       },
       {
@@ -342,10 +386,19 @@ export const REMODEL_CONFIGS = {
     ],
     divisions: [
       {
-        key: 'div1', num: '1', label: 'Demo & Prep',
+        key: 'div1', num: '1', label: 'Demo',
         items: [
           { wbs: '1.1', label: 'Demo & Haul',                       unit: 'sqft', rates: { standard:  9,    mid: 11,    custom: 14    } },
-          { wbs: '1.2', label: 'Drywall Repair & Prep',             unit: 'sqft', rates: { standard:  5,    mid:  6.50, custom:  8    } },
+        ],
+      },
+      {
+        // Site Prep — split out of "Demo & Prep". New lines are keyed 'S.n';
+        // budgets saved before this start with them removed (see RemodelBudget).
+        key: 'divS', num: 'S', label: 'Site Prep',
+        items: [
+          { wbs: 'S.1', label: 'Dumpster (Roll-Off, Haul & Disposal)', unit: 'flat',   rates: { standard:  600,  mid:  700,  custom:  850  } },
+          { wbs: 'S.2', label: 'Porta Potty (Rental + Weekly Service)', unit: 'flat',  rates: { standard:  370,  mid:  420,  custom:  530  } },
+          { wbs: 'S.3', label: 'Site Protection & Dust Barriers',   unit: 'flat',   rates: { standard:  350,  mid:  450,  custom:  625  } },
         ],
       },
       {
@@ -395,6 +448,8 @@ export const REMODEL_CONFIGS = {
           { wbs: '5.1', label: 'Flooring (LVP / Hardwood)',         unit: 'sqft', rates: { standard:   8,   mid:  14,   custom:  24   } },
           { wbs: '5.2', label: 'Lighting',                          unit: 'flat', rates: { standard:  800,  mid: 1600,  custom:  3500 } },
           { wbs: '5.3', label: 'Paint',                             unit: 'sqft', rates: { standard:   4,   mid:   5,   custom:   7   } },
+          // Moved here from "Demo & Prep" (same wbs, so saved amounts stay on it).
+          { wbs: '1.2', badge: '5.4', label: 'Drywall Repair & Prep',             unit: 'sqft', rates: { standard:  5,    mid:  6.50, custom:  8    } },
         ],
       },
       {
@@ -417,10 +472,19 @@ export const REMODEL_CONFIGS = {
     ],
     divisions: [
       {
-        key: 'div1', num: '1', label: 'Demo & Prep',
+        key: 'div1', num: '1', label: 'Demo',
         items: [
           { wbs: '1.1', label: 'Demo & Haul',                       unit: 'sqft', rates: { standard:  9,    mid: 11,    custom: 14    } },
-          { wbs: '1.2', label: 'Drywall Repair & Prep',             unit: 'sqft', rates: { standard:  5,    mid:  6.50, custom:  8    } },
+        ],
+      },
+      {
+        // Site Prep — split out of "Demo & Prep". New lines are keyed 'S.n';
+        // budgets saved before this start with them removed (see RemodelBudget).
+        key: 'divS', num: 'S', label: 'Site Prep',
+        items: [
+          { wbs: 'S.1', label: 'Dumpster (Roll-Off, Haul & Disposal)', unit: 'flat',   rates: { standard:  650,  mid:  775,  custom:  950  } },
+          { wbs: 'S.2', label: 'Porta Potty (Rental + Weekly Service)', unit: 'flat',  rates: { standard:  555,  mid:  630,  custom:  795  } },
+          { wbs: 'S.3', label: 'Site Protection & Dust Barriers',   unit: 'flat',   rates: { standard:  400,  mid:  525,  custom:  725  } },
         ],
       },
       {
@@ -471,6 +535,8 @@ export const REMODEL_CONFIGS = {
           { wbs: '5.1', label: 'Flooring (LVP / Hardwood)',         unit: 'sqft', rates: { standard:   8,   mid:  14,   custom:  24   } },
           { wbs: '5.2', label: 'Lighting',                          unit: 'flat', rates: { standard:  800,  mid: 1600,  custom:  3500 } },
           { wbs: '5.3', label: 'Paint',                             unit: 'sqft', rates: { standard:   4,   mid:   5,   custom:   7   } },
+          // Moved here from "Demo & Prep" (same wbs, so saved amounts stay on it).
+          { wbs: '1.2', badge: '5.4', label: 'Drywall Repair & Prep',             unit: 'sqft', rates: { standard:  5,    mid:  6.50, custom:  8    } },
         ],
       },
       {
