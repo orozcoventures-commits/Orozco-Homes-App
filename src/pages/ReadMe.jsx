@@ -18,7 +18,7 @@ const SECTIONS = [
     ),
     content: [
       {
-        heading: 'What is the Orozco Homes Remodel Planner?',
+        heading: 'What is the Orozco Homes Design-Build Portal?',
         body: 'The Orozco Homes app is a private project management portal designed specifically for residential remodeling clients, interior designers, and the Orozco Homes administrative team. Every project gets its own secure workspace where all parties can communicate, track progress, review selections, and manage budgets — in real time.',
       },
       {

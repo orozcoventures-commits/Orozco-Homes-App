@@ -356,7 +356,7 @@ export default function Sidebar({ isOpen, onClose }) {
               Orozco Homes
             </span>
             <span className="block text-white/40 font-light tracking-widest uppercase mt-0.5" style={{ fontSize: '0.6rem' }}>
-              Remodel Planner
+              Design-Build Portal
             </span>
           </div>
         </button>
