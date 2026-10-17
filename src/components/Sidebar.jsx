@@ -8,6 +8,18 @@ const SIDEBAR_COLOR = '#1B4F6B';
 
 const CONTRACTOR_TOOLS = [
   {
+    // Projects grouped by stage (Active, Potential, On Hold, Completed).
+    label: 'Dashboard',
+    page: 'home',
+    adminOnly: true,
+    badge: null,
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 10.5 12 3l9 7.5" /><path d="M5 9.5V21h14V9.5" /><path d="M10 21v-6h4v6" />
+      </svg>
+    ),
+  },
+  {
     label: 'Manage Clients',
     page: 'manage-clients',
     adminOnly: true,
