@@ -314,7 +314,7 @@ export default function NewHomeBudget() {
       <div className="flex items-start justify-between mb-8">
         <div>
           <p className="text-xs font-bold tracking-[0.18em] uppercase mb-1" style={{ color: '#D4AF37' }}>Contractor Tool</p>
-          <h1 className="text-2xl font-extrabold" style={{ color: '#002147' }}>New Home Budget Calculator</h1>
+          <h1 className="text-2xl font-extrabold" style={{ color: '#002147' }}>New Home Estimate</h1>
           <p className="text-sm mt-1" style={{ color: '#6B7280' }}>
             Full 7-division WBS — Virginia Beach / Hampton Roads, 2026. Every line item is editable.
           </p>

@@ -892,7 +892,7 @@ export default function DesignerWorkspace() {
       <div className="flex flex-wrap items-start justify-between gap-4 mb-8">
         <div>
           <p className="text-xs font-bold tracking-[0.18em] uppercase mb-1" style={{ color: '#D4AF37' }}>Interior Design</p>
-          <h1 className="text-2xl font-extrabold" style={{ color: '#002147' }}>Designer Workspace</h1>
+          <h1 className="text-2xl font-extrabold" style={{ color: '#002147' }}>Selections</h1>
           <p className="text-sm mt-1" style={{ color: '#6B7280' }}>
             Curate material specifications per room — clients approve or decline each item.
           </p>

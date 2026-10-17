@@ -535,7 +535,7 @@ export default function ManageClients() {
       <div className="flex items-start justify-between mb-8 gap-4">
         <div>
           <p className="text-xs font-bold tracking-[0.18em] uppercase mb-1" style={{ color: '#D4AF37' }}>Admin Tool</p>
-          <h2 className="text-2xl font-bold" style={{ color: '#002147' }}>Manage Clients</h2>
+          <h2 className="text-2xl font-bold" style={{ color: '#002147' }}>Clients</h2>
           <p className="text-sm mt-1" style={{ color: '#6B7280' }}>
             Share the 4-digit PIN with your client for instant portal access.
           </p>

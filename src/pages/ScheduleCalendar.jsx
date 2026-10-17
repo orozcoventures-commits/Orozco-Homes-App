@@ -746,7 +746,7 @@ export default function ScheduleCalendar() {
       >
         {/* Header */}
         <div className="px-4 py-4 border-b" style={{ borderColor: '#E8E6E1' }}>
-          <h2 className="font-bold text-sm" style={{ color: '#002147' }}>Job Scheduler</h2>
+          <h2 className="font-bold text-sm" style={{ color: '#002147' }}>Schedule</h2>
           <p className="text-xs mt-0.5" style={{ color: '#9CA3AF' }}>
             {filtered.length} task{filtered.length !== 1 ? 's' : ''} scheduled
           </p>

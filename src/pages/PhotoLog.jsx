@@ -321,7 +321,7 @@ export default function PhotoLog() {
           <p className="text-xs font-bold tracking-[0.18em] uppercase mb-1" style={{ color: '#D4AF37' }}>
             {isAdmin ? 'Contractor Tool' : 'Client Portal'}
           </p>
-          <h2 className="text-2xl font-bold" style={{ color: '#002147' }}>Progress Photo Log</h2>
+          <h2 className="text-2xl font-bold" style={{ color: '#002147' }}>Photos</h2>
           <p className="text-sm mt-1" style={{ color: '#6B7280' }}>
             {isAdmin
               ? 'Post progress updates so clients can follow along in real time.'
