@@ -118,12 +118,30 @@ const LAYOUT_VERSION = 3;
 const EMPTY_LAYOUT = { added: [], labels: {}, removed: [], splits: {}, allowances: {}, trades: {}, scopes: {}, subs: {}, factors: {}, v: LAYOUT_VERSION };
 const MAX_LABEL = 120;
 
+// Added lines can be priced as quantity × unit cost (layout.added[].qty/unit/rate);
+// the line amount is still kept in overrides_json, so everything else is unchanged.
+const QTY_UNITS = [
+  { key: 'sqft', label: 'sq ft' },
+  { key: 'lf',   label: 'linear ft' },
+  { key: 'ea',   label: 'each' },
+  { key: 'hr',   label: 'hour' },
+  { key: 'day',  label: 'day' },
+];
+const QTY_UNIT_KEYS = new Set(QTY_UNITS.map((u) => u.key));
+const qtyUnitLabel = (key) => QTY_UNITS.find((u) => u.key === key)?.label ?? key;
+const lineMeasure = (a) => {
+  const qty = Number(a?.qty); const rate = Number(a?.rate);
+  return QTY_UNIT_KEYS.has(a?.unit) && Number.isFinite(qty) && qty >= 0 && qty <= 1e6 && Number.isFinite(rate) && rate >= 0 && rate <= 1e7
+    ? { qty, unit: a.unit, rate } : null;
+};
+const measureAmount = (m) => Math.round(m.qty * m.rate);
+
 function normalizeLayout(raw) {
   const l = raw && typeof raw === 'object' ? raw : {};
   return {
     added: (Array.isArray(l.added) ? l.added : [])
       .filter((a) => a && typeof a.id === 'string' && typeof a.div === 'string')
-      .map((a) => ({ id: a.id, div: a.div, label: String(a.label ?? '').slice(0, MAX_LABEL) })),
+      .map((a) => ({ id: a.id, div: a.div, label: String(a.label ?? '').slice(0, MAX_LABEL), ...(lineMeasure(a) ?? {}) })),
     labels: Object.fromEntries(Object.entries(l.labels && typeof l.labels === 'object' ? l.labels : {})
       .filter(([, v]) => typeof v === 'string' && v.trim())
       .map(([k, v]) => [k, v.slice(0, MAX_LABEL)])),
@@ -311,7 +329,7 @@ function applyLayout(base, layout) {
         label: it.unit !== 'pct' && layout.labels[it.wbs] ? layout.labels[it.wbs] : it.label,
       }));
       const added = layout.added.filter((a) => (divKeys.has(a.div) ? a.div : firstKey) === div.key).map((a, i) => ({
-        wbs: a.id, label: a.label || 'New item', unit: 'flat', custom: true, badge: `${div.num}.${lastNum + i + 1}`,
+        wbs: a.id, label: a.label || 'New item', unit: 'flat', custom: true, badge: `${div.num}.${lastNum + i + 1}`, measure: lineMeasure(a),
       }));
       return {
         ...div,
@@ -557,11 +575,17 @@ function AddLineForm({ div, ds, onAdd }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
+  const [unit, setUnit] = useState('ls');          // 'ls' = lump sum, else a QTY_UNITS key
+  const [qty, setQty] = useState('');
+  const [rate, setRate] = useState('');
+  const measured = unit !== 'ls';
+  const measure = measured ? lineMeasure({ unit, qty: Number(qty) || 0, rate: Number(rate) || 0 }) : null;
+  const total = measure ? measureAmount(measure) : Number(amount.replace(/[^0-9]/g, '')) || 0;
   const submit = (e) => {
     e.preventDefault();
     if (!name.trim()) return;
-    onAdd(name.trim().slice(0, MAX_LABEL), Number(amount.replace(/[^0-9]/g, '')) || 0);
-    setName(''); setAmount(''); setOpen(false);
+    onAdd(name.trim().slice(0, MAX_LABEL), total, measure);
+    setName(''); setAmount(''); setQty(''); setRate(''); setUnit('ls'); setOpen(false);
   };
   if (!open) {
     return (
@@ -571,21 +595,74 @@ function AddLineForm({ div, ds, onAdd }) {
       </button>
     );
   }
+  const box = { border: '1.5px solid #E5E7EB', color: '#002147' };
+  const num = (v) => v.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
   return (
     <form onSubmit={submit} className="flex flex-wrap items-center gap-2 px-4 py-2.5" style={{ borderTop: '1px solid #F3F4F6', backgroundColor: '#FAFAF8' }}>
       <input autoFocus value={name} onChange={(e) => setName(e.target.value)} maxLength={MAX_LABEL}
         placeholder="Item name (e.g. Heated floor)" aria-label={`New line item name for ${div.label}`}
-        className="flex-1 min-w-[180px] px-3 py-1.5 rounded-lg text-sm focus:outline-none" style={{ border: '1.5px solid #E5E7EB', color: '#002147' }} />
-      <div className="relative shrink-0" style={{ width: 110 }}>
-        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs pointer-events-none" style={{ color: '#9CA3AF' }}>$</span>
-        <input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ''))} inputMode="numeric"
-          placeholder="0" aria-label={`New line item amount for ${div.label}`}
-          className="w-full pl-6 pr-2 py-1.5 rounded-lg text-sm font-semibold text-right focus:outline-none" style={{ border: '1.5px solid #E5E7EB', color: '#002147' }} />
-      </div>
+        className="flex-1 min-w-[180px] px-3 py-1.5 rounded-lg text-sm focus:outline-none" style={box} />
+      <select value={unit} onChange={(e) => setUnit(e.target.value)} aria-label={`Pricing for ${div.label} line`}
+        className="px-2 py-1.5 rounded-lg text-xs font-semibold focus:outline-none" style={{ ...box, backgroundColor: '#fff' }}>
+        <option value="ls">Lump sum</option>
+        {QTY_UNITS.map((u) => <option key={u.key} value={u.key}>Per {u.label}</option>)}
+      </select>
+      {measured ? (
+        <>
+          <input value={qty} onChange={(e) => setQty(num(e.target.value))} inputMode="decimal" placeholder="Qty"
+            aria-label={`New line item quantity for ${div.label}`}
+            className="w-20 px-2 py-1.5 rounded-lg text-sm font-semibold text-right focus:outline-none" style={box} />
+          <span className="text-xs" style={{ color: '#6B7280' }}>{qtyUnitLabel(unit)} ×</span>
+          <div className="relative shrink-0" style={{ width: 96 }}>
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs pointer-events-none" style={{ color: '#9CA3AF' }}>$</span>
+            <input value={rate} onChange={(e) => setRate(num(e.target.value))} inputMode="decimal" placeholder="Unit cost"
+              aria-label={`New line item unit cost for ${div.label}`}
+              className="w-full pl-6 pr-2 py-1.5 rounded-lg text-sm font-semibold text-right focus:outline-none" style={box} />
+          </div>
+          <span className="text-sm font-bold" style={{ color: '#002147' }} data-testid="add-line-total">= {fmt(total)}</span>
+        </>
+      ) : (
+        <div className="relative shrink-0" style={{ width: 110 }}>
+          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs pointer-events-none" style={{ color: '#9CA3AF' }}>$</span>
+          <input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ''))} inputMode="numeric"
+            placeholder="0" aria-label={`New line item amount for ${div.label}`}
+            className="w-full pl-6 pr-2 py-1.5 rounded-lg text-sm font-semibold text-right focus:outline-none" style={box} />
+        </div>
+      )}
       <button type="submit" disabled={!name.trim()} className="px-3 py-1.5 rounded-lg text-xs font-bold disabled:opacity-50"
         style={{ backgroundColor: '#002147', color: '#D4AF37' }}>Add</button>
       <button type="button" onClick={() => setOpen(false)} className="px-2 py-1.5 text-xs font-semibold" style={{ color: '#6B7280' }}>Cancel</button>
     </form>
+  );
+}
+
+// Quantity × unit cost under an added line. Editing either updates the amount;
+// "Lump sum" drops the quantity and keeps the amount.
+function QtyRow({ item, measure, onMeasure }) {
+  const [draft, setDraft] = useState(null);   // { qty, rate } strings while editing
+  const shown = draft ?? { qty: String(measure.qty), rate: String(measure.rate) };
+  const num = (v) => v.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
+  const commit = (next) => {
+    setDraft(null);
+    onMeasure({ unit: measure.unit, qty: Number(next.qty) || 0, rate: Number(next.rate) || 0 });
+  };
+  const change = (key, v) => {
+    const next = { ...shown, [key]: num(v) };
+    setDraft(next);
+    onMeasure({ unit: measure.unit, qty: Number(next.qty) || 0, rate: Number(next.rate) || 0 });
+  };
+  const box = { border: '1px solid #E5E7EB', color: '#002147', backgroundColor: '#fff' };
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 pl-14 pr-4 pb-2 -mt-1 text-xs" style={{ color: '#6B7280' }} data-testid={`qty-${item.wbs}`}>
+      <input value={shown.qty} onChange={(e) => change('qty', e.target.value)} onBlur={() => commit(shown)} inputMode="decimal"
+        aria-label={`Quantity for ${item.label}`} className="w-16 px-1.5 py-0.5 rounded-md font-semibold text-right focus:outline-none" style={box} />
+      <span>{qtyUnitLabel(measure.unit)} ×</span>
+      <span>$</span>
+      <input value={shown.rate} onChange={(e) => change('rate', e.target.value)} onBlur={() => commit(shown)} inputMode="decimal"
+        aria-label={`Unit cost for ${item.label}`} className="w-20 px-1.5 py-0.5 rounded-md font-semibold text-right focus:outline-none" style={box} />
+      <span>= <b style={{ color: '#002147' }}>{fmt(measureAmount({ qty: Number(shown.qty) || 0, rate: Number(shown.rate) || 0 }))}</b></span>
+      <button type="button" onClick={() => onMeasure(null)} className="ml-2 underline" title="Keep the amount, drop the quantity">Lump sum</button>
+    </div>
   );
 }
 
@@ -636,7 +713,7 @@ function SplitRow({ value, split, isDefault, onChange, onReset, allowance }) {
   );
 }
 
-function LineRow({ item, divStyle: ds, value, isOverridden, onChange, onReset, pctRate, onPctChange, isFirst, actualParts, showUnsplit, actualOpen, onToggleActual, onActualPartChange, showActuals, actualsDisabled, onRename, onRemove, breakdown, isAllowance }) {
+function LineRow({ item, divStyle: ds, value, isOverridden, onChange, onReset, pctRate, onPctChange, isFirst, actualParts, showUnsplit, actualOpen, onToggleActual, onActualPartChange, showActuals, actualsDisabled, onRename, onRemove, breakdown, isAllowance, onMeasure }) {
   const actual = partsTotal(actualParts);
   const variance = value - actual;
   const hasActual = actual > 0;
@@ -652,6 +729,11 @@ function LineRow({ item, divStyle: ds, value, isOverridden, onChange, onReset, p
 
       {/* Label, with rename */}
       <LineName item={item} onRename={onRename} isAllowance={isAllowance} />
+      {onMeasure && !item.measure && (
+        <button type="button" onClick={() => onMeasure({ unit: 'sqft', qty: 1, rate: value })}
+          className="shrink-0 text-xs font-semibold underline hidden sm:inline" style={{ color: '#9CA3AF' }}
+          title="Price this line as quantity × unit cost">Qty</button>
+      )}
 
       {/* Pct rate input (desktop only) */}
       {item.unit === 'pct' && item.pctKey && (
@@ -705,6 +787,7 @@ function LineRow({ item, divStyle: ds, value, isOverridden, onChange, onReset, p
       </div>
     )}
 
+    {onMeasure && item.measure && <QtyRow item={item} measure={item.measure} onMeasure={onMeasure} />}
     {breakdown && item.unit !== 'pct' && <SplitRow value={value} {...breakdown} />}
 
     {showActuals && actualOpen && !actualsDisabled && (
@@ -1660,7 +1743,18 @@ export default function RemodelBudget() {
   }, [config, lineVals, inputs.sqft, designSpecsTotal, changeOrdersTotal, actualVals, pctRates.profitPct]);
 
   // ── Event handlers ──────────────────────────────────────────────────────────
-  function handleLineChange(wbs, num)  { setUserVals((p) => ({ ...p, [wbs]: num })); setOverrideFlags((p) => ({ ...p, [wbs]: true })); }
+  function handleLineChange(wbs, num)  {
+    setUserVals((p) => ({ ...p, [wbs]: num })); setOverrideFlags((p) => ({ ...p, [wbs]: true }));
+    // Typing the amount of a quantity-priced line makes it a lump sum.
+    setLayout((l) => (l.added.some((a) => a.id === wbs && a.unit)
+      ? { ...l, added: l.added.map((a) => (a.id === wbs ? { id: a.id, div: a.div, label: a.label } : a)) } : l));
+  }
+  // Quantity × unit cost for an added line (null = back to lump sum, amount kept).
+  function setLineMeasure(item, measure) {
+    const m = measure ? lineMeasure(measure) : null;
+    setLayout((l) => ({ ...l, added: l.added.map((a) => (a.id === item.wbs ? { id: a.id, div: a.div, label: a.label, ...(m ?? {}) } : a)) }));
+    if (m) { setUserVals((p) => ({ ...p, [item.wbs]: measureAmount(m) })); setOverrideFlags((p) => ({ ...p, [item.wbs]: true })); }
+  }
   function resetLine(wbs)              {
     setOverrideFlags((p) => ({ ...p, [wbs]: false })); setUserVals((p) => { const n = { ...p }; delete n[wbs]; return n; });
     setLayout((l) => { if (l.factors?.[wbs] == null) return l; const factors = { ...l.factors }; delete factors[wbs]; return { ...l, factors }; });
@@ -1672,9 +1766,9 @@ export default function RemodelBudget() {
     setUserVals((p) => Object.fromEntries(Object.entries(p).filter(([w]) => isCustomWbs(w))));
     setLayout((l) => ({ ...l, factors: {} }));
   }
-  function addLine(divKey, label, amount) {
+  function addLine(divKey, label, amount, measure = null) {
     const id = newLineId();
-    setLayout((l) => ({ ...l, added: [...l.added, { id, div: divKey, label }] }));
+    setLayout((l) => ({ ...l, added: [...l.added, { id, div: divKey, label, ...(measure ?? {}) }] }));
     setUserVals((p) => ({ ...p, [id]: amount }));
     setOverrideFlags((p) => ({ ...p, [id]: true }));
   }
@@ -2927,11 +3021,12 @@ ${sheets}
                         })(),
                       } : null}
                       isAllowance={item.unit !== 'pct' && allowanceOf(item).on && allowanceOf(item).amount > 0}
+                      onMeasure={item.custom ? (m) => setLineMeasure(item, m) : null}
                     />
                   ))}
 
                   {div.items.some((it) => it.unit === 'pct') ? null : (
-                    <AddLineForm div={div} ds={ds} onAdd={(label, amount) => addLine(div.key, label, amount)} />
+                    <AddLineForm div={div} ds={ds} onAdd={(label, amount, measure) => addLine(div.key, label, amount, measure)} />
                   )}
                   {div.removedItems?.length > 0 && (
                     <div className="px-4 py-2 text-xs flex flex-wrap items-center gap-x-3 gap-y-1" style={{ borderTop: '1px solid #F3F4F6', color: '#9CA3AF' }}>
