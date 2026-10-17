@@ -13,7 +13,9 @@ import { withDesignPermits } from './remodelDesignPermits';
 
 export const SPEC_LEVELS = ['standard', 'mid', 'custom'];
 
-export const DEFAULT_PCT_RATES = { profitPct: 35, contingencyPct: 10 };
+// salesTaxPct: Virginia sales tax on materials (6% in Hampton Roads), on the
+// materials share of the direct costs. Budgets saved before it count it as 0%.
+export const DEFAULT_PCT_RATES = { profitPct: 35, contingencyPct: 10, salesTaxPct: 6 };
 const MAX_MARGIN_PCT = 95; // a 100% margin would divide by zero
 
 /**
@@ -760,8 +762,15 @@ const BASE_REMODEL_CONFIGS = {
   ...RENOVATION_CONFIGS,
 };
 
-// Every project type starts with a "Design & Permits" section (see remodelDesignPermits.js).
-export const REMODEL_CONFIGS = withDesignPermits(BASE_REMODEL_CONFIGS);
+// Every project type starts with a "Design & Permits" section (see remodelDesignPermits.js),
+// and its Margins & Contingency section starts with Materials Sales Tax (M.4).
+const SALES_TAX_LINE = { wbs: 'M.4', label: 'Materials Sales Tax', unit: 'pct', pctKey: 'salesTaxPct', pctLabel: 'Tax %' };
+const withSalesTax = (configs) => Object.fromEntries(Object.entries(configs).map(([type, cfg]) => [type, {
+  ...cfg,
+  divisions: cfg.divisions.map((d) => (d.key === 'divM' && !d.items.some((it) => it.wbs === 'M.4')
+    ? { ...d, items: [SALES_TAX_LINE, ...d.items] } : d)),
+}]));
+export const REMODEL_CONFIGS = withSalesTax(withDesignPermits(BASE_REMODEL_CONFIGS));
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Public API

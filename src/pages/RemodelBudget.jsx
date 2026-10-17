@@ -1390,7 +1390,8 @@ export default function RemodelBudget() {
       setProjectType(type);
       setInputs({ ...defaultInputs(type), ...(budget.inputs_json || {}) });
       setSpecLevel(budget.spec_level || 'mid');
-      setPctRates(budget.pct_rates_json || DEFAULT_PCT_RATES);
+      // Budgets saved before the sales tax line keep their totals (0% until set).
+      setPctRates({ ...DEFAULT_PCT_RATES, salesTaxPct: 0, ...(budget.pct_rates_json || {}) });
       setUserVals(budget.overrides_json || {});
       setOverrideFlags(budget.flags_json || {});
       setLayout(upgradeLayout(normalizeLayout(budget.layout_json), getProjectConfig(type)));
@@ -1609,6 +1610,7 @@ export default function RemodelBudget() {
     setPctRates({
       profitPct: rate(tpl.pctRates?.profitPct, DEFAULT_PCT_RATES.profitPct),
       contingencyPct: rate(tpl.pctRates?.contingencyPct, DEFAULT_PCT_RATES.contingencyPct),
+      salesTaxPct: rate(tpl.pctRates?.salesTaxPct, DEFAULT_PCT_RATES.salesTaxPct),
     });
     setUserVals(amounts);
     setOverrideFlags(Object.fromEntries(Object.keys(amounts).map((w) => [w, true])));
@@ -1686,14 +1688,20 @@ export default function RemodelBudget() {
     }
     const nonPctWbs = allNonPctWbs(config);
     const baseSum = nonPctWbs.reduce((s, w) => s + (vals[w] ?? 0), 0) + designSpecsTotal;
-    vals['M.3'] = overrideFlags['M.3'] ? (userVals['M.3'] ?? 0) : baseSum * (pctRates.contingencyPct / 100);
+    // Materials sales tax: on each line's materials share (its cost split) plus
+    // approved design selections. A real cost, so contingency and margin apply to it.
+    const materialsBase = config.divisions.flatMap((d) => d.items).filter((it) => it.unit !== 'pct')
+      .reduce((s, it) => s + (vals[it.wbs] ?? 0) * (lineSplit(it, layout).m / 100), 0) + designSpecsTotal;
+    vals['M.4'] = overrideFlags['M.4'] ? (userVals['M.4'] ?? 0) : materialsBase * ((pctRates.salesTaxPct ?? 0) / 100);
+    const costBase = baseSum + vals['M.4'];
+    vals['M.3'] = overrideFlags['M.3'] ? (userVals['M.3'] ?? 0) : costBase * (pctRates.contingencyPct / 100);
     // Final Price = (Direct Costs + Contingency) / (1 - Target Gross Margin %).
     // M.2 is the gross margin, which covers overhead and profit.
     vals['M.2'] = overrideFlags['M.2']
       ? (userVals['M.2'] ?? 0)
-      : grossMarginAmount(baseSum + vals['M.3'], pctRates.profitPct);
+      : grossMarginAmount(costBase + vals['M.3'], pctRates.profitPct);
     return vals;
-  }, [config, projectType, inputs, specLevel, pctRates, userVals, overrideFlags, designSpecsTotal, layout.factors]);
+  }, [config, projectType, inputs, specLevel, pctRates, userVals, overrideFlags, designSpecsTotal, layout]);
 
   // ── Aggregate totals (budget + actual) ──────────────────────────────────────
   const totals = useMemo(() => {
@@ -1710,7 +1718,8 @@ export default function RemodelBudget() {
     const directCosts        = nonPct.reduce((s, w) => s + (lineVals[w] ?? 0), 0) + designSpecsTotal + changeOrderCost;
     const profit             = (lineVals['M.2'] ?? 0) + changeOrderMargin;   // gross margin (overhead + profit)
     const contingency        = lineVals['M.3'] ?? 0;
-    const totalClientPrice   = directCosts + contingency + profit;
+    const salesTax           = lineVals['M.4'] ?? 0;   // materials sales tax (a cost)
+    const totalClientPrice   = directCosts + salesTax + contingency + profit;
     const contractorMargin   = profit;
     const marginPct          = totalClientPrice > 0 ? contractorMargin / totalClientPrice : 0;
     const marginTarget       = (pctRates.profitPct ?? 0) / 100;
@@ -1719,11 +1728,11 @@ export default function RemodelBudget() {
 
     // Actual — compared with the COST budget (direct + contingency), never with
     // the client price, which also contains the gross margin.
-    const budgetCost         = directCosts + contingency;
+    const budgetCost         = directCosts + salesTax + contingency;
     const actualDirectCosts  = nonPct.reduce((s, w) => s + (actualVals[w] ?? 0), 0);
     const actualOverhead     = actualVals['M.1'] ?? 0;   // legacy line from before the gross-margin model
     const actualContingency  = actualVals['M.3'] ?? 0;
-    const actualTotalCost    = actualDirectCosts + actualOverhead + actualContingency;
+    const actualTotalCost    = actualDirectCosts + actualOverhead + actualContingency + (actualVals['M.4'] ?? 0);
     const totalVariance      = budgetCost - actualTotalCost;
     const projectedMargin    = totalClientPrice - actualTotalCost;
     const projectedMarginPct = totalClientPrice > 0 ? projectedMargin / totalClientPrice : 0;
@@ -1734,7 +1743,7 @@ export default function RemodelBudget() {
       divSums[div.key] = div.items.reduce((s, item) => s + (lineVals[item.wbs] ?? 0), 0);
 
     return {
-      directCosts, profit, contingency, totalClientPrice,
+      directCosts, profit, contingency, salesTax, totalClientPrice,
       contractorMargin, marginPct, marginTarget, costPerSqft, divSums,
       budgetCost, actualDirectCosts, actualOverhead, actualContingency,
       actualTotalCost, totalVariance, projectedMargin, projectedMarginPct,
@@ -2268,9 +2277,10 @@ export default function RemodelBudget() {
   ${allowancesHTML}
   <div class="totals-block">
     <div class="totals-row sub"><span class="t-label">Direct Costs (Materials + Labor)</span><span class="t-value">$${Math.round(totals.directCosts).toLocaleString('en-US')}</span></div>
+    ${totals.salesTax > 0 ? `<div class="totals-row sub"><span class="t-label">Materials Sales Tax (${pctRates.salesTaxPct ?? 0}% of materials)</span><span class="t-value">$${Math.round(totals.salesTax).toLocaleString('en-US')}</span></div>` : ''}
     <div class="totals-row sub"><span class="t-label">Contingency (${pctRates.contingencyPct}%)</span><span class="t-value">$${Math.round(totals.contingency).toLocaleString('en-US')}</span></div>
     <div class="totals-row sub"><span class="t-label">Gross Margin (${pctRates.profitPct}% of client price — covers overhead + profit)</span><span class="t-value">$${Math.round(totals.profit).toLocaleString('en-US')}</span></div>
-    ${hasActuals ? `<div class="totals-row sub"><span class="t-label">Cost Budget (Direct + Contingency)</span><span class="t-value">$${Math.round(totals.budgetCost).toLocaleString('en-US')}</span></div>` : ''}
+    ${hasActuals ? `<div class="totals-row sub"><span class="t-label">Cost Budget (Direct${totals.salesTax > 0 ? ' + Tax' : ''} + Contingency)</span><span class="t-value">$${Math.round(totals.budgetCost).toLocaleString('en-US')}</span></div>` : ''}
     ${hasActuals ? `<div class="totals-row sub"><span class="t-label">Actual Cost Expended</span><span class="t-value" style="color:#0369A1">$${Math.round(totals.actualTotalCost).toLocaleString('en-US')}</span></div>` : ''}
     ${hasActuals ? `<div class="totals-row sub"><span class="t-label">Cost Variance (Cost Budget − Actual)</span><span class="t-value" style="color:${totals.totalVariance < 0 ? '#DC2626' : '#065F46'}">${totals.totalVariance >= 0 ? '+' : '−'}$${Math.round(Math.abs(totals.totalVariance)).toLocaleString('en-US')}</span></div>` : ''}
     <div class="totals-row grand"><span class="t-label">TOTAL CLIENT PRICE (BUDGET)</span><span class="t-value">$${Math.round(totals.totalClientPrice).toLocaleString('en-US')}</span></div>
@@ -3085,7 +3095,7 @@ ${sheets}
       {/* Grand total footer — reads left to right like the pricing formula:
           Direct + Contingency = Total Project Cost; ÷ (1 − margin) = Client Price */}
       <div className="mt-6 rounded-2xl p-6" style={{ backgroundColor: '#002147' }}>
-        <div className="grid gap-6 grid-cols-2 sm:grid-cols-5">
+        <div className={`grid gap-6 grid-cols-2 ${totals.salesTax > 0 ? 'sm:grid-cols-6' : 'sm:grid-cols-5'}`}>
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'rgba(212,175,55,0.6)' }}>Direct Costs</p>
             <p className="text-base font-extrabold text-white">{fmt(totals.directCosts)}</p>
@@ -3095,6 +3105,14 @@ ${sheets}
               </p>
             )}
           </div>
+          {totals.salesTax > 0 && (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'rgba(212,175,55,0.6)' }}>
+                + Materials Tax{overrideFlags['M.4'] ? '' : ` (${pctRates.salesTaxPct ?? 0}%)`}
+              </p>
+              <p className="text-base font-extrabold text-white">{fmt(totals.salesTax)}</p>
+            </div>
+          )}
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'rgba(212,175,55,0.6)' }}>
               + Contingency{overrideFlags['M.3'] ? '' : ` (${pctRates.contingencyPct}%)`}
