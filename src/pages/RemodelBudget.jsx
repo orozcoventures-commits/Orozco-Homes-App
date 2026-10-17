@@ -12,6 +12,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { selectProjects } from '../lib/projectList';
 import ProjectOptions from '../components/ProjectOptions';
+import BudgetVersions from '../components/BudgetVersions';
 import { useProject } from '../context/ProjectContext';
 import { buildContractPrefill, buildProposalPrefill } from '../utils/contractPrefill';
 import { starterScope, MAX_SCOPE } from '../utils/tradeScopes';
@@ -2463,6 +2464,36 @@ ${sheets}
     if (win) { win.document.write(html); win.document.close(); }
   }
 
+  // ── Estimate versions (migration 056) ───────────────────────────────────────
+  // What a saved version keeps: the estimate's saved fields, each line's amount
+  // and the totals at that moment.
+  function versionSnapshot() {
+    return {
+      budget: {
+        project_type: projectType, spec_level: specLevel, inputs_json: inputs, pct_rates_json: pctRates,
+        overrides_json: userVals, flags_json: overrideFlags, layout_json: layout,
+      },
+      lines: config.divisions.flatMap((div) => div.items.map((it) => ({
+        wbs: it.wbs, label: it.label, section: div.label, value: Math.round(lineVals[it.wbs] ?? 0),
+      }))),
+      totals: {
+        clientPrice: Math.round(totals.totalClientPrice ?? 0), directCosts: Math.round(totals.directCosts ?? 0),
+        budgetCost: Math.round(totals.budgetCost ?? 0), margin: Math.round(totals.profit ?? 0),
+      },
+    };
+  }
+  function restoreVersion(b) {
+    if (!b || typeof b !== 'object') return;
+    const type = getProjectConfig(b.project_type) ? b.project_type : projectType;
+    setProjectType(type);
+    setInputs({ ...defaultInputs(type), ...(b.inputs_json || {}) });
+    setSpecLevel(SPEC_LEVELS.includes(b.spec_level) ? b.spec_level : 'mid');
+    setPctRates({ ...DEFAULT_PCT_RATES, salesTaxPct: 0, ...(b.pct_rates_json || {}) });
+    setUserVals(b.overrides_json || {});
+    setOverrideFlags(b.flags_json || {});
+    setLayout(upgradeLayout(normalizeLayout(b.layout_json), getProjectConfig(type)));
+  }
+
   // ── Delete this budget ──────────────────────────────────────────────────────
   // Removes only this project's budget (remodel_budgets row) and its actual
   // costs. The project, client, photos, updates, selections, change orders,
@@ -2493,8 +2524,8 @@ ${sheets}
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
 
       {/* Header */}
-      <div className="flex items-start justify-between mb-6 gap-4">
-        <div className="min-w-0 flex-1">
+      <div className="flex flex-wrap items-start justify-between mb-6 gap-4">
+        <div className="min-w-[260px] flex-1">
           <p className="text-xs font-bold tracking-[0.18em] uppercase mb-0.5" style={{ color: '#D4AF37' }}>
             Contractor Tool
           </p>
@@ -2528,7 +2559,7 @@ ${sheets}
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0 mt-1">
+        <div className="flex flex-wrap items-center gap-2 mt-1">
           {hasOverrides && (
             <button onClick={resetAll}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold"
@@ -2596,6 +2627,11 @@ ${sheets}
       {contractError && (
         <p role="alert" className="-mt-4 mb-4 text-xs text-right" style={{ color: '#DC2626' }}>{contractError}</p>
       )}
+
+      {/* Saved versions of this estimate (full width, under the header) */}
+      <div className="-mt-3 mb-5">
+        <BudgetVersions projectId={currentProjectId} getSnapshot={versionSnapshot} onRestore={restoreVersion} />
+      </div>
 
       {/* Project type selector */}
       <div className="rounded-2xl p-5 mb-5"
