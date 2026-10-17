@@ -286,7 +286,7 @@ export default function AdminCreateProject() {
                 className="w-full text-sm rounded-xl px-4 py-3"
                 style={{ backgroundColor: '#FEF9E7', border: '1.5px solid #FDE68A', color: '#92400E' }}
               >
-                No clients found. Go to <strong>Manage Clients</strong> to add your first client.
+                No clients found. Go to <strong>Clients</strong> to add your first client.
               </div>
             ) : (
               <StyledSelect value={clientId} onChange={(e) => setClientId(e.target.value)}>

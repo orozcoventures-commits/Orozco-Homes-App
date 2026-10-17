@@ -6,6 +6,18 @@ import { supabase } from '../lib/supabase';
 
 const SIDEBAR_COLOR = '#1B4F6B';
 
+// Menu sections and names, in the order of a job: win it, price it, build it.
+// Pages not listed here (e.g. Create New Project, opened from the Dashboard's
+// "+ New Project") stay reachable but are not in the menu.
+const NAV_SECTIONS = [
+  { title: 'Home',          items: [['home', 'Dashboard']] },
+  { title: 'Sales',         items: [['manage-clients', 'Clients'], ['questionnaires', 'Questionnaires'], ['proposals', 'Proposals'], ['contracts', 'Contracts']] },
+  { title: 'Estimating',    items: [['remodel-budget', 'Remodel Estimates'], ['new-home-budget', 'New Home Estimates']] },
+  { title: 'Projects',      items: [['schedule', 'Schedule'], ['weekly-updates', 'Progress Updates'], ['photo-log', 'Photos'], ['designer-workspace', 'Selections'], ['approvals', 'Change Orders']] },
+  { title: 'Communication', items: [['messages', 'Messages'], ['client-portal', 'Client Portal']] },
+  { title: 'Resources',     items: [['subcontractors', 'Subcontractors'], ['readme', 'User Guide']] },
+];
+
 const CONTRACTOR_TOOLS = [
   {
     // Projects grouped by stage (Active, Potential, On Hold, Completed).
@@ -321,49 +333,55 @@ export default function Sidebar({ isOpen, onClose }) {
 
       {/* ── Nav ────────────────────────────────────────── */}
       <nav className="flex-1 px-3 py-4">
-        <p
-          className="px-3 mb-2 text-xs font-bold tracking-[0.14em] uppercase"
-          style={{ color: 'rgba(255,255,255,0.4)' }}
-        >
-          {isDesigner ? 'Design Studio' : isClient ? 'My Project' : 'Contractor Tools'}
-        </p>
-        <div className="space-y-0.5">
-          {CONTRACTOR_TOOLS.filter((t) => toolVisible(t)).map((tool) => {
-            const isActive = activePage === tool.page;
-            const count    = tool.page === 'approvals' ? pendingApprovals
-                           : tool.page === 'messages'  ? unreadMessages
-                           : 0;
-            return (
-              <div key={tool.page}>
-                {tool.page === 'readme' && (
-                  <div className="my-2 mx-1" style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }} />
-                )}
-                <button
-                  onClick={() => navigatePage(tool.page)}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150 focus:outline-none"
-                  style={{
-                    color:           isActive ? '#D4AF37' : 'rgba(255,255,255,0.72)',
-                    backgroundColor: isActive ? 'rgba(212,175,55,0.18)' : 'transparent',
-                    borderLeft:      isActive ? '2px solid #D4AF37' : '2px solid transparent',
-                  }}
-                  onMouseEnter={(e) => { if (!isActive) { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#fff'; } }}
-                  onMouseLeave={(e) => { if (!isActive) { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.72)'; } }}
-                >
-                  <span style={{ color: isActive ? '#D4AF37' : 'rgba(255,255,255,0.55)' }}>{tool.icon}</span>
-                  <span className="flex-1 text-left">{tool.label}</span>
-                  {count > 0 && (
-                    <span
-                      className="text-xs font-bold px-1.5 py-0.5 rounded-full shrink-0"
-                      style={{ backgroundColor: '#EF4444', color: '#fff', fontSize: '0.6rem', minWidth: '18px', textAlign: 'center' }}
+        {NAV_SECTIONS.map((section) => {
+          const tools = section.items
+            .map(([page, label]) => {
+              const tool = CONTRACTOR_TOOLS.find((t) => t.page === page);
+              return tool && toolVisible(tool) ? { ...tool, label } : null;
+            })
+            .filter(Boolean);
+          if (!tools.length) return null;
+          return (
+            <div key={section.title} className="mb-3">
+              <p className="px-3 mb-1 text-xs font-bold tracking-[0.14em] uppercase" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                {section.title}
+              </p>
+              <div className="space-y-0.5">
+                {tools.map((tool) => {
+                  const isActive = activePage === tool.page;
+                  const count    = tool.page === 'approvals' ? pendingApprovals
+                                 : tool.page === 'messages'  ? unreadMessages
+                                 : 0;
+                  return (
+                    <button
+                      key={tool.page}
+                      onClick={() => navigatePage(tool.page)}
+                      className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-semibold transition-all duration-150 focus:outline-none"
+                      style={{
+                        color:           isActive ? '#D4AF37' : 'rgba(255,255,255,0.72)',
+                        backgroundColor: isActive ? 'rgba(212,175,55,0.18)' : 'transparent',
+                        borderLeft:      isActive ? '2px solid #D4AF37' : '2px solid transparent',
+                      }}
+                      onMouseEnter={(e) => { if (!isActive) { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#fff'; } }}
+                      onMouseLeave={(e) => { if (!isActive) { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.72)'; } }}
                     >
-                      {count}
-                    </span>
-                  )}
-                </button>
+                      <span style={{ color: isActive ? '#D4AF37' : 'rgba(255,255,255,0.55)' }}>{tool.icon}</span>
+                      <span className="flex-1 text-left">{tool.label}</span>
+                      {count > 0 && (
+                        <span
+                          className="text-xs font-bold px-1.5 py-0.5 rounded-full shrink-0"
+                          style={{ backgroundColor: '#EF4444', color: '#fff', fontSize: '0.6rem', minWidth: '18px', textAlign: 'center' }}
+                        >
+                          {count}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
-            );
-          })}
-        </div>
+            </div>
+          );
+        })}
       </nav>
 
       {/* ── User info + logout ─────────────────────────── */}

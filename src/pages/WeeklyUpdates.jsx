@@ -532,7 +532,7 @@ export default function WeeklyUpdates() {
         </p>
         <div className="flex items-center gap-3 flex-wrap">
           <h2 className="text-2xl font-bold" style={{ color: '#002147' }}>
-            {isAdmin ? 'Weekly Project Updates' : 'Your Project Update'}
+            {isAdmin ? 'Progress Updates' : 'Your Project Update'}
           </h2>
           <span
             className="text-xs px-2.5 py-1 rounded-full font-bold"

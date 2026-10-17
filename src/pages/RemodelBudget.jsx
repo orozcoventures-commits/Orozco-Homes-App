@@ -2395,7 +2395,7 @@ ${sheets}
             Contractor Tool
           </p>
           <h1 className="text-2xl font-extrabold" style={{ color: '#002147' }}>
-            Remodel Budget Calculator
+            Remodel Estimate
           </h1>
           <p className="text-sm mt-1" style={{ color: '#6B7280' }}>
             Live WBS estimator — Virginia Beach / Hampton Roads, 2026.

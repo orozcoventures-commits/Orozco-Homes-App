@@ -179,7 +179,7 @@ export default function ProjectSelector() {
         <div className="rounded-2xl p-10 text-center" style={{ backgroundColor: '#fff', border: '1.5px dashed #E8E6E1' }}>
           <p className="text-sm font-semibold mb-1" style={{ color: '#374151' }}>No client projects yet</p>
           <p className="text-xs" style={{ color: '#9CA3AF' }}>
-            Go to <strong>Manage Clients</strong> to add a client, then <strong>Create New Project</strong> to assign one.
+            Go to <strong>Clients</strong> to add a client, then click <strong>+ New Project</strong> to assign one.
           </p>
         </div>
       ) : (
