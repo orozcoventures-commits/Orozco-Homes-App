@@ -75,6 +75,7 @@ const DIV_COLORS = {
   '4': { color: '#B45309', bg: '#FFFBEB', border: '#FDE68A' },
   '5': { color: '#C2410C', bg: '#FFF7ED', border: '#FDBA74' },
   'F': { color: '#78350F', bg: '#FDF6EC', border: '#E7C9A0' },
+  'S': { color: '#475569', bg: '#F1F5F9', border: '#CBD5E1' },
   'E': { color: '#A16207', bg: '#FEFCE8', border: '#FDE047' },
   'M': { color: '#991B1B', bg: '#FEF2F2', border: '#FECACA' },
 };
@@ -107,8 +108,10 @@ function defaultInputs(projectTypeId) {
 //            trades: { wbs: tradeKey },           (Subs & Materials view, see below)
 //            scopes: { tradeKey: text },          (this budget's Scope of Work per trade)
 //            subs: { tradeKey: { id, name } },    (who performs each trade — subcontractor_directory)
-//            factors: { wbs: n } }                (price adjustment × built-in price, from "My template")
-const EMPTY_LAYOUT = { added: [], labels: {}, removed: [], splits: {}, allowances: {}, trades: {}, scopes: {}, subs: {}, factors: {} };
+//            factors: { wbs: n },                 (price adjustment × built-in price, from "My template")
+//            v: 2 }                               (layout version, see upgradeLayout)
+const LAYOUT_VERSION = 2;
+const EMPTY_LAYOUT = { added: [], labels: {}, removed: [], splits: {}, allowances: {}, trades: {}, scopes: {}, subs: {}, factors: {}, v: LAYOUT_VERSION };
 const MAX_LABEL = 120;
 
 function normalizeLayout(raw) {
@@ -141,6 +144,26 @@ function normalizeLayout(raw) {
     factors: Object.fromEntries(Object.entries(l.factors && typeof l.factors === 'object' ? l.factors : {})
       .filter(([, v]) => Number.isFinite(Number(v)) && Number(v) >= 0 && Number(v) <= 100)
       .map(([k, v]) => [k, Number(v)])),
+    v: Number.isInteger(l.v) ? l.v : 1,
+  };
+}
+
+// Version 2 split "Demo & Prep" into Demo + Site Prep and added the Site Prep
+// lines S.1–S.3. Budgets (and templates) saved before keep their totals: the
+// new lines start removed (Restore brings them back), and lines the user added
+// for dumpsters, porta potties or protection move from Demo to Site Prep.
+const SITE_PREP_NEW_LINES = ['S.1', 'S.2', 'S.3'];
+const SITE_PREP_RE = /dumpster|roll-?off|porta|portable toilet|protection|dust barrier|zip ?wall|ram ?board/i;
+function upgradeLayout(layout, cfg) {
+  if (layout.v >= LAYOUT_VERSION || !cfg) return { ...layout, v: LAYOUT_VERSION };
+  const hasSitePrep = cfg.divisions.some((d) => d.key === 'divS');
+  const builtIn = new Set(cfg.divisions.flatMap((d) => d.items.map((it) => it.wbs)));
+  const newLines = SITE_PREP_NEW_LINES.filter((w) => builtIn.has(w) && !layout.removed.includes(w));
+  return {
+    ...layout,
+    removed: [...layout.removed, ...newLines],
+    added: layout.added.map((a) => (hasSitePrep && a.div === 'div1' && SITE_PREP_RE.test(a.label) ? { ...a, div: 'divS' } : a)),
+    v: LAYOUT_VERSION,
   };
 }
 
@@ -164,6 +187,7 @@ function clampSplit(v) {
 // First matching rule wins: [pattern, materials %, other %].
 const SPLIT_RULES = [
   [/permit|engineering|asbestos test|inspection/i,                                0, 100],
+  [/dumpster|roll-?off|porta potty|portable toilet/i,                              0, 100],
   [/demo|tear-out|remov|haul|scrape|debris/i,                                      5,  10],
   [/protection|masking|dust/i,                                                    30,   0],
   [/drying|dehumidification|mold treatment/i,                                     15,   0],
@@ -1268,7 +1292,7 @@ export default function RemodelBudget() {
       setPctRates(budget.pct_rates_json || DEFAULT_PCT_RATES);
       setUserVals(budget.overrides_json || {});
       setOverrideFlags(budget.flags_json || {});
-      setLayout(normalizeLayout(budget.layout_json));
+      setLayout(upgradeLayout(normalizeLayout(budget.layout_json), getProjectConfig(type)));
       // Open all divisions
       const cfg = getProjectConfig(type);
       if (cfg) setOpenDivs(Object.fromEntries(cfg.divisions.map((d) => [d.key, true])));
@@ -1460,8 +1484,8 @@ export default function RemodelBudget() {
         }
       }
     }
-    const { added, labels, removed, splits, allowances, trades } = layout;
-    return { version: 1, specLevel, pctRates, layout: { added, labels, removed, splits, allowances, trades, factors }, amounts };
+    const { added, labels, removed, splits, allowances, trades, v } = layout;
+    return { version: 1, specLevel, pctRates, layout: { added, labels, removed, splits, allowances, trades, factors, v }, amounts };
   }
 
   // Starts this budget from a saved template (keeps size, scopes and subs).
@@ -1469,7 +1493,7 @@ export default function RemodelBudget() {
   function applyTemplate(typeId, tpl, keep) {
     const cfg = getProjectConfig(typeId);
     if (!cfg || !tpl || typeof tpl !== 'object') return;
-    const l = normalizeLayout(tpl.layout);
+    const l = upgradeLayout(normalizeLayout(tpl.layout), cfg);
     l.removed = l.removed.filter((w) => !((actualVals[w] ?? 0) > 0));
     l.scopes = keep.scopes ?? {};
     l.subs = keep.subs ?? {};

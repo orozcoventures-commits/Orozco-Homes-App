@@ -60,9 +60,13 @@ export const RENOVATION_CONFIGS = {
     icon: 'bath',
     inputFields: [sqftInput('Shower Size', 15, 9, 60, 1)],
     divisions: [
-      D('div1', '1', 'Demo & Prep', [
+      D('div1', '1', 'Demo', [
         L('1.1', 'Tub Removal & Haul',                    'flat',  700,  900, 1200),
-        L('1.2', 'Floor & Wall Protection',               'flat',  200,  300,  450),
+      ]),
+      D('divS', 'S', 'Site Prep', [
+        L('S.1', 'Dumpster (Roll-Off, Haul & Disposal)',  'flat',  395,  450,  525),
+        L('S.2', 'Porta Potty (Rental + Weekly Service)', 'flat',  185,  210,  265),
+        { ...L('1.2', 'Floor & Wall Protection',               'flat',  200,  300,  450), badge: 'S.3' },   // moved from Demo & Prep (same wbs)
       ]),
       D('div2', '2', 'Plumbing Rough-In', [
         L('2.1', 'Valve Relocation & Drain Conversion',   'flat',  900, 1300, 2000),
@@ -88,8 +92,13 @@ export const RENOVATION_CONFIGS = {
     icon: 'bath',
     inputFields: [sqftInput('Bathroom Size', 50, 20, 200, 5)],
     divisions: [
-      D('div1', '1', 'Demo & Prep', [
+      D('div1', '1', 'Demo', [
         L('1.1', 'Remove Old Fixtures & Haul',            'flat',  400,  600,  900),
+      ]),
+      D('divS', 'S', 'Site Prep', [
+        L('S.1', 'Dumpster (Roll-Off, Haul & Disposal)',  'flat',  350,  395,  450),
+        L('S.2', 'Porta Potty (Rental + Weekly Service)', 'flat',  185,  210,  265),
+        L('S.3', 'Site Protection & Dust Barriers',       'flat',  150,  200,  275),
       ]),
       D('div2', '2', 'Fixtures & Finishes', [
         L('2.1', 'Vanity + Top',                          'flat', 1200, 2200, 4500),
@@ -116,8 +125,13 @@ export const RENOVATION_CONFIGS = {
     icon: 'bath',
     inputFields: [sqftInput('Bathroom Size', 60, 30, 200, 5)],
     divisions: [
-      D('div1', '1', 'Demo & Prep', [
+      D('div1', '1', 'Demo', [
         L('1.1', 'Demo & Haul',                           'sqft',   14,   16,   20),
+      ]),
+      D('divS', 'S', 'Site Prep', [
+        L('S.1', 'Dumpster (Roll-Off, Haul & Disposal)',  'flat',  475,  550,  650),
+        L('S.2', 'Porta Potty (Rental + Weekly Service)', 'flat',  185,  210,  265),
+        L('S.3', 'Site Protection & Dust Barriers',       'flat',  250,  325,  450),
       ]),
       D('div2', '2', 'Plumbing Rough-In', [
         L('2.1', 'Curbless Drain, Valve & Supply',        'flat', 2500, 3400, 5000),
@@ -151,8 +165,13 @@ export const RENOVATION_CONFIGS = {
     icon: 'bath',
     inputFields: [],
     divisions: [
-      D('div1', '1', 'Demo & Prep', [
+      D('div1', '1', 'Demo', [
         L('1.1', 'Remove Old Vanity & Haul',              'flat',  300,  400,  600),
+      ]),
+      D('divS', 'S', 'Site Prep', [
+        L('S.1', 'Dumpster (Roll-Off, Haul & Disposal)',  'flat',  350,  395,  450),
+        L('S.2', 'Porta Potty (Rental + Weekly Service)', 'flat',  185,  210,  265),
+        L('S.3', 'Site Protection & Dust Barriers',       'flat',  150,  200,  275),
       ]),
       D('div2', '2', 'Plumbing Rough-In', [
         L('2.1', 'Plumbing Branch for Second Sink',       'flat',  900, 1300, 1900),
@@ -181,9 +200,13 @@ export const RENOVATION_CONFIGS = {
     icon: 'kitchen',
     inputFields: [lfInput('Cabinet Length', 20, 6, 60)],
     divisions: [
-      D('div1', '1', 'Demo & Prep', [
-        L('1.1', 'Protection & Prep',                     'flat',  300,  400,  600),
-        L('1.2', 'Countertop Tear-Out & Haul',            'flat',  400,  600,  900),
+      D('div1', '1', 'Demo', [
+        { ...L('1.2', 'Countertop Tear-Out & Haul',            'flat',  400,  600,  900), badge: '1.1' },
+      ]),
+      D('divS', 'S', 'Site Prep', [
+        L('S.1', 'Dumpster (Roll-Off, Haul & Disposal)',  'flat',  395,  450,  525),
+        L('S.2', 'Porta Potty (Rental + Weekly Service)', 'flat',  185,  210,  265),
+        { ...L('1.1', 'Protection & Prep',                     'flat',  300,  400,  600), badge: 'S.3' },   // moved from Demo & Prep (same wbs)
       ]),
       D('div2', '2', 'Cabinets', [
         L('2.1', 'Cabinet Painting (Doors + Boxes)',      'linear_ft', 120, 170, 260),
@@ -236,9 +259,13 @@ export const RENOVATION_CONFIGS = {
     icon: 'renovation',
     inputFields: [lfInput('Built-In Length', 8, 2, 30)],
     divisions: [
-      D('div1', '1', 'Demo & Prep', [
+      D('div1', '1', 'Demo', [
         L('1.1', 'Fireplace & Hearth Demo + Haul',        'flat', 2500, 3500, 5000),
-        L('1.2', 'Dust Protection',                       'flat',  250,  350,  500),
+      ]),
+      D('divS', 'S', 'Site Prep', [
+        L('S.1', 'Dumpster (Roll-Off, Haul & Disposal)',  'flat',  475,  550,  650),
+        L('S.2', 'Porta Potty (Rental + Weekly Service)', 'flat',  185,  210,  265),
+        { ...L('1.2', 'Dust Protection',                       'flat',  250,  350,  500), badge: 'S.3' },   // moved from Demo & Prep (same wbs)
       ]),
       D('div2', '2', 'Structure & Framing', [
         L('2.1', 'Chimney Cap & Roof Patch',              'flat', 1200, 1800, 2800),
@@ -402,8 +429,13 @@ export const RENOVATION_CONFIGS = {
     icon: 'renovation',
     inputFields: [sqftInput('Room Size', 60, 20, 300, 5)],
     divisions: [
-      D('div1', '1', 'Demo & Prep', [
+      D('div1', '1', 'Demo', [
         L('1.1', 'Demo & Haul',                           'sqft',    8,   10,   14),
+      ]),
+      D('divS', 'S', 'Site Prep', [
+        L('S.1', 'Dumpster (Roll-Off, Haul & Disposal)',  'flat',  425,  475,  550),
+        L('S.2', 'Porta Potty (Rental + Weekly Service)', 'flat',  185,  210,  265),
+        L('S.3', 'Site Protection & Dust Barriers',       'flat',  200,  275,  375),
       ]),
       D('div2', '2', 'Plumbing Rough-In', [
         L('2.1', 'Utility Sink & Washer Box',             'flat', 1000, 1500, 2400),
@@ -475,8 +507,13 @@ export const RENOVATION_CONFIGS = {
     icon: 'renovation',
     inputFields: [qtyInput('Number of Steps', 14, 3, 40)],
     divisions: [
-      D('div1', '1', 'Demo & Prep', [
+      D('div1', '1', 'Demo', [
         L('1.1', 'Remove Old Treads / Carpet',            'flat',  400,  600,  900),
+      ]),
+      D('divS', 'S', 'Site Prep', [
+        L('S.1', 'Dumpster (Roll-Off, Haul & Disposal)',  'flat',  350,  395,  450),
+        L('S.2', 'Porta Potty (Rental + Weekly Service)', 'flat',  185,  210,  265),
+        L('S.3', 'Site Protection & Dust Barriers',       'flat',  150,  200,  275),
       ]),
       D('div2', '2', 'Stairs & Railing', [
         L('2.1', 'Treads & Risers (per step)',            'qty',   220,  320,  520),
