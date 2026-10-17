@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useRef } from 'react';
+import ProjectOptions from '../components/ProjectOptions';
 import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
   addDays, addMonths, subMonths, addWeeks, subWeeks,
@@ -169,9 +170,7 @@ function TaskModal({
               style={{ border: '1.5px solid #E8E6E1', color: '#002147', backgroundColor: '#F9F8F6' }}
             >
               <option value="">— Select project —</option>
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>{p.project_name}</option>
-              ))}
+              <ProjectOptions projects={projects} />
             </select>
           </div>
 
@@ -762,9 +761,7 @@ export default function ScheduleCalendar() {
             style={{ border: '1px solid #E8E6E1', color: '#002147', backgroundColor: '#F9F8F6' }}
           >
             <option value="">All Projects</option>
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>{p.project_name}</option>
-            ))}
+            <ProjectOptions projects={projects} />
           </select>
         </div>
 

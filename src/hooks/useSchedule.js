@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
+import { selectProjects } from '../lib/projectList';
 
 const SCHEDULE_SELECT = `
   *,
@@ -47,10 +48,7 @@ export function useSchedule() {
   }
 
   async function fetchProjects() {
-    const { data } = await supabase
-      .from('projects')
-      .select('id, project_name')
-      .order('created_at', { ascending: false });
+    const { data } = await selectProjects('id, project_name', { orderBy: 'created_at', ascending: false });
     if (data) setProjects(data);
   }
 

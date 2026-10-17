@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useProject } from '../context/ProjectContext';
+import { STAGES } from '../utils/projectStages';
 
 // Returns a random 4-digit zero-padded string, e.g. '0512' or '3921'.
 // Treated strictly as a string so leading zeros are preserved.
@@ -23,12 +24,6 @@ const CATEGORY_OPTIONS = [
 const NEW_TYPE = '__new__';
 const MAX_TYPE_NAME = 60;
 const typeSlug = (name) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
-
-const STATUS_OPTIONS = [
-  { value: 'on-track',  label: 'On Track' },
-  { value: 'attention', label: 'Needs Attention' },
-  { value: 'delayed',   label: 'Delayed' },
-];
 
 function Field({ label, required, children }) {
   return (
@@ -92,7 +87,7 @@ export default function AdminCreateProject() {
   const [newTypeName, setNewTypeName] = useState('');
   const [customTypes, setCustomTypes] = useState([]);   // [{ value, label }] used on earlier projects
   const [projectTitle, setProjectTitle] = useState('');
-  const [status, setStatus]           = useState('on-track');
+  const [stage, setStage]             = useState('potential');
   const [submitting, setSubmitting]   = useState(false);
   const [error, setError]             = useState('');
   const [success, setSuccess]         = useState(null);
@@ -151,17 +146,20 @@ export default function AdminCreateProject() {
 
     const pin = generateUniquePin();
 
-    const { data, error: insertError } = await supabase
-      .from('projects')
-      .insert({
-        managed_client_id: clientId,
-        label:             categoryLabel,
-        project_name:      projectTitle.trim(),
-        category:          categoryValue,
-        project_pin:       pin,
-      })
-      .select()
-      .single();
+    const row = {
+      managed_client_id: clientId,
+      label:             categoryLabel,
+      project_name:      projectTitle.trim(),
+      category:          categoryValue,
+      project_pin:       pin,
+      stage,
+    };
+    let { data, error: insertError } = await supabase.from('projects').insert(row).select().single();
+    // Before migration 055 there is no stage column: create the project without it.
+    if (insertError && /stage/.test(insertError.message ?? '')) {
+      delete row.stage;
+      ({ data, error: insertError } = await supabase.from('projects').insert(row).select().single());
+    }
 
     setSubmitting(false);
 
@@ -179,7 +177,7 @@ export default function AdminCreateProject() {
     setCategory('');
     setNewTypeName('');
     setProjectTitle('');
-    setStatus('on-track');
+    setStage('potential');
   }
 
   function handleCreateAnother() {
@@ -335,11 +333,11 @@ export default function AdminCreateProject() {
             />
           </Field>
 
-          {/* Initial status */}
-          <Field label="Initial Status">
-            <StyledSelect value={status} onChange={(e) => setStatus(e.target.value)}>
-              {STATUS_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
+          {/* Stage */}
+          <Field label="Stage">
+            <StyledSelect value={stage} onChange={(e) => setStage(e.target.value)}>
+              {[...STAGES].sort((a, b) => (a.key === 'potential' ? -1 : b.key === 'potential' ? 1 : 0)).map((o) => (
+                <option key={o.key} value={o.key}>{o.label} — {o.hint}</option>
               ))}
             </StyledSelect>
           </Field>

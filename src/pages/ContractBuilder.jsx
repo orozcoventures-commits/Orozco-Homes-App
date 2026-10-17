@@ -6,6 +6,8 @@ import PaperCopyPanel from '../components/PaperCopyPanel';
 import { CONTRACT_PREFILL_KEYS } from '../utils/contractPrefill';
 import { PROPOSAL_TO_CONTRACT_KEYS } from '../utils/proposalTemplate';
 import { supabase } from '../lib/supabase';
+import { selectProjects } from '../lib/projectList';
+import ProjectOptions from '../components/ProjectOptions';
 import {
   CONTRACT_FIELDS,
   SECTION_LABELS,
@@ -229,7 +231,7 @@ export default function ContractBuilder() {
   }, [projectState.contractDraft, dispatch]);
 
   useEffect(() => {
-    supabase.from('projects').select('id, project_name, managed_client_id').order('project_name')
+    selectProjects('id, project_name, managed_client_id')
       .then(({ data }) => setProjects(data ?? []));
   }, []);
 
@@ -570,7 +572,7 @@ export default function ContractBuilder() {
               <select value={link?.projectId ?? ''} onChange={(e) => handleProjectPick(e.target.value)} aria-label="Project"
                 className="w-full sm:w-1/2" style={inputStyle(false)}>
                 <option value="">— Pick a project —</option>
-                {projects.map((p) => <option key={p.id} value={p.id}>{p.project_name}</option>)}
+                <ProjectOptions projects={projects} />
               </select>
             </div>
             {(() => {

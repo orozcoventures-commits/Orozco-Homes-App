@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
+import { selectProjects } from '../lib/projectList';
+import ProjectOptions from '../components/ProjectOptions';
 import { useDesignSpecs } from '../hooks/useDesignSpecs';
 import { useAuth } from '../context/AuthContext';
 import { useProject } from '../context/ProjectContext';
@@ -394,7 +396,7 @@ function SpecModal({ initial, prefill, projects, onSave, onClose, saving }) {
               style={{ backgroundColor: '#F9FAFB', border: '1.5px solid #E5E7EB', color: '#111827' }}
             >
               <option value="">— Select project —</option>
-              {projects.map((p) => <option key={p.id} value={p.id}>{p.project_name}</option>)}
+              <ProjectOptions projects={projects} />
             </select>
           </div>
 
@@ -816,10 +818,7 @@ export default function DesignerWorkspace() {
 
   // Load projects on mount
   useEffect(() => {
-    supabase
-      .from('projects')
-      .select('id, project_name')
-      .order('created_at', { ascending: false })
+    selectProjects('id, project_name', { orderBy: 'created_at', ascending: false })
       .then(({ data }) => {
         setProjects(data ?? []);
         if (data && data.length > 0) setProjectId(data[0].id);
@@ -924,7 +923,7 @@ export default function DesignerWorkspace() {
               style={{ backgroundColor: '#F9FAFB', border: '1.5px solid #E5E7EB', color: '#111827' }}
             >
               <option value="">— Select a project —</option>
-              {projects.map((p) => <option key={p.id} value={p.id}>{p.project_name}</option>)}
+              <ProjectOptions projects={projects} />
             </select>
           </div>
 

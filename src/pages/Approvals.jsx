@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
+import { selectProjects } from '../lib/projectList';
+import ProjectOptions from '../components/ProjectOptions';
 import { useAuth } from '../context/AuthContext';
 import { useProject } from '../context/ProjectContext';
 
@@ -71,7 +73,7 @@ function AddOrderForm({ projects, onAdded, onCancel }) {
             className={inputCls} style={{ ...inputBaseStyle, backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%239CA3AF\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3E%3Cpolyline points=\'6 9 12 15 18 9\'/%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', appearance: 'none' }}
             onFocus={focused} onBlur={blurred}>
             <option value="">Select project…</option>
-            {projects.map((p) => <option key={p.id} value={p.id}>{p.project_name}</option>)}
+            <ProjectOptions projects={projects} />
           </select>
         </div>
         {/* Category */}
@@ -200,7 +202,7 @@ export default function Approvals() {
   useEffect(() => {
     fetchOrders();
     if (isAdmin) {
-      supabase.from('projects').select('id, project_name').order('project_name')
+      selectProjects('id, project_name')
         .then(({ data }) => setProjects(data ?? []));
     }
   }, [fetchOrders, isAdmin]);
