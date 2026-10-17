@@ -13,9 +13,9 @@ const NAV_SECTIONS = [
   { title: 'Home',          items: [['home', 'Dashboard']] },
   { title: 'Sales',         items: [['manage-clients', 'Clients'], ['questionnaires', 'Questionnaires'], ['proposals', 'Proposals'], ['contracts', 'Contracts']] },
   { title: 'Estimating',    items: [['remodel-budget', 'Remodel Estimates'], ['new-home-budget', 'New Home Estimates']] },
-  { title: 'Projects',      items: [['schedule', 'Schedule'], ['weekly-updates', 'Progress Updates'], ['photo-log', 'Photos'], ['designer-workspace', 'Selections'], ['approvals', 'Change Orders']] },
+  { title: 'Projects',      items: [['schedule', 'Schedule'], ['subcontractors', 'Subcontractors'], ['weekly-updates', 'Progress Updates'], ['photo-log', 'Photos'], ['designer-workspace', 'Selections'], ['approvals', 'Change Orders']] },
   { title: 'Communication', items: [['messages', 'Messages'], ['client-portal', 'Client Portal']] },
-  { title: 'Resources',     items: [['subcontractors', 'Subcontractors'], ['readme', 'User Guide']] },
+  { title: 'Help',          items: [['readme', 'User Guide']] },
 ];
 
 const CONTRACTOR_TOOLS = [
