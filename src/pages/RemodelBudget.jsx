@@ -1172,6 +1172,7 @@ export default function RemodelBudget() {
   // ── Internal project picker ─────────────────────────────────────────────────
   const [dbProjects,     setDbProjects]     = useState([]);
   const [selectedProjId, setSelectedProjId] = useState('');
+  const [deleteMsg,      setDeleteMsg]      = useState(null);   // { status, msg } after "Delete this budget"
 
   // currentProjectId drives all save/load; empty string = standalone mode (no DB save)
   const currentProjectId   = selectedProjId || null;
@@ -2356,6 +2357,31 @@ ${sheets}
     if (win) { win.document.write(html); win.document.close(); }
   }
 
+  // ── Delete this budget ──────────────────────────────────────────────────────
+  // Removes only this project's budget (remodel_budgets row) and its actual
+  // costs. The project, client, photos, updates, selections, change orders,
+  // proposals and contracts stay.
+  async function deleteThisBudget() {
+    if (!currentProjectId) return;
+    const id = currentProjectId;
+    const name = currentProjectName ?? 'this project';
+    if (!confirm(`Delete the budget for "${name}" (Total Client Price ${fmt(totals.totalClientPrice)})?\n\n`
+      + 'This removes this budget\'s lines, prices and actual costs. The project, client, photos, updates, '
+      + 'proposals and contracts stay.\n\nThis can\'t be undone.')) return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    syncingRef.current = true;   // no auto-save while deleting
+    setDeleteMsg({ status: 'deleting', msg: 'Deleting…' });
+    const actualsRes = await supabase.from('remodel_budget_actuals').delete().eq('project_id', id);
+    const budgetRes = actualsRes.error ? actualsRes : await supabase.from('remodel_budgets').delete().eq('project_id', id);
+    if (budgetRes.error) {
+      syncingRef.current = false;
+      setDeleteMsg({ status: 'error', msg: `Not deleted: ${budgetRes.error.message}` });
+      return;
+    }
+    setSelectedProjId('');       // clears the page; picking the project again starts a fresh budget
+    setDeleteMsg({ status: 'deleted', msg: `The budget for "${name}" was deleted.` });
+  }
+
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -2378,7 +2404,7 @@ ${sheets}
             <div className="flex items-center gap-2 flex-1 min-w-48 max-w-xs">
               <select
                 value={selectedProjId}
-                onChange={(e) => setSelectedProjId(e.target.value)}
+                onChange={(e) => { setSelectedProjId(e.target.value); setDeleteMsg(null); }}
                 className="w-full px-3 py-2 rounded-xl text-sm focus:outline-none"
                 style={{ backgroundColor: '#F9FAFB', border: '1.5px solid #E5E7EB', color: '#111827' }}
               >
@@ -3032,6 +3058,24 @@ ${sheets}
             ? 'Click an Actual cell to enter what you spent on that line by Material, Labor and Subcontractor.'
             : 'Pick a project to track actual costs against this budget.'}
         </p>
+      )}
+
+      {/* Delete this budget (only this project's budget and its actual costs) */}
+      {currentProjectId && (
+        <div className="mt-10 pt-5 flex flex-col items-center gap-1.5" style={{ borderTop: '1px solid #E8E6E1' }}>
+          <button type="button" onClick={deleteThisBudget} disabled={deleteMsg?.status === 'deleting'}
+            className="px-4 py-2 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-red-300 disabled:opacity-60"
+            style={{ border: '1.5px solid #FCA5A5', color: '#B91C1C', backgroundColor: '#fff' }}>
+            {deleteMsg?.status === 'deleting' ? 'Deleting…' : 'Delete this budget'}
+          </button>
+          <p className="text-xs text-center" style={{ color: '#9CA3AF' }}>
+            Removes only this budget and its actual costs — the project, client, photos and documents stay.
+          </p>
+        </div>
+      )}
+      {deleteMsg?.msg && deleteMsg.status !== 'deleting' && (
+        <p role={deleteMsg.status === 'error' ? 'alert' : 'status'} className="mt-4 text-sm font-semibold text-center"
+          style={{ color: deleteMsg.status === 'error' ? '#DC2626' : '#059669' }}>{deleteMsg.msg}</p>
       )}
     </div>
   );
