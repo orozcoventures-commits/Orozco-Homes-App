@@ -10,6 +10,8 @@ import {
   grossMarginAmount,
 } from '../utils/remodelBudgetCalculator';
 import { supabase } from '../lib/supabase';
+import { selectProjects } from '../lib/projectList';
+import ProjectOptions from '../components/ProjectOptions';
 import { useProject } from '../context/ProjectContext';
 import { buildContractPrefill, buildProposalPrefill } from '../utils/contractPrefill';
 import { starterScope, MAX_SCOPE } from '../utils/tradeScopes';
@@ -1180,7 +1182,7 @@ export default function RemodelBudget() {
 
   // Load project list once on mount
   useEffect(() => {
-    supabase.from('projects').select('id, project_name').order('created_at', { ascending: false })
+    selectProjects('id, project_name', { orderBy: 'created_at', ascending: false })
       .then(({ data }) => setDbProjects(data ?? []));
   }, []);
 
@@ -2409,7 +2411,7 @@ ${sheets}
                 style={{ backgroundColor: '#F9FAFB', border: '1.5px solid #E5E7EB', color: '#111827' }}
               >
                 <option value="">— No project (unsaved estimate) —</option>
-                {dbProjects.map((p) => <option key={p.id} value={p.id}>{p.project_name}</option>)}
+                <ProjectOptions projects={dbProjects} />
               </select>
             </div>
             {saving && <span className="text-xs" style={{ color: '#9CA3AF' }}>Saving…</span>}

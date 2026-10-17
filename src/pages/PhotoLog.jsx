@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
+import { selectProjects } from '../lib/projectList';
+import ProjectOptions from '../components/ProjectOptions';
 
 const CATEGORIES = ['All', 'Demo', 'Framing', 'Plumbing', 'Electrical', 'Tile', 'Cabinets', 'Finishing'];
 
@@ -193,10 +195,7 @@ export default function PhotoLog() {
         .from('photo_logs')
         .select('id, category, caption, image_url, created_at, likes, project:projects(id, project_name)')
         .order('created_at', { ascending: false }),
-      supabase
-        .from('projects')
-        .select('id, project_name')
-        .order('project_name'),
+      selectProjects('id, project_name'),
     ]);
 
     if (logsRes.data) setFeed(logsRes.data);
@@ -351,7 +350,7 @@ export default function PhotoLog() {
                     className="w-full text-sm rounded-xl px-3 py-2 focus:outline-none"
                     style={{ border: '1.5px solid #E8E6E1', color: '#002147', backgroundColor: '#F9F8F6' }}
                   >
-                    {projects.map((p) => <option key={p.id} value={p.id}>{p.project_name}</option>)}
+                    <ProjectOptions projects={projects} />
                   </select>
                 )}
               </div>

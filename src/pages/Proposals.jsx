@@ -3,6 +3,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useProject } from '../context/ProjectContext';
 import { supabase } from '../lib/supabase';
+import { selectProjects } from '../lib/projectList';
+import ProjectOptions from '../components/ProjectOptions';
 import ProposalDocument from '../components/ProposalDocument';
 import PaperCopyPanel from '../components/PaperCopyPanel';
 import { PROPOSAL_PREFILL_KEYS } from '../utils/contractPrefill';
@@ -260,7 +262,7 @@ export default function Proposals() {
   }, [projectState.proposalDraft, dispatch]);
 
   useEffect(() => {
-    supabase.from('projects').select('id, project_name, managed_client_id').order('project_name')
+    selectProjects('id, project_name, managed_client_id')
       .then(({ data }) => setProjects(data ?? []));
   }, []);
 
@@ -613,7 +615,7 @@ export default function Proposals() {
               <select id="pf-project" value={link?.projectId ?? ''} onChange={(e) => handleProjectPick(e.target.value)}
                 className="w-full sm:w-1/2" style={{ border: `1.5px solid ${BORDER}`, borderRadius: '10px', padding: '0.55rem 0.85rem', fontSize: '0.82rem', color: NAVY, backgroundColor: '#fff' }}>
                 <option value="">— Pick a project —</option>
-                {projects.map((p) => <option key={p.id} value={p.id}>{p.project_name}</option>)}
+                <ProjectOptions projects={projects} />
               </select>
             </div>
             {sections.map((sec) => (

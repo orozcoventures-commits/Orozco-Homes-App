@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useProject } from '../context/ProjectContext';
 import { useAuth } from '../context/AuthContext';
+import { STAGES, stageOf, stageInfo, groupByStage } from '../utils/projectStages';
 
 const STATUS_CFG = {
   'on-track':  { dot: '#10B981', text: 'On Track',        bg: '#ECFDF5', color: '#065F46' },
@@ -73,15 +74,15 @@ export default function ProjectSelector() {
   useEffect(() => {
     if (!isAuthenticated) return;
     async function fetchProjects() {
-      const { data } = await supabase
-        .from('projects')
-        .select(`
+      const cols = `
           id, project_name, label, category, created_at, project_pin,
           managed_client:clients(full_name, email),
           client_profile:profiles(full_name),
-          weekly_updates(status, progress_percent, current_phase, updated_at)
-        `)
-        .order('created_at', { ascending: false });
+          weekly_updates(status, progress_percent, current_phase, updated_at)`;
+      // Stage is read for admins (migration 055); without it the list loads as before.
+      let { data, error } = await supabase.from('projects')
+        .select(isAdmin ? `${cols}, stage` : cols).order('created_at', { ascending: false });
+      if (error && isAdmin) ({ data } = await supabase.from('projects').select(cols).order('created_at', { ascending: false }));
 
       const enriched = (data ?? []).map((p) => ({
         ...p,
@@ -93,10 +94,25 @@ export default function ProjectSelector() {
       setLoadingProjects(false);
     }
     fetchProjects();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, isAdmin]);
 
   function openDbProject(project) {
     dispatch({ type: 'SET_DB_PROJECT', project });
+  }
+
+  const [showCompleted, setShowCompleted] = useState(false);
+  const [stageError,    setStageError]    = useState('');
+  async function changeStage(project, stage) {
+    const before = project.stage;
+    setDbProjects((list) => list.map((p) => (p.id === project.id ? { ...p, stage } : p)));
+    setStageError('');
+    const { error } = await supabase.from('projects').update({ stage }).eq('id', project.id);
+    if (error) {
+      setDbProjects((list) => list.map((p) => (p.id === project.id ? { ...p, stage: before } : p)));
+      setStageError(/stage/.test(error.message ?? '')
+        ? 'Stages are not saved yet — run migration 055 in Supabase first.'
+        : `Stage not saved: ${error.message}`);
+    }
   }
 
   // ── Client view ───────────────────────────────────────────────────────────
@@ -136,7 +152,7 @@ export default function ProjectSelector() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <p className="text-xs font-bold tracking-[0.18em] uppercase mb-1" style={{ color: '#D4AF37' }}>Contractor Dashboard</p>
-          <h2 className="text-2xl font-bold" style={{ color: '#002147' }}>Active Projects</h2>
+          <h2 className="text-2xl font-bold" style={{ color: '#002147' }}>Projects</h2>
         </div>
         <button
           onClick={() => dispatch({ type: 'SET_PAGE', page: 'create-project' })}
@@ -167,8 +183,43 @@ export default function ProjectSelector() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-          {dbProjects.map((p) => <DbProjectCard key={p.id} project={p} onClick={() => openDbProject(p)} />)}
+        <div className="space-y-8">
+          {stageError && <p role="alert" className="text-sm font-semibold" style={{ color: '#DC2626' }}>{stageError}</p>}
+          {groupByStage(dbProjects).map(({ stage, projects }) => {
+            const hidden = stage.key === 'completed' && !showCompleted;
+            return (
+              <section key={stage.key} aria-labelledby={`stage-${stage.key}`}>
+                <div className="flex items-center gap-3 mb-3">
+                  <h3 id={`stage-${stage.key}`} className="text-xs font-bold tracking-[0.14em] uppercase" style={{ color: stage.color }}>
+                    {stage.label} <span style={{ color: '#9CA3AF' }}>({projects.length})</span>
+                  </h3>
+                  {stage.key === 'completed' && (
+                    <button type="button" onClick={() => setShowCompleted((v) => !v)} className="text-xs font-semibold hover:underline focus:outline-none" style={{ color: '#6B7280' }}>
+                      {showCompleted ? 'Hide completed' : 'Show completed'}
+                    </button>
+                  )}
+                </div>
+                {!hidden && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                    {projects.map((p) => (
+                      <div key={p.id} className="flex flex-col gap-1.5">
+                        <DbProjectCard project={p} onClick={() => openDbProject(p)} />
+                        <label className="flex items-center gap-2 px-1 text-xs" style={{ color: '#6B7280' }}>
+                          Stage
+                          <select value={stageOf(p)} onChange={(e) => changeStage(p, e.target.value)}
+                            aria-label={`Stage for ${p.project_name}`}
+                            className="text-xs font-semibold rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-yellow-300"
+                            style={{ border: `1px solid ${stageInfo(stageOf(p)).border}`, backgroundColor: stageInfo(stageOf(p)).bg, color: stageInfo(stageOf(p)).color }}>
+                            {STAGES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+                          </select>
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            );
+          })}
         </div>
       )}
     </div>
