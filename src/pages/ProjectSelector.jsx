@@ -148,7 +148,7 @@ export default function ProjectSelector() {
 
   // ── Admin view ────────────────────────────────────────────────────────────
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 py-10">
       <div className="flex items-center justify-between mb-6">
         <div>
           <p className="text-xs font-bold tracking-[0.18em] uppercase mb-1" style={{ color: '#D4AF37' }}>Contractor Dashboard</p>
@@ -200,7 +200,7 @@ export default function ProjectSelector() {
                   )}
                 </div>
                 {!hidden && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
                     {projects.map((p) => (
                       <div key={p.id} className="flex flex-col gap-1.5">
                         <DbProjectCard project={p} onClick={() => openDbProject(p)} />
