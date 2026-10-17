@@ -1,4 +1,4 @@
-// src/components/ProposalDocument.jsx — printable Orozco Homes Project Retainer Agreement
+// src/components/ProposalDocument.jsx — printable Orozco Homes Project Proposal
 import { Fragment } from 'react';
 import {
   PROPOSAL_TITLE, fmtLongDate, investmentRange, fillTokens, parseBody, sectionNumbers,
