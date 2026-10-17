@@ -14,6 +14,7 @@ import { useProject } from '../context/ProjectContext';
 import { buildContractPrefill, buildProposalPrefill } from '../utils/contractPrefill';
 import { starterScope, MAX_SCOPE } from '../utils/tradeScopes';
 import { coiStatus, formatCoiDate, openCoi } from '../lib/subcontractorDirectory';
+import { DESIGN_PERMIT_NEW_LINES } from '../utils/remodelDesignPermits';
 import { PROPOSAL_FIELDS } from '../utils/proposalTemplate';
 
 // ── Project type groupings ────────────────────────────────────────────────────
@@ -76,6 +77,7 @@ const DIV_COLORS = {
   '5': { color: '#C2410C', bg: '#FFF7ED', border: '#FDBA74' },
   'F': { color: '#78350F', bg: '#FDF6EC', border: '#E7C9A0' },
   'S': { color: '#475569', bg: '#F1F5F9', border: '#CBD5E1' },
+  'P': { color: '#1E3A8A', bg: '#EFF6FF', border: '#BFDBFE' },
   'E': { color: '#A16207', bg: '#FEFCE8', border: '#FDE047' },
   'M': { color: '#991B1B', bg: '#FEF2F2', border: '#FECACA' },
 };
@@ -109,8 +111,8 @@ function defaultInputs(projectTypeId) {
 //            scopes: { tradeKey: text },          (this budget's Scope of Work per trade)
 //            subs: { tradeKey: { id, name } },    (who performs each trade — subcontractor_directory)
 //            factors: { wbs: n },                 (price adjustment × built-in price, from "My template")
-//            v: 2 }                               (layout version, see upgradeLayout)
-const LAYOUT_VERSION = 2;
+//            v: 3 }                               (layout version, see upgradeLayout)
+const LAYOUT_VERSION = 3;
 const EMPTY_LAYOUT = { added: [], labels: {}, removed: [], splits: {}, allowances: {}, trades: {}, scopes: {}, subs: {}, factors: {}, v: LAYOUT_VERSION };
 const MAX_LABEL = 120;
 
@@ -148,23 +150,31 @@ function normalizeLayout(raw) {
   };
 }
 
-// Version 2 split "Demo & Prep" into Demo + Site Prep and added the Site Prep
-// lines S.1–S.3. Budgets (and templates) saved before keep their totals: the
+// Budgets (and templates) saved before a new section keep their totals: its
 // new lines start removed (Restore brings them back), and lines the user added
-// for dumpsters, porta potties or protection move from Demo to Site Prep.
+// for that section move into it.
+//   v2: "Demo & Prep" split into Demo + Site Prep (new lines S.1–S.3); added
+//       dumpster / porta potty / protection lines move from Demo to Site Prep.
+//   v3: "Design & Permits" first in every type (new lines P.1–P.4); added
+//       design / drawing / permit / engineering lines move into it.
 const SITE_PREP_NEW_LINES = ['S.1', 'S.2', 'S.3'];
 const SITE_PREP_RE = /dumpster|roll-?off|porta|portable toilet|protection|dust barrier|zip ?wall|ram ?board/i;
+const DESIGN_PERMIT_RE = /design consult|architect|drawings\b|blueprint|permit|engineering\b/i;
 function upgradeLayout(layout, cfg) {
   if (layout.v >= LAYOUT_VERSION || !cfg) return { ...layout, v: LAYOUT_VERSION };
-  const hasSitePrep = cfg.divisions.some((d) => d.key === 'divS');
+  const divKeys = new Set(cfg.divisions.map((d) => d.key));
   const builtIn = new Set(cfg.divisions.flatMap((d) => d.items.map((it) => it.wbs)));
-  const newLines = SITE_PREP_NEW_LINES.filter((w) => builtIn.has(w) && !layout.removed.includes(w));
-  return {
-    ...layout,
-    removed: [...layout.removed, ...newLines],
-    added: layout.added.map((a) => (hasSitePrep && a.div === 'div1' && SITE_PREP_RE.test(a.label) ? { ...a, div: 'divS' } : a)),
-    v: LAYOUT_VERSION,
-  };
+  const startRemoved = (wbsList, removed) => [...removed, ...wbsList.filter((w) => builtIn.has(w) && !removed.includes(w))];
+  let { removed, added } = layout;
+  if (layout.v < 2) {
+    removed = startRemoved(SITE_PREP_NEW_LINES, removed);
+    if (divKeys.has('divS')) added = added.map((a) => (a.div === 'div1' && SITE_PREP_RE.test(a.label) ? { ...a, div: 'divS' } : a));
+  }
+  if (layout.v < 3) {
+    removed = startRemoved(DESIGN_PERMIT_NEW_LINES, removed);
+    if (divKeys.has('divP')) added = added.map((a) => (DESIGN_PERMIT_RE.test(a.label) ? { ...a, div: 'divP' } : a));
+  }
+  return { ...layout, removed, added, v: LAYOUT_VERSION };
 }
 
 // ── Cost breakdown: Materials / Subcontract / Other (fees) ────────────────────
@@ -188,6 +198,7 @@ function clampSplit(v) {
 const SPLIT_RULES = [
   [/permit|engineering|asbestos test|inspection/i,                                0, 100],
   [/dumpster|roll-?off|porta potty|portable toilet/i,                              0, 100],
+  [/design consult|architect|drawings\b|permit plans|blueprint/i,               0, 100],
   [/demo|tear-out|remov|haul|scrape|debris/i,                                      5,  10],
   [/protection|masking|dust/i,                                                    30,   0],
   [/drying|dehumidification|mold treatment/i,                                     15,   0],
@@ -283,6 +294,10 @@ const layoutIsEmpty = (l) => !l.added.length && !l.removed.length && !Object.key
 function applyLayout(base, layout) {
   if (!base) return base;
   const removed = new Set(layout.removed);
+  // Custom lines whose section no longer exists (e.g. it was merged into
+  // Design & Permits) show in the first section instead of disappearing.
+  const divKeys = new Set(base.divisions.map((d) => d.key));
+  const firstKey = base.divisions[0]?.key;
   return {
     ...base,
     divisions: base.divisions.map((div) => {
@@ -293,7 +308,7 @@ function applyLayout(base, layout) {
         originalLabel: it.label,
         label: it.unit !== 'pct' && layout.labels[it.wbs] ? layout.labels[it.wbs] : it.label,
       }));
-      const added = layout.added.filter((a) => a.div === div.key).map((a, i) => ({
+      const added = layout.added.filter((a) => (divKeys.has(a.div) ? a.div : firstKey) === div.key).map((a, i) => ({
         wbs: a.id, label: a.label || 'New item', unit: 'flat', custom: true, badge: `${div.num}.${lastNum + i + 1}`,
       }));
       return {

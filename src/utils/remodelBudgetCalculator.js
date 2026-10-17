@@ -9,6 +9,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { RENOVATION_CONFIGS } from './remodelRenovationTypes';
+import { withDesignPermits } from './remodelDesignPermits';
 
 export const SPEC_LEVELS = ['standard', 'mid', 'custom'];
 
@@ -31,7 +32,7 @@ export const SPEC_LABELS = { standard: 'Standard', mid: 'Mid-Range', custom: 'Cu
 // REMODEL_CONFIGS
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const REMODEL_CONFIGS = {
+const BASE_REMODEL_CONFIGS = {
 
   // ── BATHROOM SMALL (up to 50 sqft) ───────────────────────────────────────
   'bathroom-small': {
@@ -758,6 +759,9 @@ export const REMODEL_CONFIGS = {
   // Partial renovations (shower add, flooring, attic, deck, ...)
   ...RENOVATION_CONFIGS,
 };
+
+// Every project type starts with a "Design & Permits" section (see remodelDesignPermits.js).
+export const REMODEL_CONFIGS = withDesignPermits(BASE_REMODEL_CONFIGS);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Public API
