@@ -7,7 +7,7 @@ import {
 // with "+ Add line item → From catalog".
 
 const NAVY = '#002147';
-const EMPTY_FORM = { name: '', category: '', unit: 'ls', unit_cost: '', materials_pct: '', notes: '' };
+const EMPTY_FORM = { name: '', category: '', unit: 'ls', unit_cost: '', materials_pct: '', notes: '', link: '' };
 const COMMON_CATEGORIES = ['Design & Permits', 'Demo', 'Site Prep', 'Framing', 'Plumbing', 'Electrical', 'HVAC', 'Insulation',
   'Drywall', 'Tile', 'Flooring', 'Cabinets & Countertops', 'Fixtures', 'Finish Carpentry', 'Painting', 'Exterior', 'Other'];
 const money = (n) => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -34,7 +34,7 @@ export default function CostCatalog() {
   const shown = useMemo(() => {
     const q = search.trim().toLowerCase();
     return (items ?? []).filter((i) => (!category || i.category === category)
-      && (!q || `${i.name} ${i.category} ${i.notes}`.toLowerCase().includes(q)));
+      && (!q || `${i.name} ${i.category} ${i.notes} ${i.link ?? ''}`.toLowerCase().includes(q)));
   }, [items, search, category]);
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
@@ -59,7 +59,7 @@ export default function CostCatalog() {
     setEditingId(item.id); setFormError('');
     setForm({
       name: item.name, category: item.category, unit: item.unit, unit_cost: String(item.unit_cost),
-      materials_pct: item.materials_pct == null ? '' : String(item.materials_pct), notes: item.notes,
+      materials_pct: item.materials_pct == null ? '' : String(item.materials_pct), notes: item.notes, link: item.link ?? '',
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -117,9 +117,13 @@ export default function CostCatalog() {
             <label className={label} htmlFor="cc-pct" style={{ color: '#374151' }}>Materials % <span className="font-normal" style={{ color: '#9CA3AF' }}>(optional)</span></label>
             <input id="cc-pct" value={form.materials_pct} onChange={set('materials_pct')} inputMode="numeric" placeholder="auto" className={input} style={inputStyle} />
           </div>
-          <div className="sm:col-span-2 lg:col-span-6">
+          <div className="sm:col-span-2 lg:col-span-3">
             <label className={label} htmlFor="cc-notes" style={{ color: '#374151' }}>Notes <span className="font-normal" style={{ color: '#9CA3AF' }}>(supplier, model, what's included — internal)</span></label>
             <input id="cc-notes" value={form.notes} onChange={set('notes')} maxLength={500} className={input} style={inputStyle} />
+          </div>
+          <div className="sm:col-span-2 lg:col-span-3">
+            <label className={label} htmlFor="cc-link" style={{ color: '#374151' }}>Website link <span className="font-normal" style={{ color: '#9CA3AF' }}>(optional — product page or spec sheet)</span></label>
+            <input id="cc-link" inputMode="url" value={form.link} onChange={set('link')} maxLength={500} placeholder="https://www.ferguson.com/…" className={input} style={inputStyle} />
           </div>
         </div>
         {formError && <p role="alert" className="mt-3 text-sm font-semibold" style={{ color: '#DC2626' }}>{formError}</p>}
@@ -172,6 +176,10 @@ export default function CostCatalog() {
                   <td className="px-4 py-2.5">
                     <span className="font-semibold" style={{ color: NAVY }}>{i.name}</span>
                     {i.notes && <span className="block text-xs" style={{ color: '#9CA3AF' }}>{i.notes}</span>}
+                    {/^https?:\/\//i.test(i.link ?? '') && (
+                      <a href={i.link} target="_blank" rel="noopener noreferrer" className="block w-fit mt-0.5 text-xs font-semibold hover:underline" style={{ color: '#0369A1' }}
+                        aria-label={`Open link for ${i.name}`}>Open link ↗</a>
+                    )}
                   </td>
                   <td className="px-4 py-2.5" style={{ color: '#6B7280' }}>{i.category || '—'}</td>
                   <td className="px-4 py-2.5" style={{ color: '#6B7280' }}>{catalogUnitLabel(i.unit)}</td>
