@@ -40,10 +40,10 @@ function ContractDocument({ doc, id }) {
 const KINDS = {
   proposal: {
     section: 'Proposals',
-    docName: 'Project Retainer Agreement',
+    docName: 'Project Proposal',
     listFn: 'get_pin_proposals', signFn: 'sign_pin_proposal', declineFn: 'decline_pin_proposal', idParam: 'p_proposal_id',
     status: { sent: AWAITING, accepted: SIGNED, declined: DECLINED },
-    title: (d) => d.snapshot?.project_title || 'Project Retainer Agreement',
+    title: (d) => d.snapshot?.project_title || 'Project Proposal',
     detail: (d) => { const r = investmentRange(d.snapshot ?? {}); return r ? `Estimated ${r}` : ''; },
     signedNote: (d) => ((d.signatures ?? []).length
       ? `✓ Signed by ${d.signatures.map((s) => s.name).join(' and ')} on ${fmtLongDate(d.accepted_at?.slice(0, 10))}.`

@@ -1,4 +1,4 @@
-// src/pages/Proposals.jsx — Orozco Homes proposals (Project Retainer Agreements)
+// src/pages/Proposals.jsx — Orozco Homes project proposals
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useProject } from '../context/ProjectContext';

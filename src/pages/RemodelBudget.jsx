@@ -2456,7 +2456,7 @@ ${sheets}
           </button>
           <button onClick={handleGenerateProposal}
             disabled={!currentProjectId || generatingContract || budgetLoading}
-            title={currentProjectId ? 'Open a proposal (Project Retainer Agreement) filled with this client and an estimated range' : 'Pick a project first'}
+            title={currentProjectId ? 'Open a project proposal filled with this client and an estimated range' : 'Pick a project first'}
             className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ backgroundColor: '#D4AF37', color: '#002147' }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"

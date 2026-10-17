@@ -1,11 +1,11 @@
-// src/utils/proposalTemplate.js — Orozco Homes Project Retainer Agreement (proposal)
+// src/utils/proposalTemplate.js — Orozco Homes Project Proposal (with retainer terms)
 //
 // A proposal = form fields (client, company, project, investment, terms) plus
 // an ordered list of sections that can be edited, added, removed and moved.
 // Section bodies use a small markup (see SECTION_MARKUP_HELP) and can include
 // {{tokens}} that are filled from the form fields when the document renders.
 
-export const PROPOSAL_TITLE = 'Project Retainer Agreement';
+export const PROPOSAL_TITLE = 'Project Proposal';
 
 export const PROPOSAL_FIELDS = [
   // ── Client ────────────────────────────────────────────────────────────────
@@ -84,11 +84,36 @@ export const newSectionId = () =>
 
 const S = (id, title, body, numbered = true, kind = 'text') => ({ id, kind, title, body, numbered });
 
+// Built-in text replaced in v2 (Project Proposal). Saved default templates
+// still holding these exact texts get the new ones (see upgradeTemplateSections).
+const OLD_INTRO_BODY = `This Project Retainer Agreement is made between Orozco Homes and the client for the purpose of initiating formal project planning and reserving placement in the construction calendar for a residential renovation project.
+This Agreement outlines the scope of professional services to be performed after deposit and terms required to prepare a complete and build-ready construction plan.`;
+const OLD_OVERVIEW_BODY = 'Orozco Homes will complete {{project_title}} under a coordinated construction schedule.';
+
 export const BUILT_IN_SECTIONS = [
-  S('intro', '', `This Project Retainer Agreement is made between Orozco Homes and the client for the purpose of initiating formal project planning and reserving placement in the construction calendar for a residential renovation project.
+  S('difference', 'The Orozco Homes Difference: More Than a Contractor', `A successful remodel involves much more than construction. It requires hundreds of decisions, multiple specialized trades, material procurement, scheduling, design coordination, inspections, problem-solving and quality control.
+Orozco Homes provides a full-service, design-build remodeling experience designed to take that responsibility off the homeowner. From the initial concept through final completion, we are the central point of coordination for your project.
+## Our team manages:
+- **Client Communication** – Providing a clear point of contact throughout design, planning and construction.
+- **Design & Space Planning** – Developing layouts that balance beauty, functionality and the existing structure of your home.
+- **Professional Design Guidance** – Working alongside our designer to guide cabinetry, tile, plumbing fixtures, lighting, carpentry, finishes and other selections.
+- **Trade Coordination** – Coordinating expert plumbers, electricians, carpenters, tile installers, painters, HVAC professionals and other specialized trades.
+- **Architectural & Engineering Coordination** – Bringing in architects, engineers and other professionals when required by the project.
+- **Permitting & Inspections** – Coordinating required permits, inspections and applicable construction requirements.
+- **Material Procurement** – Ordering and coordinating project materials so homeowners do not have to manage multiple vendors, deliveries and construction specifications themselves.
+- **Project Scheduling** – Sequencing trades and materials to keep construction moving efficiently.
+- **Construction Management** – Managing the project from demolition through completion and addressing the day-to-day decisions that naturally arise during remodeling.
+- **Quality Control** – Reviewing workmanship and installation throughout the project and coordinating corrections when necessary.
+Our goal is to manage the entire remodeling/building process for your space so you can enjoy creating your home without having to become your own designer, purchaser, scheduler and general contractor.`, false),
+  S('intro', '', `This Project Proposal and Retainer Agreement (“Agreement”) is made between Orozco Homes and the client for the purpose of initiating formal project planning and reserving placement in the construction calendar for a residential renovation project.
 This Agreement outlines the scope of professional services to be performed after deposit and terms required to prepare a complete and build-ready construction plan.`, false),
   S('client', 'Client Information', '', true, 'client'),
-  S('overview', 'Project Overview', 'Orozco Homes will complete {{project_title}} under a coordinated construction schedule.', false),
+  S('overview', 'Project Overview', `## Preliminary Project Scope & Vision
+The following scope represents a preliminary project vision based on current discussions, observed existing conditions and anticipated design selections. Final scope, pricing, specifications and construction requirements may be adjusted as the design develops, selections are finalized and trade evaluations and existing conditions are confirmed.
+Orozco Homes will work with the homeowners to design and complete {{project_title}}. Final configuration will be determined during the design and planning phase and will take into consideration plumbing, electrical, structural conditions and overall functionality.
+Each area will receive comprehensive remodeling based on the final approved design and selections. Wet areas will be properly waterproofed using professional installation methods and industry best practices. All applicable work will be completed in accordance with local building codes, manufacturer requirements and professional construction standards.
+Throughout the project, Orozco Homes will work collaboratively with the homeowners to develop the layouts, establish the overall design direction and guide material, fixture, finish and color selections. The goal is to create cohesive spaces that reflect the homeowners’ priorities while balancing aesthetics, functionality, constructability and long-term durability.
+The final construction scope and project investment will be established after the design direction, selections, necessary professional evaluations and major construction requirements have been confirmed.`, false),
   S('scope', 'Scope of Work', '', false),
   S('materials', 'Materials Included', `(Based on allowances)
 - All required building materials`, false),
@@ -153,6 +178,20 @@ Client understands that final construction pricing may be adjusted to address ve
 
 const copySections = (list) => list.map((s) => ({ ...s }));
 
+// A saved default template made before the Project Proposal update gets the
+// new "Orozco Homes Difference" section first, and the new intro / overview
+// text where it still has the original wording (edited text is kept).
+function upgradeTemplateSections(sections) {
+  const builtIn = (id) => BUILT_IN_SECTIONS.find((s) => s.id === id);
+  const next = copySections(sections).map((s) => {
+    if (s.id === 'intro' && s.body === OLD_INTRO_BODY) return { ...s, body: builtIn('intro').body };
+    if (s.id === 'overview' && s.body === OLD_OVERVIEW_BODY) return { ...s, body: builtIn('overview').body };
+    return s;
+  });
+  if (!next.some((s) => s.id === 'difference')) next.unshift({ ...builtIn('difference') });
+  return next;
+}
+
 export function todayISO() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -166,7 +205,7 @@ export function proposalDefaults(template = null) {
     .filter((k) => template?.fields?.[k] != null)
     .map((k) => [k, String(template.fields[k])]));
   const sections = Array.isArray(template?.sections) && template.sections.length
-    ? template.sections
+    ? upgradeTemplateSections(template.sections)
     : BUILT_IN_SECTIONS;
   return { ...builtIn, ...fields, proposal_date: todayISO(), sections: copySections(sections) };
 }
@@ -175,14 +214,16 @@ export function proposalDefaults(template = null) {
 // adding a section when the template doesn't have one.
 export function applyPrefillToSections(sections, { project_overview, scope_of_work, materials_included, allowances }) {
   const next = copySections(sections);
-  const put = (id, title, body, afterId) => {
+  const put = (id, title, body, afterId, keepExisting = false) => {
     if (!body) return;
     const found = next.find((s) => s.id === id);
-    if (found) { found.body = body; return; }
+    if (found) { if (!(keepExisting && found.body?.trim())) found.body = body; return; }
     const at = next.findIndex((s) => s.id === afterId);
     next.splice(at >= 0 ? at + 1 : next.length, 0, { id, kind: 'text', title, body, numbered: false });
   };
-  put('overview', 'Project Overview', project_overview, 'client');
+  // The template's overview (standard text with {{project_title}}) is kept;
+  // the budget's one-line overview only fills an empty or missing one.
+  put('overview', 'Project Overview', project_overview, 'client', true);
   put('scope', 'Scope of Work', scope_of_work, 'overview');
   if (materials_included) {
     const items = materials_included.split('\n').map((l) => l.trim()).filter(Boolean).map((l) => `- ${l.replace(/^[-*•]\s*/, '')}`);
@@ -264,7 +305,7 @@ export function sectionNumbers(sections) {
 // buyout, cancellation, risk disclosure) and must not be copied into the
 // contract, which has its own terms.
 const RETAINER_ONLY_SECTIONS = new Set([
-  'intro', 'deposit', 'preconstruction', 'retainer', 'work-product', 'transition', 'cancellation', 'unforeseen',
+  'difference', 'intro', 'deposit', 'preconstruction', 'retainer', 'work-product', 'transition', 'cancellation', 'unforeseen',
 ]);
 
 // Section body → plain contract text: headings stay as lines, bullets become
