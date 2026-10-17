@@ -13,6 +13,7 @@ import { supabase } from '../lib/supabase';
 import { selectProjects } from '../lib/projectList';
 import ProjectOptions from '../components/ProjectOptions';
 import BudgetVersions from '../components/BudgetVersions';
+import { fetchCatalog, catalogUnitLabel } from '../lib/costCatalog';
 import { useProject } from '../context/ProjectContext';
 import { buildContractPrefill, buildProposalPrefill } from '../utils/contractPrefill';
 import { starterScope, MAX_SCOPE } from '../utils/tradeScopes';
@@ -572,21 +573,31 @@ function LineName({ item, onRename, isAllowance }) {
   );
 }
 
-function AddLineForm({ div, ds, onAdd }) {
+function AddLineForm({ div, ds, onAdd, catalog }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
   const [unit, setUnit] = useState('ls');          // 'ls' = lump sum, else a QTY_UNITS key
   const [qty, setQty] = useState('');
   const [rate, setRate] = useState('');
+  const [pickedPct, setPickedPct] = useState(null);  // materials % from a catalog item
   const measured = unit !== 'ls';
+  // Fill the form from a Cost Catalog item.
+  const pick = (id) => {
+    const item = (catalog ?? []).find((c) => c.id === id);
+    if (!item) return;
+    setName(item.name);
+    if (item.unit === 'ls') { setUnit('ls'); setAmount(String(Math.round(Number(item.unit_cost) || 0))); }
+    else { setUnit(item.unit); setRate(String(item.unit_cost)); if (!qty) setQty('1'); }
+    setPickedPct(item.materials_pct ?? null);
+  };
   const measure = measured ? lineMeasure({ unit, qty: Number(qty) || 0, rate: Number(rate) || 0 }) : null;
   const total = measure ? measureAmount(measure) : Number(amount.replace(/[^0-9]/g, '')) || 0;
   const submit = (e) => {
     e.preventDefault();
     if (!name.trim()) return;
-    onAdd(name.trim().slice(0, MAX_LABEL), total, measure);
-    setName(''); setAmount(''); setQty(''); setRate(''); setUnit('ls'); setOpen(false);
+    onAdd(name.trim().slice(0, MAX_LABEL), total, measure, pickedPct == null ? null : { m: pickedPct, o: 0 });
+    setName(''); setAmount(''); setQty(''); setRate(''); setUnit('ls'); setPickedPct(null); setOpen(false);
   };
   if (!open) {
     return (
@@ -600,6 +611,20 @@ function AddLineForm({ div, ds, onAdd }) {
   const num = (v) => v.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
   return (
     <form onSubmit={submit} className="flex flex-wrap items-center gap-2 px-4 py-2.5" style={{ borderTop: '1px solid #F3F4F6', backgroundColor: '#FAFAF8' }}>
+      {catalog?.length > 0 && (
+        <select value="" onChange={(e) => pick(e.target.value)} aria-label={`From catalog for ${div.label}`}
+          className="w-full sm:w-auto px-2 py-1.5 rounded-lg text-xs font-semibold focus:outline-none"
+          style={{ border: '1.5px solid #FDE68A', color: '#92400E', backgroundColor: '#FFFBEB' }}>
+          <option value="">From catalog…</option>
+          {[...new Set(catalog.map((c) => c.category || 'Other'))].map((cat) => (
+            <optgroup key={cat} label={cat}>
+              {catalog.filter((c) => (c.category || 'Other') === cat).map((c) => (
+                <option key={c.id} value={c.id}>{c.name} — ${Number(c.unit_cost).toLocaleString('en-US')}{c.unit !== 'ls' ? ` / ${catalogUnitLabel(c.unit)}` : ''}</option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+      )}
       <input autoFocus value={name} onChange={(e) => setName(e.target.value)} maxLength={MAX_LABEL}
         placeholder="Item name (e.g. Heated floor)" aria-label={`New line item name for ${div.label}`}
         className="flex-1 min-w-[180px] px-3 py-1.5 rounded-lg text-sm focus:outline-none" style={box} />
@@ -1259,6 +1284,8 @@ export default function RemodelBudget() {
   const [dbProjects,     setDbProjects]     = useState([]);
   const [selectedProjId, setSelectedProjId] = useState('');
   const [deleteMsg,      setDeleteMsg]      = useState(null);   // { status, msg } after "Delete this budget"
+  const [catalog,        setCatalog]        = useState([]);     // Cost Catalog items for "+ Add line item"
+  useEffect(() => { fetchCatalog().then(({ items }) => setCatalog(items)); }, []);
 
   // currentProjectId drives all save/load; empty string = standalone mode (no DB save)
   const currentProjectId   = selectedProjId || null;
@@ -1776,9 +1803,13 @@ export default function RemodelBudget() {
     setUserVals((p) => Object.fromEntries(Object.entries(p).filter(([w]) => isCustomWbs(w))));
     setLayout((l) => ({ ...l, factors: {} }));
   }
-  function addLine(divKey, label, amount, measure = null) {
+  function addLine(divKey, label, amount, measure = null, split = null) {
     const id = newLineId();
-    setLayout((l) => ({ ...l, added: [...l.added, { id, div: divKey, label, ...(measure ?? {}) }] }));
+    setLayout((l) => ({
+      ...l,
+      added: [...l.added, { id, div: divKey, label, ...(measure ?? {}) }],
+      ...(split ? { splits: { ...(l.splits ?? {}), [id]: clampSplit(split) } } : {}),
+    }));
     setUserVals((p) => ({ ...p, [id]: amount }));
     setOverrideFlags((p) => ({ ...p, [id]: true }));
   }
@@ -3072,7 +3103,7 @@ ${sheets}
                   ))}
 
                   {div.items.some((it) => it.unit === 'pct') ? null : (
-                    <AddLineForm div={div} ds={ds} onAdd={(label, amount, measure) => addLine(div.key, label, amount, measure)} />
+                    <AddLineForm div={div} ds={ds} catalog={catalog} onAdd={(label, amount, measure, split) => addLine(div.key, label, amount, measure, split)} />
                   )}
                   {div.removedItems?.length > 0 && (
                     <div className="px-4 py-2 text-xs flex flex-wrap items-center gap-x-3 gap-y-1" style={{ borderTop: '1px solid #F3F4F6', color: '#9CA3AF' }}>
