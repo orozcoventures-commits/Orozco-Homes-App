@@ -293,6 +293,49 @@ export default function Sidebar({ isOpen, onClose }) {
     onClose();
   }
 
+  // Menu drop-downs: which sections are open (remembered on this device).
+  // A section opens by itself when it holds the current page, unless closed.
+  const [openSections, setOpenSections] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('sidebar_open_sections')) || {}; } catch { return {}; }
+  });
+  function toggleSection(title, open) {
+    setOpenSections((prev) => {
+      const next = { ...prev, [title]: open };
+      try { localStorage.setItem('sidebar_open_sections', JSON.stringify(next)); } catch { /* storage unavailable */ }
+      return next;
+    });
+  }
+  const toolCount = (page) => (page === 'approvals' ? pendingApprovals : page === 'messages' ? unreadMessages : 0);
+  function renderTool(tool) {
+    const isActive = activePage === tool.page;
+    const count    = toolCount(tool.page);
+    return (
+      <button
+        key={tool.page}
+        onClick={() => navigatePage(tool.page)}
+        className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-semibold transition-all duration-150 focus:outline-none"
+        style={{
+          color:           isActive ? '#D4AF37' : 'rgba(255,255,255,0.72)',
+          backgroundColor: isActive ? 'rgba(212,175,55,0.18)' : 'transparent',
+          borderLeft:      isActive ? '2px solid #D4AF37' : '2px solid transparent',
+        }}
+        onMouseEnter={(e) => { if (!isActive) { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#fff'; } }}
+        onMouseLeave={(e) => { if (!isActive) { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.72)'; } }}
+      >
+        <span style={{ color: isActive ? '#D4AF37' : 'rgba(255,255,255,0.55)' }}>{tool.icon}</span>
+        <span className="flex-1 text-left">{tool.label}</span>
+        {count > 0 && (
+          <span
+            className="text-xs font-bold px-1.5 py-0.5 rounded-full shrink-0"
+            style={{ backgroundColor: '#EF4444', color: '#fff', fontSize: '0.6rem', minWidth: '18px', textAlign: 'center' }}
+          >
+            {count}
+          </span>
+        )}
+      </button>
+    );
+  }
+
   const sidebar = (
     <aside
       className="flex flex-col h-full overflow-y-auto"
@@ -341,44 +384,27 @@ export default function Sidebar({ isOpen, onClose }) {
             })
             .filter(Boolean);
           if (!tools.length) return null;
+          // A section with one item is a plain link, no drop-down.
+          if (tools.length === 1) return <div key={section.title} className="mb-1">{renderTool(tools[0])}</div>;
+          const hasActive = tools.some((t) => t.page === activePage);
+          const open = openSections[section.title] ?? hasActive;
+          const pending = tools.reduce((n, t) => n + toolCount(t.page), 0);
+          const id = `nav-${section.title.toLowerCase()}`;
           return (
-            <div key={section.title} className="mb-3">
-              <p className="px-3 mb-1 text-xs font-bold tracking-[0.14em] uppercase" style={{ color: 'rgba(255,255,255,0.4)' }}>
-                {section.title}
-              </p>
-              <div className="space-y-0.5">
-                {tools.map((tool) => {
-                  const isActive = activePage === tool.page;
-                  const count    = tool.page === 'approvals' ? pendingApprovals
-                                 : tool.page === 'messages'  ? unreadMessages
-                                 : 0;
-                  return (
-                    <button
-                      key={tool.page}
-                      onClick={() => navigatePage(tool.page)}
-                      className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-semibold transition-all duration-150 focus:outline-none"
-                      style={{
-                        color:           isActive ? '#D4AF37' : 'rgba(255,255,255,0.72)',
-                        backgroundColor: isActive ? 'rgba(212,175,55,0.18)' : 'transparent',
-                        borderLeft:      isActive ? '2px solid #D4AF37' : '2px solid transparent',
-                      }}
-                      onMouseEnter={(e) => { if (!isActive) { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#fff'; } }}
-                      onMouseLeave={(e) => { if (!isActive) { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.72)'; } }}
-                    >
-                      <span style={{ color: isActive ? '#D4AF37' : 'rgba(255,255,255,0.55)' }}>{tool.icon}</span>
-                      <span className="flex-1 text-left">{tool.label}</span>
-                      {count > 0 && (
-                        <span
-                          className="text-xs font-bold px-1.5 py-0.5 rounded-full shrink-0"
-                          style={{ backgroundColor: '#EF4444', color: '#fff', fontSize: '0.6rem', minWidth: '18px', textAlign: 'center' }}
-                        >
-                          {count}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
+            <div key={section.title} className="mb-1">
+              <button type="button" onClick={() => toggleSection(section.title, !open)} aria-expanded={open} aria-controls={id}
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold tracking-[0.14em] uppercase focus:outline-none hover:bg-white/5"
+                style={{ color: hasActive ? 'rgba(212,175,55,0.85)' : 'rgba(255,255,255,0.5)' }}>
+                <span className="flex-1 text-left">{section.title}</span>
+                {!open && pending > 0 && (
+                  <span className="font-bold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: '#EF4444', color: '#fff', fontSize: '0.6rem', letterSpacing: 0 }}>{pending}</span>
+                )}
+                <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"
+                  style={{ transition: 'transform 0.15s', transform: open ? 'rotate(180deg)' : 'none' }}>
+                  <polyline points="2 4 6 8 10 4" />
+                </svg>
+              </button>
+              {open && <div id={id} className="space-y-0.5 mt-0.5 mb-2">{tools.map(renderTool)}</div>}
             </div>
           );
         })}
