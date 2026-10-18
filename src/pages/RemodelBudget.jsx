@@ -16,10 +16,14 @@ import BudgetVersions from '../components/BudgetVersions';
 import { fetchCatalog, catalogUnitLabel } from '../lib/costCatalog';
 import { useProject } from '../context/ProjectContext';
 import { buildContractPrefill, buildProposalPrefill } from '../utils/contractPrefill';
-import { starterScope, MAX_SCOPE } from '../utils/tradeScopes';
+import { starterScope, withoutLegacyGeneral, MAX_SCOPE } from '../utils/tradeScopes';
 import { coiStatus, formatCoiDate, openCoi } from '../lib/subcontractorDirectory';
 import { DESIGN_PERMIT_NEW_LINES } from '../utils/remodelDesignPermits';
-import { PROPOSAL_FIELDS } from '../utils/proposalTemplate';
+import { PROPOSAL_FIELDS, fmtLongDate } from '../utils/proposalTemplate';
+import { TRADES } from '../utils/trades';
+import { loadLatestStandards } from '../utils/subStandards';
+import { buildSnapshot, defaultTerms, sendProblem } from '../utils/subAgreement';
+import TradeAgreement from '../components/TradeAgreement';
 
 // ── Project type groupings ────────────────────────────────────────────────────
 
@@ -255,25 +259,7 @@ const splitAmounts = (value, sp) => ({ m: value * sp.m / 100, o: value * sp.o / 
 // ── Subs & Materials view: trades ─────────────────────────────────────────────
 // Each line's Subcontract amount goes to one trade. The default comes from the
 // line's name (then its section's name); it can be changed per line and is
-// saved in layout.trades { wbs: tradeKey }. Listed in construction order.
-const TRADES = [
-  { key: 'demolition', label: 'Demolition' },
-  { key: 'concrete',   label: 'Concrete / Foundation' },
-  { key: 'framing',    label: 'Framing' },
-  { key: 'roofing',    label: 'Roofing' },
-  { key: 'windows',    label: 'Windows & Doors' },
-  { key: 'siding',     label: 'Siding & Exterior' },
-  { key: 'plumbing',   label: 'Plumbing (Rough-In + Finish)' },
-  { key: 'hvac',       label: 'HVAC' },
-  { key: 'electrical', label: 'Electrical (Rough-In + Finish)' },
-  { key: 'insulation', label: 'Insulation' },
-  { key: 'drywall',    label: 'Drywall' },
-  { key: 'tiling',     label: 'Tiling' },
-  { key: 'flooring',   label: 'Flooring' },
-  { key: 'carpentry',  label: 'Finish Carpentry / Cabinets' },
-  { key: 'painting',   label: 'Painting' },
-  { key: 'other',      label: 'Other sub work' },
-];
+// saved in layout.trades { wbs: tradeKey }. Trades: src/utils/trades.js.
 const TRADE_KEYS = new Set(TRADES.map((t) => t.key));
 
 // First matching rule wins: [pattern, trade].
@@ -998,6 +984,13 @@ const TRADE_MATCH = {
 const subMatchesTrade = (sub, trade) => !!TRADE_MATCH[trade]?.test(`${sub.service ?? ''} ${sub.specialty ?? ''}`);
 const subLabel = (sub) => sub.display_name || sub.company || sub.name || sub.service || `#${sub.id}`;
 
+// Orozco Homes details (the same defaults as proposals and contracts).
+const COMPANY = Object.fromEntries(PROPOSAL_FIELDS.filter((f) => f.section === 'company').map((f) => [f.key, f.defaultValue ?? '']));
+const companyInfo = () => ({
+  name: 'Orozco Homes', rep: COMPANY.company_rep_name, title: COMPANY.company_rep_title,
+  license: COMPANY.company_license, phone: COMPANY.company_phone, email: COMPANY.company_email,
+});
+
 // COI status with a 30-day warning: 'active' | 'expiring' | 'expired' | 'none'.
 function coiState(expiresOn) {
   const status = coiStatus(expiresOn);
@@ -1230,7 +1223,7 @@ function TradeScope({ trade, scope }) {
   );
 }
 
-function SubsMaterialsView({ data, onTradeChange, scope, subs, sheets, bids }) {
+function SubsMaterialsView({ data, onTradeChange, scope, subs, sheets, bids, agreements }) {
   const { trades, materials, fees, designSpecsTotal, changeOrderCost, subTotal, materialTotal, feeTotal, directCosts } = data;
   const used = new Set(trades.map((t) => t.key));
   const notUsed = TRADES.filter((t) => t.key !== 'other' && !used.has(t.key));
@@ -1242,6 +1235,11 @@ function SubsMaterialsView({ data, onTradeChange, scope, subs, sheets, bids }) {
   const coiExpired = assignedSubs.filter((x) => coiState(x.coi_expires_on) === 'expired').length;
   const coiSoon = assignedSubs.filter((x) => coiState(x.coi_expires_on) === 'expiring').length;
   const coiMissing = assignedSubs.filter((x) => coiState(x.coi_expires_on) === 'none').length;
+  // Subcontract Agreements: fully signed, and "ready to start" (fully signed + COI current).
+  const subInfo = agreements.subInfo;
+  const signedCount = trades.filter((t) => agreements.current(t.key)?.status === 'countersigned').length;
+  const readyCount = trades.filter((t) => agreements.current(t.key)?.status === 'countersigned' && ['active', 'expiring'].includes(subInfo(t.key).coi)).length;
+  const toCountersign = trades.filter((t) => agreements.current(t.key)?.status === 'signed').length;
   return (
     <div className="space-y-4" data-testid="subs-materials-view">
       {/* Section 1 — Subcontractor work */}
@@ -1259,6 +1257,9 @@ function SubsMaterialsView({ data, onTradeChange, scope, subs, sheets, bids }) {
             {coiExpired > 0 && <span style={{ color: '#991B1B', fontWeight: 700 }}>{coiExpired} COI expired</span>}
             {coiSoon > 0 && <span style={{ color: '#92400E', fontWeight: 700 }}>{coiSoon} COI expiring within 30 days</span>}
             {coiMissing > 0 && <span>{coiMissing} with no COI on file</span>}
+            {!agreements.missing && <span><b style={{ color: '#002147' }}>{signedCount} of {trades.length}</b> agreements fully signed</span>}
+            {!agreements.missing && <span style={{ color: readyCount === trades.length ? '#059669' : '#6B7280', fontWeight: readyCount ? 700 : 400 }}>{readyCount} ready to start</span>}
+            {toCountersign > 0 && <span style={{ color: '#92400E', fontWeight: 700 }}>{toCountersign} waiting for your countersignature</span>}
           </p>
         )}
         {trades.length > 0 && (
@@ -1291,6 +1292,7 @@ function SubsMaterialsView({ data, onTradeChange, scope, subs, sheets, bids }) {
             <TradeSub trade={t} subs={subs} />
             <TradeBids trade={t} subs={subs} bids={bids} />
             <TradeScope trade={t} scope={scope} />
+            <TradeAgreement trade={t} api={agreements} sub={subInfo(t.key)} />
             {t.lines.map((l) => (
               <div key={l.item.wbs} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-2 text-sm" style={{ borderTop: '1px solid #F3F4F6' }}>
                 <div className="flex-1 min-w-[10rem]">
@@ -1975,7 +1977,7 @@ export default function RemodelBudget() {
     if (!needSubs) return undefined;
     let live = true;
     supabase.from('subcontractor_directory')
-      .select('id, display_name, company, name, service, specialty, phone, email, coi_expires_on, coi_file_path')
+      .select('id, display_name, company, name, service, specialty, phone, email, license, address, coi_expires_on, coi_file_path')
       .order('display_name')
       .then(({ data, error }) => {
         if (!live) return;
@@ -1994,6 +1996,8 @@ export default function RemodelBudget() {
   // Subcontractor bids per trade (migration 059), loaded with the Subs & Materials tab.
   const [tradeBids,      setTradeBids]      = useState({ project: null, list: [], missing: false });
   const [bidMsg,         setBidMsg]         = useState(null);
+  const [subAgreements,  setSubAgreements]  = useState({ project: null, list: [], missing: false });
+  const [agreementMsg,   setAgreementMsg]   = useState(null);
   const needBids = viewMode === 'trade' && !!currentProjectId && tradeBids.project !== currentProjectId;
   useEffect(() => {
     if (!needBids) return undefined;
@@ -2046,6 +2050,115 @@ export default function RemodelBudget() {
     assigned: (trade) => layout.subs?.[trade],
     onAssign: assignTradeSub,
   };
+  // Subcontract Agreements per trade (migration 060), loaded with the Subs & Materials tab.
+  const needAgreements = viewMode === 'trade' && !!currentProjectId && subAgreements.project !== currentProjectId;
+  useEffect(() => {
+    if (!needAgreements) return undefined;
+    let live = true;
+    const project = currentProjectId;
+    supabase.from('sub_agreements').select('*').eq('project_id', project).order('created_at')
+      .then(({ data, error }) => {
+        if (!live) return;
+        const missing = !!error && /sub_agreements|schema cache|does not exist/i.test(error.message ?? '');
+        setSubAgreements({ project, list: error ? [] : (data ?? []), missing });
+      });
+    return () => { live = false; };
+  }, [needAgreements, currentProjectId]);
+  const agreementList = subAgreements.project === currentProjectId ? subAgreements.list : [];
+  const putAgreement = (row) => setSubAgreements((a) => ({ ...a, list: a.list.some((x) => x.id === row.id) ? a.list.map((x) => (x.id === row.id ? row : x)) : [...a.list, row] }));
+  const agreementFail = (trade, what, error) => setAgreementMsg({ trade, status: 'error', text: `${what}: ${error.message}` });
+  const tradeSubInfo = (key) => {
+    const pick = layout.subs?.[key];
+    const sub = pick ? subDirectory?.find((x) => x.id === pick.id) ?? null : null;
+    return { pick, sub, coi: sub ? coiState(sub.coi_expires_on) : null };
+  };
+  async function agreementSnapshot(terms, trade) {
+    const { sub } = tradeSubInfo(trade.key);
+    const problem = sendProblem({ terms, sub, scope: scopeApi.of(trade.key) });
+    if (problem) { setAgreementMsg({ trade: trade.key, status: 'error', text: problem }); return null; }
+    const { version } = await loadLatestStandards(supabase);
+    return buildSnapshot({
+      terms, trade, standards: version,
+      scope: scopeApi.of(trade.key),
+      project: { name: currentProjectName ?? config.label, type: config.label },
+      sub: { name: sub.company || subLabel(sub), contact: sub.name ?? '', license: sub.license ?? '', phone: sub.phone?.[0] ?? '', email: sub.email?.[0] ?? '', address: sub.address ?? '' },
+      items: trade.lines.map((l) => ({ label: l.item.label, section: l.div.label, by: suppliedBy(l.item) })),
+      company: companyInfo(),
+    });
+  }
+  const agreementsApi = {
+    missing: subAgreements.missing,
+    msg: agreementMsg,
+    rep: { name: companyInfo().rep, title: companyInfo().title },
+    current: (key) => {
+      const list = agreementList.filter((a) => a.trade_key === key);
+      return list.find((a) => a.status === 'draft' || a.status === 'sent') ?? list.at(-1) ?? null;
+    },
+    count: (key) => agreementList.filter((a) => a.trade_key === key).length,
+    selectedBid: (key) => bidsApi.forTrade(key).find((b) => b.selected) ?? null,
+    scopeOf: (key) => scopeApi.of(key),
+    buildSnapshot: agreementSnapshot,
+    subInfo: tradeSubInfo,
+    async create(trade) {
+      const { sub } = tradeSubInfo(trade.key);
+      if (!sub) return;
+      const bid = agreementsApi.selectedBid(trade.key);
+      // The job address from this project's contract, when there is one.
+      const { data: contract } = await supabase.from('contracts').select('project_address').eq('project_id', currentProjectId)
+        .not('project_address', 'is', null).order('created_at', { ascending: false }).limit(1).maybeSingle();
+      const terms = defaultTerms(trade.key, { amount: bid ? String(bid.amount) : '', address: contract?.project_address ?? '' });
+      const { data, error } = await supabase.from('sub_agreements')
+        .insert({ project_id: currentProjectId, trade_key: trade.key, sub_id: sub.id, sub_name: subLabel(sub).slice(0, 120), terms })
+        .select('*').single();
+      if (error) { agreementFail(trade.key, 'Agreement not created', error); return; }
+      putAgreement(data);
+      setAgreementMsg({ trade: trade.key, status: 'ok', text: 'Draft created. Check the price, payment schedule and dates, then send it.' });
+    },
+    async save(ag, terms) {
+      const { data, error } = await supabase.from('sub_agreements').update({ terms }).eq('id', ag.id).select('*').single();
+      if (error) { agreementFail(ag.trade_key, 'Draft not saved', error); return; }
+      putAgreement(data);
+      setAgreementMsg({ trade: ag.trade_key, status: 'ok', text: 'Draft saved.' });
+    },
+    async send(ag, terms, trade) {
+      const snapshot = await agreementSnapshot(terms, trade);
+      if (!snapshot) return;
+      const { sub } = tradeSubInfo(trade.key);
+      const { data, error } = await supabase.from('sub_agreements')
+        .update({ terms, snapshot, status: 'sent', sub_id: sub.id, sub_name: subLabel(sub).slice(0, 120) })
+        .eq('id', ag.id).select('*').single();
+      if (error) { agreementFail(ag.trade_key, 'Not sent', error); return; }
+      putAgreement(data);
+      setAgreementMsg({ trade: ag.trade_key, status: 'ok', text: 'Ready to sign — copy the link or click "Email…" to send it to the subcontractor.' });
+    },
+    async recall(ag) {
+      if (!confirm('Take this agreement back to edit? The link you sent will stop working; you\'ll send a new link after your changes.')) return;
+      const { data, error } = await supabase.from('sub_agreements').update({ status: 'draft' }).eq('id', ag.id).select('*').single();
+      if (error) { agreementFail(ag.trade_key, 'Not changed', error); return; }
+      putAgreement(data);
+      setAgreementMsg({ trade: ag.trade_key, status: 'ok', text: 'Back to draft. The old link no longer works.' });
+    },
+    async remove(ag) {
+      if (!confirm(ag.status === 'sent' ? 'Cancel this agreement? The link you sent will stop working.' : 'Delete this draft agreement?')) return;
+      const { error } = await supabase.from('sub_agreements').delete().eq('id', ag.id);
+      if (error) { agreementFail(ag.trade_key, 'Not deleted', error); return; }
+      setSubAgreements((a) => ({ ...a, list: a.list.filter((x) => x.id !== ag.id) }));
+      setAgreementMsg(null);
+    },
+    async countersign(ag, sig) {
+      const { data, error } = await supabase.from('sub_agreements')
+        .update({ status: 'countersigned', contractor_signature: { name: sig.name.trim(), title: sig.title.trim() } })
+        .eq('id', ag.id).select('*').single();
+      if (error) { agreementFail(ag.trade_key, 'Not countersigned', error); return; }
+      putAgreement(data);
+      setAgreementMsg({ trade: ag.trade_key, status: 'ok', text: 'Countersigned — the agreement is fully signed and locked.' });
+    },
+    async copy(trade, url) {
+      let ok = false;
+      try { await navigator.clipboard.writeText(url); ok = true; } catch { /* clipboard blocked */ }
+      setAgreementMsg({ trade, status: ok ? 'ok' : 'error', text: ok ? 'Link copied.' : 'Could not copy — select the link and copy it.' });
+    },
+  };
   const sheetsApi = {
     amounts: showSheetAmounts,
     setAmounts: (on) => {
@@ -2054,7 +2167,7 @@ export default function RemodelBudget() {
     },
     print: (keys) => handleTradeSheets(keys),
   };
-  const defaultScopeOf = (trade) => scopeDefaults[trade] ?? starterScope(trade);
+  const defaultScopeOf = (trade) => withoutLegacyGeneral(scopeDefaults[trade]) ?? starterScope(trade);
   function setTradeScope(trade, text) {
     setLayout((l) => ({ ...l, scopes: { ...(l.scopes ?? {}), [trade]: String(text).slice(0, MAX_SCOPE) } }));
     setScopeSave((p) => ({ ...p, [trade]: undefined }));
@@ -2067,7 +2180,7 @@ export default function RemodelBudget() {
     });
   }
   async function saveDefaultScope(trade) {
-    const text = layout.scopes?.[trade] ?? defaultScopeOf(trade);
+    const text = withoutLegacyGeneral(layout.scopes?.[trade]) ?? defaultScopeOf(trade);
     setScopeSave((p) => ({ ...p, [trade]: { status: 'saving' } }));
     const { error } = await supabase.from('trade_scope_templates').upsert({ trade_key: trade, scope: text }, { onConflict: 'trade_key' });
     if (error) {
@@ -2080,7 +2193,7 @@ export default function RemodelBudget() {
     setScopeSave((p) => ({ ...p, [trade]: { status: 'saved', msg: 'Saved as your default scope.' } }));
   }
   const scopeApi = {
-    of: (trade) => layout.scopes?.[trade] ?? defaultScopeOf(trade),
+    of: (trade) => withoutLegacyGeneral(layout.scopes?.[trade]) ?? defaultScopeOf(trade),
     isEdited: (trade) => layout.scopes?.[trade] != null,
     hasSavedDefault: (trade) => scopeDefaults[trade] != null,
     saveState: scopeSave,
@@ -2129,6 +2242,8 @@ export default function RemodelBudget() {
   // Cost breakdown of the direct costs: budget lines by their split, approved
   // design selections as materials, approved change orders on their own.
   const lineBreakdown = (item) => splitAmounts(lineVals[item.wbs] ?? 0, lineSplit(item, layout));
+  // Who supplies a line's materials (trade sheets and agreements).
+  const suppliedBy = (item) => (lineBreakdown(item).m > 0.5 ? 'Orozco Homes' : 'Subcontractor');
   const divBreakdown = (div) => div.items.filter((it) => it.unit !== 'pct').reduce((acc, it) => {
     const b = lineBreakdown(it);
     return { m: acc.m + b.m, s: acc.s + b.s, o: acc.o + b.o };
@@ -2569,13 +2684,19 @@ export default function RemodelBudget() {
 
   // ── Trade sheets (Subs & Materials) ─────────────────────────────────────────
   // One printable page per trade for the subcontractor: project, scope of
-  // work, work items, who supplies materials, acceptance lines. Budget amounts
-  // only when "Show amounts on trade sheets" is ticked.
+  // work, work items, who supplies materials. Budget amounts only when "Show
+  // amounts on trade sheets" is ticked. The sub signs the Subcontract
+  // Agreement (online), not the sheet.
+  function agreementNote(key) {
+    const ag = agreementsApi.current(key);
+    if (ag?.sub_signed_at) return `Signed Subcontract Agreement on file (signed by ${escHtml(ag.sub_signature?.name ?? '')} on ${escHtml(fmtLongDate(ag.sub_signed_at.slice(0, 10)))}). The agreement — Scope of Work plus the Orozco Homes Subcontractor Standards — governs this work.`;
+    return 'This sheet is for reference. The work is performed under the Orozco Homes Subcontract Agreement for this trade (Scope of Work plus the Orozco Homes Subcontractor Standards), signed online before work starts.';
+  }
   function handleTradeSheets(tradeKeys) {
     if (!subsMaterials) return;
     const dateStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     const money = (n) => '$' + Math.round(Number(n) || 0).toLocaleString('en-US');
-    const company = Object.fromEntries(PROPOSAL_FIELDS.filter((f) => f.section === 'company').map((f) => [f.key, f.defaultValue ?? '']));
+    const company = COMPANY;
     const projectName = currentProjectName ?? config.label;
     const trades = subsMaterials.trades.filter((t) => tradeKeys.includes(t.key));
     if (!trades.length) return;
@@ -2589,11 +2710,8 @@ export default function RemodelBudget() {
            ${sub?.phone?.[0] ? `<br>${escHtml(sub.phone[0])}` : ''}${sub?.email?.[0] ? `<br>${escHtml(sub.email[0])}` : ''}
            ${sub ? `<br><span class="coi ${coi}">${escHtml(COI_CHIP[coi].label)}${sub.coi_expires_on ? ` · ${coi === 'expired' ? 'expired' : 'expires'} ${escHtml(formatCoiDate(sub.coi_expires_on))}` : ''}</span>` : ''}`
         : '<span class="blank">Not assigned</span>';
-      const rows = t.lines.map((l) => {
-        const m = lineBreakdown(l.item).m;
-        return `<tr><td>${escHtml(l.item.label)}</td><td class="muted">${escHtml(l.div.label)}</td>
-          <td>${m > 0.5 ? 'Orozco Homes' : 'Subcontractor'}</td>${showSheetAmounts ? `<td class="amount">${money(l.amount)}</td>` : ''}</tr>`;
-      }).join('');
+      const rows = t.lines.map((l) => `<tr><td>${escHtml(l.item.label)}</td><td class="muted">${escHtml(l.div.label)}</td>
+          <td>${suppliedBy(l.item)}</td>${showSheetAmounts ? `<td class="amount">${money(l.amount)}</td>` : ''}</tr>`).join('');
       return `<section class="sheet">
   <div class="header">
     <div><div class="brand-name">Orozco Homes</div><div class="brand-sub">Design &amp; Construction · Virginia Beach, VA</div></div>
@@ -2612,13 +2730,8 @@ export default function RemodelBudget() {
     <tbody>${rows}</tbody>
     ${showSheetAmounts ? `<tfoot><tr><td colspan="3" class="amount-label">Total — ${escHtml(t.label)}</td><td class="amount">${money(t.total)}</td></tr></tfoot>` : ''}
   </table>
-  <h2>Acceptance</h2>
-  <p class="small">The subcontractor agrees to perform the scope above in a workmanlike manner, per code and manufacturer instructions, and to keep a current certificate of insurance on file with Orozco Homes.</p>
-  <div class="sign">
-    <div><div class="line"></div>Subcontractor signature</div>
-    <div><div class="line"></div>Printed name</div>
-    <div><div class="line"></div>Date</div>
-  </div>
+  <h2>Agreement</h2>
+  <p class="small">${agreementNote(t.key)}</p>
   <p class="foot">Orozco Homes · ${escHtml(company.company_license)} · ${escHtml(company.company_phone)} · ${escHtml(company.company_email)}</p>
 </section>`;
     }).join('');
@@ -2648,8 +2761,6 @@ export default function RemodelBudget() {
   .amount-label{text-align:right;font-weight:700;color:#002147}
   tfoot td{font-weight:700;border-top:1.5px solid #D1D5DB;background:#F9FAFB}
   .small{font-size:9pt;color:#374151;line-height:1.5}
-  .sign{display:grid;grid-template-columns:2fr 2fr 1fr;gap:24px;margin-top:34px;font-size:8pt;color:#6B7280}
-  .line{border-bottom:1px solid #1A1A1A;height:22px;margin-bottom:4px}
   .foot{margin-top:28px;font-size:7.5pt;color:#9CA3AF;text-align:center}
   @media print{body{padding:0}.sheet + .sheet{margin-top:0;padding-top:0;border-top:none;break-before:page}@page{margin:.6in;size:letter portrait}}
 </style></head><body>
@@ -3107,7 +3218,7 @@ ${sheets}
           {subDirError && (
             <p role="alert" className="px-4 mb-2 text-xs font-semibold" style={{ color: '#DC2626' }}>{subDirError}</p>
           )}
-          <SubsMaterialsView data={subsMaterials} onTradeChange={setLineTrade} scope={scopeApi} subs={subsApi} sheets={sheetsApi} bids={bidsApi} />
+          <SubsMaterialsView data={subsMaterials} onTradeChange={setLineTrade} scope={scopeApi} subs={subsApi} sheets={sheetsApi} bids={bidsApi} agreements={agreementsApi} />
         </>
       )}
 

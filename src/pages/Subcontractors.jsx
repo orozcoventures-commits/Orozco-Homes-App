@@ -5,6 +5,7 @@ import {
   ShieldCheck, ShieldAlert, ShieldQuestion, FileText, Paperclip, Trash2,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import SubStandardsEditor from '../components/SubStandardsEditor';
 import {
   EMPTY_SUBCONTRACTOR_FORM, toForm, validateForm, createSubcontractor, updateSubcontractor, deleteSubcontractor,
   COI_ACCEPT, openCoi, coiStatus, formatCoiDate,
@@ -383,7 +384,49 @@ function SubcontractorModal({ mode, title, form, setForm, onSave, onDelete, onCl
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
+// Two tabs: the Directory, and the Standards every Subcontract Agreement includes.
+const TABS = [['directory', 'Directory'], ['standards', 'Standards']];
+
+function PageTabs({ tab, onTab }) {
+  return (
+    <div role="tablist" aria-label="Subcontractors" className="flex gap-1 mb-6 p-1 rounded-xl w-fit" style={{ backgroundColor: '#F3F4F6' }}>
+      {TABS.map(([key, label]) => (
+        <button key={key} type="button" role="tab" aria-selected={tab === key} onClick={() => onTab(key)}
+          className="px-4 py-1.5 rounded-lg text-sm font-bold focus:outline-none focus:ring-2 focus:ring-sky-300"
+          style={tab === key ? { backgroundColor: '#002147', color: '#D4AF37' } : { color: '#4B5563' }}>
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function Subcontractors() {
+  const [tab, setTab] = useState(() => {
+    try { return localStorage.getItem('subs-tab') === 'standards' ? 'standards' : 'directory'; } catch { return 'directory'; }
+  });
+  const changeTab = (key) => {
+    setTab(key);
+    try { localStorage.setItem('subs-tab', key); } catch { /* storage unavailable */ }
+  };
+  const tabs = <PageTabs tab={tab} onTab={changeTab} />;
+  if (tab === 'directory') return <Directory tabs={tabs} />;
+  return (
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <div className="mb-6">
+        <p className="text-xs font-bold tracking-[0.18em] uppercase mb-1" style={{ color: '#D4AF37' }}>Admin Tool</p>
+        <h2 className="text-2xl font-bold" style={{ color: '#002147' }}>Subcontractors</h2>
+        <p className="text-sm mt-1" style={{ color: '#6B7280' }}>
+          Subcontractor Standards &amp; Trade-Specific Expectations — included in every Subcontract Agreement.
+        </p>
+      </div>
+      {tabs}
+      <SubStandardsEditor />
+    </div>
+  );
+}
+
+function Directory({ tabs }) {
   const [query, setQuery] = useState('');
   const [attempt, setAttempt] = useState(0);
   // Last completed request: `key` identifies which search it answered, so the
@@ -511,6 +554,8 @@ export default function Subcontractors() {
           <Plus size={15} strokeWidth={2.5} /> Add Subcontractor
         </button>
       </div>
+
+      {tabs}
 
       {/* Search */}
       <div className="relative mb-3">

@@ -19,7 +19,9 @@ import ContractBuilder from './pages/ContractBuilder';
 import Proposals from './pages/Proposals';
 import Questionnaires from './pages/Questionnaires';
 import PublicQuestionnaire from './pages/PublicQuestionnaire';
+import PublicSubAgreement from './pages/PublicSubAgreement';
 import { questionnaireRoute } from './utils/questionnaireTemplate';
+import { subAgreementRoute } from './utils/subAgreement';
 import Subcontractors from './pages/Subcontractors';
 import NewHomeBudget from './pages/NewHomeBudget';
 import RemodelBudget from './pages/RemodelBudget';
@@ -213,6 +215,9 @@ export default function App() {
   // Customer questionnaire links work without logging in.
   const qRoute = questionnaireRoute(window.location.pathname);
   if (qRoute) return <ErrorBoundary><PublicQuestionnaire route={qRoute} /></ErrorBoundary>;
+  // Subcontract Agreement links (subcontractors sign without logging in).
+  const sRoute = subAgreementRoute(window.location.pathname);
+  if (sRoute) return <ErrorBoundary><PublicSubAgreement route={sRoute} /></ErrorBoundary>;
 
   return (
     <ErrorBoundary>
