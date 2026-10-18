@@ -3,10 +3,17 @@
 // These are used until a default is saved for a trade (table
 // trade_scope_templates, migration 053), and each budget can edit its own copy
 // (layout_json.scopes). Internal working text — edit freely.
+//
+// Scopes describe the work only. Rules for how every sub works (labor and
+// tools, codes, protection, cleanup, insurance) are in the Subcontractor
+// Standards (src/utils/subStandards.js) that each Subcontract Agreement
+// includes, so they are not repeated here.
 
 export const MAX_SCOPE = 8000;
 
-const GENERAL = [
+// The "General:" block the starter scopes used to end with, now covered by the
+// Subcontractor Standards. Removed from saved scopes that still end with it.
+const LEGACY_GENERAL = '\n\nGeneral:\n' + [
   'Furnish all labor, tools, equipment and consumables (fasteners, blades, tape, caulk, etc.) to complete the work below.',
   'Orozco Homes supplies the materials listed in the budget unless noted otherwise.',
   'Work to Virginia USBC / 2021 IRC and manufacturer instructions; schedule and pass required inspections for this trade.',
@@ -14,7 +21,11 @@ const GENERAL = [
   'Current COI (general liability + workers\' comp) and Virginia contractor license on file before starting.',
 ].map((t) => `• ${t}`).join('\n');
 
-const scope = (...lines) => `${lines.map((t) => `• ${t}`).join('\n')}\n\nGeneral:\n${GENERAL}`;
+export function withoutLegacyGeneral(text) {
+  return typeof text === 'string' && text.endsWith(LEGACY_GENERAL) ? text.slice(0, -LEGACY_GENERAL.length) : text;
+}
+
+const scope = (...lines) => lines.map((t) => `• ${t}`).join('\n');
 
 export const STARTER_SCOPES = {
   demolition: scope(
@@ -22,7 +33,6 @@ export const STARTER_SCOPES = {
     'Selective demolition of the areas shown; remove fixtures, finishes and materials to studs/subfloor as required.',
     'Cap or confirm plumbing and electrical are made safe before removal (by licensed trades).',
     'Haul debris to the dumpster; sweep and vacuum; leave the area ready for framing.',
-    'Notify Orozco Homes immediately of rot, mold, termite damage or hidden conditions.',
   ),
   concrete: scope(
     'Layout, excavation and forming for footings / slab per approved plans.',
