@@ -1061,6 +1061,120 @@ function TradeSub({ trade, subs }) {
   );
 }
 
+// Bids for one trade (migration 059): quotes received from subcontractors,
+// compared with the trade's budget; "Select" marks the chosen one.
+function TradeBids({ trade, subs, bids }) {
+  const [open, setOpen] = useState(false);
+  const [subPick, setSubPick] = useState('');
+  const [otherName, setOtherName] = useState('');
+  const [amount, setAmount] = useState('');
+  const [date, setDate] = useState('');
+  const [notes, setNotes] = useState('');
+  const [busy, setBusy] = useState(false);
+  const list = bids.forTrade(trade.key);
+  const selected = list.find((b) => b.selected);
+  const vs = (amt) => {
+    const d = Number(amt) - trade.total;
+    return { d, text: `${d > 0 ? '+' : d < 0 ? '−' : ''}${fmt(Math.abs(d))} ${d > 0 ? 'over' : d < 0 ? 'under' : 'on'} budget`, color: d > 0 ? '#B45309' : '#059669' };
+  };
+  const matching = (subs.list ?? []).filter((s) => subMatchesTrade(s, trade.key));
+  const others = (subs.list ?? []).filter((s) => !subMatchesTrade(s, trade.key));
+  const id = `bids-${trade.key}`;
+  const submit = async (e) => {
+    e.preventDefault();
+    const sub = (subs.list ?? []).find((s) => String(s.id) === subPick);
+    const name = sub ? subLabel(sub) : otherName.trim();
+    const amt = Number(String(amount).replace(/[^0-9.]/g, ''));
+    if (!name) { bids.setMsg({ trade: trade.key, status: 'error', text: 'Pick a subcontractor or type a name.' }); return; }
+    if (!Number.isFinite(amt) || amt <= 0) { bids.setMsg({ trade: trade.key, status: 'error', text: 'Enter the bid amount.' }); return; }
+    setBusy(true);
+    const ok = await bids.add({ trade_key: trade.key, sub_id: sub ? sub.id : null, sub_name: name.slice(0, 120), amount: Math.round(amt * 100) / 100, bid_date: date || null, notes: notes.trim().slice(0, 500) });
+    setBusy(false);
+    if (ok) { setSubPick(''); setOtherName(''); setAmount(''); setDate(''); setNotes(''); }
+  };
+  const box = { border: '1px solid #D1D5DB', color: '#002147', backgroundColor: '#fff' };
+  const msg = bids.msg?.trade === trade.key ? bids.msg : null;
+  return (
+    <div className="px-5 py-2" style={{ borderTop: '1px solid #F3F4F6', backgroundColor: open ? '#FAFDFF' : '#fff' }}>
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-controls={id}
+        className="flex flex-wrap items-center gap-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-sky-300 rounded" style={{ color: '#0369A1' }}>
+        <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+          style={{ transition: 'transform 0.2s', transform: open ? 'rotate(90deg)' : 'none' }} aria-hidden="true"><polyline points="4 1 8 6 4 11" /></svg>
+        Bids{list.length ? ` (${list.length})` : ''}
+        {selected && (
+          <span className="font-semibold px-1.5 py-0.5 rounded" style={{ backgroundColor: '#ECFDF5', color: '#065F46' }}>
+            Selected: {selected.sub_name} {fmt(selected.amount)} · <span style={{ color: vs(selected.amount).color }}>{vs(selected.amount).text}</span>
+          </span>
+        )}
+      </button>
+      {open && (
+        <div id={id} className="mt-2 text-xs">
+          {bids.missing ? (
+            <p role="alert" className="font-semibold" style={{ color: '#DC2626' }}>Bids are not set up yet — run migration 059 in Supabase first.</p>
+          ) : (
+            <>
+              {list.length > 0 && (
+                <table className="w-full mb-2" data-testid={`bids-table-${trade.key}`}>
+                  <tbody>
+                    {list.map((b) => {
+                      const v = vs(b.amount);
+                      return (
+                        <tr key={b.id} style={{ borderTop: '1px solid #E0F2FE' }}>
+                          <td className="py-1.5 font-semibold" style={{ color: '#002147' }}>
+                            {b.sub_name}{b.selected && <span className="ml-1.5 px-1.5 py-0.5 rounded" style={{ backgroundColor: '#ECFDF5', color: '#065F46' }}>Selected</span>}
+                            {b.notes && <span className="block font-normal" style={{ color: '#9CA3AF' }}>{b.notes}</span>}
+                          </td>
+                          <td className="py-1.5" style={{ color: '#6B7280' }}>{b.bid_date ? formatCoiDate(b.bid_date) : ''}</td>
+                          <td className="py-1.5 text-right font-bold" style={{ color: '#002147' }}>{fmt(b.amount)}</td>
+                          <td className="py-1.5 text-right font-semibold" style={{ color: v.color }}>{v.text}</td>
+                          <td className="py-1.5 text-right whitespace-nowrap">
+                            {!b.selected && (
+                              <button type="button" onClick={() => bids.select(b)} className="ml-2 font-bold underline" style={{ color: '#0369A1' }}
+                                aria-label={`Select bid from ${b.sub_name}`}>Select</button>
+                            )}
+                            <button type="button" onClick={() => bids.remove(b)} className="ml-2 underline" style={{ color: '#9CA3AF' }}
+                              aria-label={`Delete bid from ${b.sub_name}`}>Delete</button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+              <form onSubmit={submit} className="flex flex-wrap items-center gap-2">
+                <select value={subPick} onChange={(e) => setSubPick(e.target.value)} aria-label={`Bid subcontractor for ${trade.label}`}
+                  className="px-2 py-1 rounded-md max-w-[220px] focus:outline-none" style={box}>
+                  <option value="">Other (type a name)…</option>
+                  {matching.length > 0 && <optgroup label={`${trade.label} subcontractors`}>{matching.map((s) => <option key={s.id} value={s.id}>{subLabel(s)}</option>)}</optgroup>}
+                  {others.length > 0 && <optgroup label="All other subcontractors">{others.map((s) => <option key={s.id} value={s.id}>{subLabel(s)}</option>)}</optgroup>}
+                </select>
+                {!subPick && (
+                  <input value={otherName} onChange={(e) => setOtherName(e.target.value)} maxLength={120} placeholder="Company name"
+                    aria-label={`Bid company name for ${trade.label}`} className="w-40 px-2 py-1 rounded-md focus:outline-none" style={box} />
+                )}
+                <div className="relative">
+                  <span className="absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: '#9CA3AF' }}>$</span>
+                  <input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))} inputMode="decimal" placeholder="Amount"
+                    aria-label={`Bid amount for ${trade.label}`} className="w-28 pl-5 pr-2 py-1 rounded-md text-right focus:outline-none" style={box} />
+                </div>
+                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} aria-label={`Bid date for ${trade.label}`}
+                  className="px-2 py-1 rounded-md focus:outline-none" style={box} />
+                <input value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={500} placeholder="Notes (what's included)"
+                  aria-label={`Bid notes for ${trade.label}`} className="flex-1 min-w-[140px] px-2 py-1 rounded-md focus:outline-none" style={box} />
+                <button type="submit" disabled={busy} className="px-3 py-1 rounded-md font-bold disabled:opacity-60" style={{ backgroundColor: '#0369A1', color: '#fff' }}>Add bid</button>
+              </form>
+              {msg && <p role={msg.status === 'error' ? 'alert' : 'status'} className="mt-1.5 font-semibold" style={{ color: msg.status === 'error' ? '#DC2626' : '#059669' }}>{msg.text}</p>}
+              <p className="mt-1.5" style={{ color: '#9CA3AF' }}>
+                Budget for {trade.label}: <b style={{ color: '#002147' }}>{fmt(trade.total)}</b>. Selecting a bid from your directory also sets "Performed by". Bids don't change the estimate.
+              </p>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Scope of Work for one trade: this budget's copy, or the default (saved
 // default, else the built-in starter). Edits save with the budget.
 function TradeScope({ trade, scope }) {
@@ -1116,7 +1230,7 @@ function TradeScope({ trade, scope }) {
   );
 }
 
-function SubsMaterialsView({ data, onTradeChange, scope, subs, sheets }) {
+function SubsMaterialsView({ data, onTradeChange, scope, subs, sheets, bids }) {
   const { trades, materials, fees, designSpecsTotal, changeOrderCost, subTotal, materialTotal, feeTotal, directCosts } = data;
   const used = new Set(trades.map((t) => t.key));
   const notUsed = TRADES.filter((t) => t.key !== 'other' && !used.has(t.key));
@@ -1175,6 +1289,7 @@ function SubsMaterialsView({ data, onTradeChange, scope, subs, sheets }) {
               </span>
             </div>
             <TradeSub trade={t} subs={subs} />
+            <TradeBids trade={t} subs={subs} bids={bids} />
             <TradeScope trade={t} scope={scope} />
             {t.lines.map((l) => (
               <div key={l.item.wbs} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-2 text-sm" style={{ borderTop: '1px solid #F3F4F6' }}>
@@ -1876,6 +1991,56 @@ export default function RemodelBudget() {
       return { ...l, subs };
     });
   }
+  // Subcontractor bids per trade (migration 059), loaded with the Subs & Materials tab.
+  const [tradeBids,      setTradeBids]      = useState({ project: null, list: [], missing: false });
+  const [bidMsg,         setBidMsg]         = useState(null);
+  const needBids = viewMode === 'trade' && !!currentProjectId && tradeBids.project !== currentProjectId;
+  useEffect(() => {
+    if (!needBids) return undefined;
+    let live = true;
+    const project = currentProjectId;
+    supabase.from('remodel_trade_bids').select('*').eq('project_id', project).order('created_at')
+      .then(({ data, error }) => {
+        if (!live) return;
+        const missing = !!error && /remodel_trade_bids|schema cache|does not exist/i.test(error.message ?? '');
+        setTradeBids({ project, list: error ? [] : (data ?? []), missing });
+      });
+    return () => { live = false; };
+  }, [needBids, currentProjectId]);
+  const bidsApi = {
+    missing: tradeBids.missing,
+    msg: bidMsg,
+    setMsg: setBidMsg,
+    forTrade: (key) => (tradeBids.project === currentProjectId ? tradeBids.list.filter((b) => b.trade_key === key) : []),
+    async add(row) {
+      const { data, error } = await supabase.from('remodel_trade_bids').insert({ project_id: currentProjectId, ...row }).select('*').single();
+      if (error) { setBidMsg({ trade: row.trade_key, status: 'error', text: `Bid not saved: ${error.message}` }); return false; }
+      setTradeBids((t) => ({ ...t, list: [...t.list, data] }));
+      setBidMsg({ trade: row.trade_key, status: 'ok', text: `Bid from ${data.sub_name} added.` });
+      return true;
+    },
+    async select(bid) {
+      const others = tradeBids.list.filter((b) => b.trade_key === bid.trade_key && b.selected && b.id !== bid.id).map((b) => b.id);
+      if (others.length) {
+        const { error } = await supabase.from('remodel_trade_bids').update({ selected: false }).in('id', others);
+        if (error) { setBidMsg({ trade: bid.trade_key, status: 'error', text: `Not selected: ${error.message}` }); return; }
+      }
+      const { error } = await supabase.from('remodel_trade_bids').update({ selected: true }).eq('id', bid.id);
+      if (error) { setBidMsg({ trade: bid.trade_key, status: 'error', text: `Not selected: ${error.message}` }); return; }
+      setTradeBids((t) => ({ ...t, list: t.list.map((b) => (b.trade_key === bid.trade_key ? { ...b, selected: b.id === bid.id } : b)) }));
+      const sub = bid.sub_id != null ? subDirectory?.find((s) => s.id === bid.sub_id) : null;
+      if (sub) assignTradeSub(bid.trade_key, { id: sub.id, name: subLabel(sub) });
+      setBidMsg({ trade: bid.trade_key, status: 'ok', text: sub
+        ? `Selected ${bid.sub_name} — also set as "Performed by".`
+        : `Selected ${bid.sub_name}. "Performed by" was not changed — add them in Subcontractors to assign them.` });
+    },
+    async remove(bid) {
+      if (!confirm(`Delete the bid from ${bid.sub_name} (${fmt(bid.amount)})?`)) return;
+      const { error } = await supabase.from('remodel_trade_bids').delete().eq('id', bid.id);
+      if (error) { setBidMsg({ trade: bid.trade_key, status: 'error', text: `Not deleted: ${error.message}` }); return; }
+      setTradeBids((t) => ({ ...t, list: t.list.filter((b) => b.id !== bid.id) }));
+    },
+  };
   const subsApi = {
     list: subDirectory,
     assigned: (trade) => layout.subs?.[trade],
@@ -2942,7 +3107,7 @@ ${sheets}
           {subDirError && (
             <p role="alert" className="px-4 mb-2 text-xs font-semibold" style={{ color: '#DC2626' }}>{subDirError}</p>
           )}
-          <SubsMaterialsView data={subsMaterials} onTradeChange={setLineTrade} scope={scopeApi} subs={subsApi} sheets={sheetsApi} />
+          <SubsMaterialsView data={subsMaterials} onTradeChange={setLineTrade} scope={scopeApi} subs={subsApi} sheets={sheetsApi} bids={bidsApi} />
         </>
       )}
 
