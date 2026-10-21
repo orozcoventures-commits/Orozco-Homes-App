@@ -2506,6 +2506,8 @@
       // Card statement category -> budget category name (used only when that category exists)
       const CARD_CATEGORY_MAP = [
         [/insurance/i, 'Insurance'],
+        // Doctor, dentist, hospital, lab, vision, pharmacy -> a medical category ("Doctors & Medical", "Health"...)
+        [/medical|dental|dentist|doctor|physician|hospital|health ?care|clinic|optometr|vision care|chiropract|laborator|pharmac/i, 'Doctors & Medical'],
         [/groceries|grocery|supermarket|wholesale/i, 'Groceries'],
         [/hardware|contracting|home improvement|building supplies/i, 'Home Improvement'],
         [/charit/i, 'Giving'],
@@ -2545,6 +2547,7 @@
         Electrical: /electric|dominion|energy|power/i,
         'Natural Gas': /natural gas/i,
         Insurance: /insur/i,
+        'Doctors & Medical': /doctor|medical|dental|dentist|health|pharmac/i,
       };
       const findCategory = (name) => catByName(name)
         || (CATEGORY_ALIASES[name] && state.categories.find((c) => CATEGORY_ALIASES[name].test(c.name)));
