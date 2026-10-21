@@ -77,6 +77,7 @@
       <nav class="flex flex-wrap gap-1 border-b border-slate-300" role="tablist" aria-label="Sections">
         <button type="button" role="tab" data-tab="budget" class="tab-btn">Budget</button>
         <button type="button" role="tab" data-tab="loans" class="tab-btn">Loans</button>
+        <button type="button" role="tab" data-tab="projects" class="tab-btn">Home Improvement</button>
         <button type="button" role="tab" data-tab="networth" class="tab-btn">Net Worth</button>
         <button type="button" role="tab" data-tab="retirement" class="tab-btn">Retirement</button>
       </nav>
@@ -350,6 +351,119 @@
           </table>
         </div>
       </section>
+    </div>
+
+    <!-- HOME IMPROVEMENT -->
+    <div data-tabpanel="projects" hidden class="space-y-6">
+      <section class="bg-white rounded-xl shadow-sm p-5">
+        <div class="flex flex-wrap items-end gap-3">
+          <div class="min-w-0 flex-1">
+            <label for="projSelect" class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">Project</label>
+            <select id="projSelect" class="w-full max-w-md rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"></select>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button id="projNewBtn" type="button" class="rounded-md border border-slate-300 hover:bg-slate-50 px-3 py-2 text-sm font-medium">New project</button>
+            <button id="projImportBtn" type="button" class="rounded-md bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 text-sm font-medium">Import from spreadsheet</button>
+            <input id="projImportFile" type="file" accept=".xlsx,.xls" hidden />
+          </div>
+        </div>
+        <div id="projHead" class="mt-4 grid sm:grid-cols-[1fr_auto_auto] gap-3 items-end" hidden>
+          <div>
+            <label for="projName" class="block text-sm font-medium text-slate-600 mb-1">Project name</label>
+            <input id="projName" type="text" maxlength="80" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label for="projContingency" class="block text-sm font-medium text-slate-600 mb-1">Contingency (%)</label>
+            <input id="projContingency" type="text" inputmode="decimal" class="w-28 rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <button id="projDeleteBtn" type="button" class="rounded-md border border-slate-300 hover:bg-red-50 hover:text-red-700 px-3 py-2 text-sm">Delete project</button>
+        </div>
+        <p id="projEmpty" class="text-sm text-slate-500 mt-3">No projects yet. Click <strong>Import from spreadsheet</strong> to load your budget file, or <strong>New project</strong> to start one.</p>
+      </section>
+
+      <div id="projBody" hidden class="space-y-6">
+        <section id="projCards" class="grid grid-cols-2 lg:grid-cols-4 gap-4"></section>
+
+        <div class="grid lg:grid-cols-3 gap-6">
+          <div class="lg:col-span-2 space-y-6 min-w-0">
+            <section class="bg-white rounded-xl shadow-sm p-5">
+              <div class="flex flex-wrap items-baseline justify-between gap-2 mb-3">
+                <h2 class="text-lg font-semibold">Materials</h2>
+                <p class="text-xs text-slate-500">Click any name, amount or note to change it.</p>
+              </div>
+              <div class="overflow-x-auto"><table class="w-full text-sm">
+                <thead><tr class="text-left text-slate-500 border-b border-slate-200">
+                  <th class="py-2 pr-2 font-medium">Item</th><th class="py-2 px-2 font-medium text-right">Estimate</th>
+                  <th class="py-2 px-2 font-medium text-right">Actual</th><th class="py-2 px-2 font-medium text-right">Difference</th>
+                  <th class="py-2 px-2 font-medium">Notes</th><th></th></tr></thead>
+                <tbody id="projMaterials"></tbody></table></div>
+            </section>
+            <section class="bg-white rounded-xl shadow-sm p-5">
+              <h2 class="text-lg font-semibold mb-3">Labor</h2>
+              <div class="overflow-x-auto"><table class="w-full text-sm">
+                <thead><tr class="text-left text-slate-500 border-b border-slate-200">
+                  <th class="py-2 pr-2 font-medium">Trade / work</th><th class="py-2 px-2 font-medium text-right">Estimate</th>
+                  <th class="py-2 px-2 font-medium text-right">Actual</th><th class="py-2 px-2 font-medium text-right">Difference</th>
+                  <th class="py-2 px-2 font-medium">Notes</th><th></th></tr></thead>
+                <tbody id="projLabor"></tbody></table></div>
+            </section>
+            <section class="bg-white rounded-xl shadow-sm p-5">
+              <h2 class="text-lg font-semibold mb-3">Change orders</h2>
+              <div class="overflow-x-auto"><table class="w-full text-sm">
+                <thead><tr class="text-left text-slate-500 border-b border-slate-200">
+                  <th class="py-2 pr-2 font-medium">Date</th><th class="py-2 px-2 font-medium">Reason</th>
+                  <th class="py-2 px-2 font-medium text-right">Amount</th><th class="py-2 px-2 font-medium">Notes</th><th></th></tr></thead>
+                <tbody id="projChanges"></tbody></table></div>
+              <div id="projChangeForm" class="mt-3 grid sm:grid-cols-[auto_1fr_auto_auto] gap-2">
+                <input id="coDate" type="date" aria-label="Change order date" class="rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                <input id="coReason" type="text" maxlength="120" placeholder="Reason, e.g. subfloor replacement" aria-label="Reason" class="min-w-0 rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                <input id="coAmount" type="text" inputmode="decimal" placeholder="Amount" aria-label="Amount" class="w-32 rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                <button id="coAddBtn" type="button" class="rounded-md border border-slate-300 hover:bg-slate-50 px-3 py-2 text-sm font-medium">Add</button>
+              </div>
+            </section>
+          </div>
+
+          <div class="space-y-6 min-w-0">
+            <section class="bg-white rounded-xl shadow-sm p-5">
+              <h2 class="text-lg font-semibold mb-3">Add an item</h2>
+              <div id="projAddForm" class="space-y-3">
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label for="piSection" class="block text-sm font-medium text-slate-600 mb-1">Type</label>
+                    <select id="piSection" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"><option value="materials">Materials</option><option value="labor">Labor</option></select>
+                  </div>
+                  <div>
+                    <label for="piArea" class="block text-sm font-medium text-slate-600 mb-1">Area / trade</label>
+                    <input id="piArea" type="text" maxlength="60" list="piAreaList" placeholder="e.g. Kitchen" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                    <datalist id="piAreaList"></datalist>
+                  </div>
+                </div>
+                <div>
+                  <label for="piName" class="block text-sm font-medium text-slate-600 mb-1">Item</label>
+                  <input id="piName" type="text" maxlength="120" placeholder="e.g. Pendant lights" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label for="piEstimate" class="block text-sm font-medium text-slate-600 mb-1">Estimate ($)</label>
+                    <input id="piEstimate" type="text" inputmode="decimal" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  </div>
+                  <div>
+                    <label for="piActual" class="block text-sm font-medium text-slate-600 mb-1">Actual ($)</label>
+                    <input id="piActual" type="text" inputmode="decimal" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  </div>
+                </div>
+                <button id="piAddBtn" type="button" class="w-full rounded-md bg-indigo-600 hover:bg-indigo-500 text-white py-2 font-medium">Add item</button>
+                <p id="piMsg" class="text-sm text-red-600 min-h-[1.25rem]" aria-live="polite"></p>
+              </div>
+            </section>
+            <section class="bg-white rounded-xl shadow-sm p-5">
+              <h2 class="text-lg font-semibold">Where the money went</h2>
+              <p class="text-xs text-slate-500 mb-3">Actual spending by area, compared with its estimate.</p>
+              <div id="projAreas" class="space-y-3"></div>
+            </section>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- NET WORTH -->
@@ -731,6 +845,8 @@
           loan: {},
           netWorth: { items: [], history: {} },
           retirement: {},
+          projects: [],
+          activeProject: null,
         };
       }
 
@@ -763,6 +879,8 @@
               history: isObj(data.netWorth.history) ? data.netWorth.history : {},
             } : { items: [], history: {} },
             retirement: isObj(data.retirement) ? data.retirement : {},
+            projects: Array.isArray(data.projects) ? data.projects : [],
+            activeProject: typeof data.activeProject === 'string' ? data.activeProject : null,
           };
         } catch (e) {
           return freshState();
@@ -1548,6 +1666,262 @@
         });
       });
 
+      // ---------- Home improvement projects ----------
+      const projNum = (v) => { const t = String(v === undefined || v === null ? '' : v).replace(/[$,\s]/g, ''); const n = parseFloat(t); return Number.isFinite(n) ? Math.round(n * 100) / 100 : 0; };
+      const activeProject = () => state.projects.find((x) => x.id === state.activeProject) || state.projects[0] || null;
+      function projTotals(pr) {
+        const sum = (list, k) => Math.round(list.reduce((a, it) => a + (Number(it[k]) || 0), 0) * 100) / 100;
+        const mat = pr.items.filter((it) => it.section === 'materials'), lab = pr.items.filter((it) => it.section === 'labor');
+        const t = {
+          matEst: sum(mat, 'estimate'), matAct: sum(mat, 'actual'), labEst: sum(lab, 'estimate'), labAct: sum(lab, 'actual'),
+          co: sum(pr.changeOrders || [], 'amount'),
+        };
+        t.est = Math.round((t.matEst + t.labEst) * 100) / 100;
+        t.act = Math.round((t.matAct + t.labAct + t.co) * 100) / 100;
+        t.contPct = Number.isFinite(parseFloat(pr.contingency)) ? parseFloat(pr.contingency) : 10;
+        t.budget = Math.round(t.est * (1 + t.contPct / 100) * 100) / 100;
+        return t;
+      }
+
+      function projRowsHtml(pr, section) {
+        const items = pr.items.filter((it) => it.section === section);
+        if (!items.length) return `<tr><td colspan="6" class="py-4 text-center text-slate-400">No ${section} yet. Add one on the right.</td></tr>`;
+        const areas = [...new Set(items.map((it) => it.area || 'Other'))];
+        const field = 'rounded-md border border-transparent hover:border-slate-300 focus:border-slate-300 bg-transparent px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500';
+        const money = (it, k) => `<div class="relative inline-block"><span class="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400">$</span>
+            <input type="text" inputmode="decimal" data-f="${k}" value="${it[k] ? Number(it[k]).toFixed(2) : ''}" placeholder="—" aria-label="${k} for ${escapeHtml(it.name)}"
+                   class="w-28 pl-5 text-right tabular-nums ${field}" /></div>`;
+        return areas.map((area) => {
+          const list = items.filter((it) => (it.area || 'Other') === area);
+          const est = list.reduce((a, it) => a + (Number(it.estimate) || 0), 0), act = list.reduce((a, it) => a + (Number(it.actual) || 0), 0);
+          return `<tr class="bg-slate-50 border-y border-slate-200">
+              <th scope="rowgroup" class="py-2 px-2 text-left font-semibold text-slate-700">${escapeHtml(area)}</th>
+              <td class="py-2 px-2 text-right font-semibold tabular-nums" data-area-est="${escapeHtml(section + '|' + area)}">${fmt.format(est)}</td>
+              <td class="py-2 px-2 text-right font-semibold tabular-nums" data-area-act="${escapeHtml(section + '|' + area)}">${fmt.format(act)}</td>
+              <td class="py-2 px-2 text-right tabular-nums" data-area-var="${escapeHtml(section + '|' + area)}">${varianceCell(est - act)}</td><td></td><td></td></tr>`
+            + list.map((it) => `<tr class="border-b border-slate-100 align-top" data-pi="${it.id}">
+                <td class="py-1 pl-3 pr-1"><input type="text" data-f="name" value="${escapeHtml(it.name)}" maxlength="120" aria-label="Item" class="w-full min-w-[10rem] ${field}" />
+                  ${it.detail ? `<span class="block px-2 text-[11px] text-slate-400 truncate max-w-xs" title="${escapeHtml(it.detail)}">${escapeHtml(it.detail)}</span>` : ''}
+                  ${it.link ? `<a href="${escapeHtml(it.link)}" target="_blank" rel="noopener" class="px-2 text-[11px] text-indigo-600 underline">product link</a>` : ''}</td>
+                <td class="py-1 px-1 text-right">${money(it, 'estimate')}</td>
+                <td class="py-1 px-1 text-right">${money(it, 'actual')}</td>
+                <td class="py-1.5 px-2 text-right tabular-nums" data-pi-var="${it.id}">${it.actual ? varianceCell((Number(it.estimate) || 0) - (Number(it.actual) || 0)) : '<span class="text-slate-400">not paid yet</span>'}</td>
+                <td class="py-1 px-1"><input type="text" data-f="note" value="${escapeHtml(it.note || '')}" maxlength="120" placeholder="Add a note" aria-label="Note" class="w-full min-w-[8rem] ${field}" /></td>
+                <td class="py-1 pl-1 text-right"><button type="button" data-pi-del="${it.id}" class="text-slate-400 hover:text-red-600 px-1 text-lg leading-none" aria-label="Delete ${escapeHtml(it.name)}">&times;</button></td>
+              </tr>`).join('');
+        }).join('');
+      }
+
+      function renderProjTotals() {
+        const pr = activeProject();
+        if (!pr) return;
+        const t = projTotals(pr);
+        const diff = Math.round((t.est - t.act) * 100) / 100;
+        const left = Math.round((t.budget - t.act) * 100) / 100;
+        const card = (label, value, sub, cls = '') => `<div class="bg-white rounded-xl shadow-sm p-5 ${cls}">
+            <p class="text-xs uppercase tracking-wide text-slate-500">${label}</p>
+            <p class="text-2xl font-semibold mt-1 tabular-nums">${value}</p><p class="text-xs mt-1 text-slate-500">${sub}</p></div>`;
+        $('projCards').innerHTML =
+          card('Estimated', fmt.format(t.est), `materials ${fmt.format(t.matEst)} · labor ${fmt.format(t.labEst)}`)
+          + card('Actual so far', fmt.format(t.act), `materials ${fmt.format(t.matAct)} · labor ${fmt.format(t.labAct)}${t.co ? ` · change orders ${fmt.format(t.co)}` : ''}`)
+          + card(diff >= 0 ? 'Under estimate' : 'Over estimate', `<span class="${diff >= 0 ? 'text-emerald-700' : 'text-red-700'}">${diff >= 0 ? '' : '▲ '}${fmt.format(Math.abs(diff))}</span>`,
+              `${t.est ? Math.round((Math.abs(diff) / t.est) * 1000) / 10 : 0}% ${diff >= 0 ? 'under' : 'over'} the estimate`)
+          + card(`Budget with ${t.contPct}% contingency`, fmt.format(t.budget),
+              left >= 0 ? `<span class="text-emerald-700">${fmt.format(left)} of cushion left</span>` : `<span class="text-red-700">▲ ${fmt.format(-left)} past the cushion</span>`);
+        // Section and area subtotals (kept current while typing)
+        pr.items.forEach(() => {});
+        const areas = {};
+        pr.items.forEach((it) => {
+          const k = it.section + '|' + (it.area || 'Other');
+          const a = areas[k] || (areas[k] = { est: 0, act: 0 });
+          a.est += Number(it.estimate) || 0; a.act += Number(it.actual) || 0;
+        });
+        Object.entries(areas).forEach(([k, a]) => {
+          const q = (attr) => document.querySelector(`[${attr}="${CSS.escape(k)}"]`);
+          if (q('data-area-est')) q('data-area-est').textContent = fmt.format(a.est);
+          if (q('data-area-act')) q('data-area-act').textContent = fmt.format(a.act);
+          if (q('data-area-var')) q('data-area-var').innerHTML = varianceCell(a.est - a.act);
+        });
+        // Where the money went: biggest areas by actual, bar = actual vs estimate
+        const list = Object.entries(areas).map(([k, a]) => ({ name: k.split('|')[1], section: k.split('|')[0], ...a }))
+          .filter((a) => a.act || a.est).sort((x, y) => y.act - x.act).slice(0, 10);
+        $('projAreas').innerHTML = list.map((a) => {
+          const pr2 = progress(a.act, a.est);
+          return `<div><div class="flex justify-between gap-2 text-sm"><span class="min-w-0 truncate">${escapeHtml(a.name)} <span class="text-xs text-slate-400">${a.section === 'labor' ? 'labor' : 'materials'}</span></span>
+              <span class="tabular-nums text-slate-600 whitespace-nowrap">${fmt0.format(a.act)} / ${fmt0.format(a.est)}${pr2.over ? ' <span class="text-red-700 font-semibold">▲</span>' : ''}</span></div>
+            <div class="h-2 rounded-full bg-slate-100 overflow-hidden mt-1"><div class="h-full rounded-full ${pr2.color}" style="width:${pr2.width}%"></div></div></div>`;
+        }).join('') || '<p class="text-sm text-slate-400">Add items to see the breakdown.</p>';
+      }
+
+      function renderProjects() {
+        const pr = activeProject();
+        $('projSelect').innerHTML = state.projects.map((x) => `<option value="${x.id}" ${pr && x.id === pr.id ? 'selected' : ''}>${escapeHtml(x.name)}</option>`).join('')
+          || '<option value="">No projects yet</option>';
+        $('projHead').hidden = !pr; $('projBody').hidden = !pr; $('projEmpty').hidden = !!pr;
+        if (!pr) return;
+        if (document.activeElement !== $('projName')) $('projName').value = pr.name;
+        if (document.activeElement !== $('projContingency')) $('projContingency').value = Number.isFinite(parseFloat(pr.contingency)) ? pr.contingency : 10;
+        $('projMaterials').innerHTML = projRowsHtml(pr, 'materials');
+        $('projLabor').innerHTML = projRowsHtml(pr, 'labor');
+        const cos = pr.changeOrders || [];
+        $('projChanges').innerHTML = cos.map((c) => `<tr class="border-b border-slate-100">
+            <td class="py-1.5 pr-2 whitespace-nowrap">${c.date ? escapeHtml(longDate(c.date)) : '—'}</td>
+            <td class="py-1.5 px-2">${escapeHtml(c.reason || '')}</td>
+            <td class="py-1.5 px-2 text-right tabular-nums">${fmt.format(Number(c.amount) || 0)}</td>
+            <td class="py-1.5 px-2 text-slate-500">${escapeHtml(c.note || '')}</td>
+            <td class="py-1.5 pl-1 text-right"><button type="button" data-co-del="${c.id}" class="text-slate-400 hover:text-red-600 px-1 text-lg leading-none" aria-label="Delete change order">&times;</button></td></tr>`).join('')
+          || '<tr><td colspan="5" class="py-3 text-center text-slate-400">No change orders.</td></tr>';
+        $('piAreaList').innerHTML = [...new Set(pr.items.filter((it) => it.section === $('piSection').value).map((it) => it.area).filter(Boolean))]
+          .map((a) => `<option value="${escapeHtml(a)}"></option>`).join('');
+        renderProjTotals();
+      }
+
+      // Reads a renovation budget workbook: MATERIALS (category, description, est. each, qty, actual, notes),
+      // LABOR (trade, scope, est., actual, notes) and CHANGE ORDERS (date, reason, amount, notes) sheets.
+      function projFromWorkbook(XLSX, wb, fileName) {
+        const sheet = (re) => { const n = wb.SheetNames.find((x) => re.test(x)); return n ? XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: true, defval: '' }) : null; };
+        const num = (v) => (typeof v === 'number' ? v : (String(v).trim() && Number.isFinite(projNum(v)) && /\d/.test(String(v)) ? projNum(v) : null));
+        const isUrl = (v) => /^https?:\/\//i.test(String(v).trim());
+        const text = (v) => String(v === undefined || v === null ? '' : v).trim();
+        const items = [];
+        const mat = sheet(/material/i);
+        if (mat) {
+          let area = 'General';
+          mat.slice(1).forEach((r) => {
+            const cat = text(r[0]), desc = text(r[1]);
+            const each = num(r[3]), qty = num(r[4]), act = num(r[5]);
+            if (/total|difference/i.test(cat)) return;
+            const caps = cat && cat === cat.toUpperCase() && /[A-Z]{3}/.test(cat);
+            // A heading row may carry $0 amounts (e.g. APPLIANCES); treat it as a section, not an item
+            if (caps && !each && !act) { area = cat.replace(/\b\w+/g, (w) => w.charAt(0) + w.slice(1).toLowerCase()); return; }
+            if (each === null && act === null) {
+              // An all-caps label with nothing else is a section heading (SITE PREP, KITCHEN...)
+              if (cat && !desc && cat === cat.toUpperCase() && /[A-Z]/.test(cat)) area = cat.replace(/\b\w+/g, (w) => w.charAt(0) + w.slice(1).toLowerCase());
+              else if (cat && desc && cat === cat.toUpperCase() && !isUrl(desc) && desc.length > 40) area = cat.replace(/\b\w+/g, (w) => w.charAt(0) + w.slice(1).toLowerCase());
+              return;
+            }
+            const link = isUrl(desc) ? desc : ((desc.match(/https?:\/\/\S+/) || [])[0] || '');
+            const detail = isUrl(desc) ? '' : desc.replace(/https?:\/\/\S+/g, '').trim();
+            const name = cat || (detail.length > 60 ? detail.slice(0, 60) + '…' : detail) || 'Item';
+            items.push({ id: uid(), section: 'materials', area, name, detail: cat ? detail : '', link,
+              estimate: each !== null ? Math.round(each * (qty || 1) * 100) / 100 : 0, actual: act !== null ? act : 0, note: text(r[6]) });
+          });
+        }
+        const lab = sheet(/labor/i);
+        if (lab) {
+          let trade = 'General';
+          lab.slice(1).forEach((r) => {
+            const tr = text(r[0]), scope = text(r[1]), est = num(r[2]), act = num(r[3]);
+            if (/total|difference/i.test(tr)) return;
+            if (tr) trade = tr;
+            if (est === null && act === null) return;
+            const name = tr || (scope.length > 70 ? scope.slice(0, 70) + '…' : scope) || trade;
+            items.push({ id: uid(), section: 'labor', area: trade, name, detail: tr ? scope : '', link: '',
+              estimate: est !== null ? est : 0, actual: act !== null ? act : 0, note: text(r[4]) });
+          });
+        }
+        const changeOrders = [];
+        const co = sheet(/change/i);
+        if (co) co.slice(1).forEach((r) => {
+          const amt = num(r[3]);
+          if (amt === null || /total/i.test(text(r[0]))) return;
+          const d = r[1] instanceof Date ? r[1] : null;
+          changeOrders.push({ id: uid(), date: d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` : '',
+            reason: text(r[2]) || text(r[0]), amount: amt, note: text(r[4]) });
+        });
+        const name = fileName.replace(/\.[^.]+$/, '').replace(/^[0-9a-f]{6,}-/i, '').replace(/_/g, ' ').trim() || 'Home project';
+        return { id: uid(), name, contingency: 10, items, changeOrders };
+      }
+
+      $('projImportBtn').addEventListener('click', () => $('projImportFile').click());
+      $('projImportFile').addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        e.target.value = '';
+        if (!file) return;
+        try {
+          const XLSX = await loadXlsx();
+          const wb = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true });
+          const pr = projFromWorkbook(XLSX, wb, file.name);
+          if (!pr.items.length) { toast('Couldn’t find Materials or Labor sheets with amounts in that file.'); return; }
+          state.projects.push(pr);
+          state.activeProject = pr.id;
+          save(); renderProjects();
+          const t = projTotals(pr);
+          toast(`Imported ${pr.items.length} items: estimated ${fmt0.format(t.est)}, actual ${fmt0.format(t.act)}.`);
+        } catch (err) {
+          toast(err.message || 'Couldn’t read that file.');
+        }
+      });
+      $('projNewBtn').addEventListener('click', () => {
+        const pr = { id: uid(), name: 'New project', contingency: 10, items: [], changeOrders: [] };
+        state.projects.push(pr); state.activeProject = pr.id;
+        save(); renderProjects(); $('projName').focus(); $('projName').select();
+      });
+      $('projSelect').addEventListener('change', (e) => { state.activeProject = e.target.value; save(); renderProjects(); });
+      $('projName').addEventListener('input', (e) => {
+        const pr = activeProject(); if (!pr) return;
+        pr.name = e.target.value.trim() || 'Untitled project'; save();
+        const opt = $('projSelect').querySelector(`option[value="${CSS.escape(pr.id)}"]`); if (opt) opt.textContent = pr.name;
+      });
+      $('projContingency').addEventListener('input', (e) => {
+        const pr = activeProject(); if (!pr) return;
+        pr.contingency = projNum(e.target.value); save(); renderProjTotals();
+      });
+      $('projDeleteBtn').addEventListener('click', async () => {
+        const pr = activeProject(); if (!pr) return;
+        if (!(await askConfirm(`Delete the project "${pr.name}" and all ${pr.items.length} of its items? This can't be undone.`, 'Delete project'))) return;
+        state.projects = state.projects.filter((x) => x !== pr);
+        state.activeProject = state.projects[0] ? state.projects[0].id : null;
+        save(); renderProjects();
+      });
+      // Inline edits on items: totals update as you type
+      ['projMaterials', 'projLabor'].forEach((id) => {
+        $(id).addEventListener('input', (e) => {
+          const pr = activeProject(); const row = e.target.closest('[data-pi]');
+          const it = pr && row && pr.items.find((x) => x.id === row.dataset.pi);
+          if (!it) return;
+          const f = e.target.dataset.f;
+          if (f === 'name') it.name = e.target.value.trim() || 'Item';
+          if (f === 'note') it.note = e.target.value;
+          if (f === 'estimate' || f === 'actual') {
+            it[f] = projNum(e.target.value);
+            const v = document.querySelector(`[data-pi-var="${CSS.escape(it.id)}"]`);
+            if (v) v.innerHTML = it.actual ? varianceCell((Number(it.estimate) || 0) - (Number(it.actual) || 0)) : '<span class="text-slate-400">not paid yet</span>';
+          }
+          save(); renderProjTotals();
+        });
+        $(id).addEventListener('click', async (e) => {
+          const btn = e.target.closest('[data-pi-del]'); if (!btn) return;
+          const pr = activeProject(); const it = pr.items.find((x) => x.id === btn.dataset.piDel);
+          if (!it || !(await askConfirm(`Delete "${it.name}"?`, 'Delete'))) return;
+          pr.items = pr.items.filter((x) => x !== it); save(); renderProjects();
+        });
+      });
+      $('piSection').addEventListener('change', renderProjects);
+      $('piAddBtn').addEventListener('click', () => {
+        const pr = activeProject(); if (!pr) return;
+        const name = $('piName').value.trim();
+        if (!name) { $('piMsg').textContent = 'Type the item.'; $('piName').focus(); return; }
+        $('piMsg').textContent = '';
+        pr.items.push({ id: uid(), section: $('piSection').value, area: $('piArea').value.trim() || 'General', name, detail: '', link: '',
+          estimate: projNum($('piEstimate').value), actual: projNum($('piActual').value), note: '' });
+        ['piName', 'piEstimate', 'piActual'].forEach((x) => { $(x).value = ''; });
+        save(); renderProjects(); toast(`Added ${name}`); $('piName').focus();
+      });
+      $('projAddForm').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.tagName === 'INPUT') { e.preventDefault(); $('piAddBtn').click(); } });
+      $('coAddBtn').addEventListener('click', () => {
+        const pr = activeProject(); if (!pr) return;
+        const amount = projNum($('coAmount').value);
+        if (!amount) { $('coAmount').focus(); return; }
+        (pr.changeOrders || (pr.changeOrders = [])).push({ id: uid(), date: $('coDate').value, reason: $('coReason').value.trim(), amount, note: '' });
+        ['coDate', 'coReason', 'coAmount'].forEach((x) => { $(x).value = ''; });
+        save(); renderProjects();
+      });
+      $('projChanges').addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-co-del]'); if (!btn) return;
+        const pr = activeProject(); pr.changeOrders = pr.changeOrders.filter((c) => c.id !== btn.dataset.coDel); save(); renderProjects();
+      });
+
       // ---------- Retirement planner ----------
       const RET_FIELDS = ['Age', 'RetireAge', 'PlanTo', 'Savings', 'Contrib', 'Spend', 'SsMonthly', 'SsAge', 'Other', 'ReturnPre', 'ReturnPost', 'Inflation', 'Tax'];
       const RET_DEFAULTS = { retireage: 65, planto: 95, contrib: 0, ssmonthly: 0, ssage: 67, other: 0, returnpre: 7, returnpost: 5, inflation: 3, tax: 15 };
@@ -2190,6 +2564,7 @@
         renderRules();
         renderLoan();
         renderNetWorth();
+        renderProjects();
         if (!$('retChartBox').closest('[data-tabpanel]').hidden) renderRetirement();
         $('incomeInput').value = effectiveIncome() || '';
         $('setupMonthLabel').textContent = monthName(selectedMonth);
@@ -2453,7 +2828,7 @@
       let lastBudgetTab = 'overview';
       function showTab(name) {
         if (name === 'budget') name = lastBudgetTab;
-        if (![...BUDGET_TABS, 'networth', 'loans', 'retirement'].includes(name)) name = 'overview';
+        if (![...BUDGET_TABS, 'networth', 'loans', 'projects', 'retirement'].includes(name)) name = 'overview';
         const inBudget = BUDGET_TABS.includes(name);
         if (inBudget) lastBudgetTab = name;
         document.querySelectorAll('[data-tabpanel]').forEach((el) => { el.hidden = el.dataset.tabpanel !== name; });
