@@ -614,6 +614,19 @@
           </div>
 
           <div class="border-t border-slate-200 mt-6 pt-5">
+            <h3 class="font-semibold">Combine categories</h3>
+            <p class="text-xs text-slate-500 mt-0.5">Moves purchases (every month), budgets, typed Actual amounts and vendor rules into one category, then removes the empty one.</p>
+            <div id="mergeForm" class="mt-3 flex flex-wrap items-center gap-2 text-sm">
+              <span class="text-slate-600">Move everything from</span>
+              <select id="mergeFrom" aria-label="Category to combine" class="min-w-0 flex-1 rounded-md border border-slate-300 px-2 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"></select>
+              <span class="text-slate-600">into</span>
+              <select id="mergeInto" aria-label="Category to keep" class="min-w-0 flex-1 rounded-md border border-slate-300 px-2 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"></select>
+              <button id="mergeBtn" type="button" class="rounded-md border border-slate-300 hover:bg-slate-50 px-3 py-2 font-medium">Combine</button>
+            </div>
+            <p id="mergeMsg" class="text-sm text-red-600 mt-1 min-h-[1.25rem]" aria-live="polite"></p>
+          </div>
+
+          <div class="border-t border-slate-200 mt-6 pt-5">
             <h3 class="font-semibold">Vendor rules</h3>
             <p class="text-xs text-slate-500 mt-0.5">Send a store's purchases to a category automatically, for card imports and for purchases already in your budget.
               Separate several stores with commas. A new category name creates the category.</p>
@@ -2146,7 +2159,17 @@
         renderAll();
       }
 
+      function renderMergeSelects() {
+        const opts = state.categories.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+        ['mergeFrom', 'mergeInto'].forEach((id, i) => {
+          const cur = $(id).value;
+          $(id).innerHTML = `<option value="">${i ? 'Category to keep\u2026' : 'Category to remove\u2026'}</option>` + opts;
+          if (state.categories.some((c) => c.id === cur)) $(id).value = cur;
+        });
+      }
+
       function renderRules() {
+        renderMergeSelects();
         $('ruleCatList').innerHTML = state.categories.map((c) => `<option value="${escapeHtml(c.name)}"></option>`).join('');
         const byCat = {};
         state.vendorRules.forEach((r) => { (byCat[r.categoryId] || (byCat[r.categoryId] = [])).push(r); });
@@ -2248,6 +2271,45 @@
         }, 3000);
       }
       $('addCategoryBtn').addEventListener('click', addCategory);
+
+      // Combine one category into another: everything that pointed at "from" now points at "into"
+      $('mergeBtn').addEventListener('click', async () => {
+        const fromId = $('mergeFrom').value, intoId = $('mergeInto').value;
+        const from = state.categories.find((c) => c.id === fromId), into = state.categories.find((c) => c.id === intoId);
+        if (!from || !into) { $('mergeMsg').textContent = 'Pick both categories.'; return; }
+        if (from === into) { $('mergeMsg').textContent = 'Pick two different categories.'; return; }
+        $('mergeMsg').textContent = '';
+        const moving = state.expenses.filter((e) => e.categoryId === fromId);
+        const newBudget = toNum(from.budget) + toNum(into.budget);
+        if (!(await askConfirm(`Combine "${from.name}" into "${into.name}"? ${moving.length} purchase${moving.length === 1 ? '' : 's'} will move, `
+          + `the monthly budget becomes ${fmt.format(newBudget)} (${fmt.format(toNum(into.budget))} + ${fmt.format(toNum(from.budget))}), and "${from.name}" is removed.`,
+          'Combine', 'Cancel', 'bg-sky-600 hover:bg-sky-500'))) return;
+        moving.forEach((e) => { e.categoryId = intoId; });
+        // Per-month budgets: add the two months' amounts wherever either one was set for that month
+        Object.keys(state.monthBudgets).forEach((m) => {
+          const ov = state.monthBudgets[m];
+          const has = (id) => Object.prototype.hasOwnProperty.call(ov, id);
+          if (has(fromId) || has(intoId)) {
+            ov[intoId] = toNum(has(intoId) ? ov[intoId] : into.budget) + toNum(has(fromId) ? ov[fromId] : from.budget);
+            delete ov[fromId];
+          }
+        });
+        into.budget = newBudget;
+        Object.keys(state.monthActuals).forEach((m) => {
+          const a = state.monthActuals[m];
+          if (Object.prototype.hasOwnProperty.call(a, fromId)) {
+            a[intoId] = Math.round((signedNum(a[intoId]) + signedNum(a[fromId])) * 100) / 100;
+            delete a[fromId];
+          }
+        });
+        state.vendorRules.forEach((r) => { if (r.categoryId === fromId) r.categoryId = intoId; });
+        Object.keys(state.importRules).forEach((k) => { if (state.importRules[k] === fromId) state.importRules[k] = intoId; });
+        state.categories = state.categories.filter((c) => c.id !== fromId);
+        openGroups.add(groupOf(into));
+        save();
+        renderAll();
+        toast(`Combined ${from.name} into ${into.name}. ${moving.length} purchase${moving.length === 1 ? '' : 's'} moved.`);
+      });
 
       async function addRule() {
         const matches = $('ruleMatch').value.split(',').map((m) => m.trim()).filter(Boolean);
