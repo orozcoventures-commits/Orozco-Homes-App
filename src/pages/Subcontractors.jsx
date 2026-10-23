@@ -9,7 +9,7 @@ import SubStandardsEditor from '../components/SubStandardsEditor';
 import { DIRECTORY_GROUPS, UNGROUPED, directoryGroupOf } from '../utils/trades';
 import {
   EMPTY_SUBCONTRACTOR_FORM, toForm, validateForm, createSubcontractor, updateSubcontractor, deleteSubcontractor,
-  COI_ACCEPT, openCoi, coiStatus, formatCoiDate,
+  COI_ACCEPT, openCoi, coiState, formatCoiDate,
 } from '../lib/subcontractorDirectory';
 
 const SEARCH_DEBOUNCE_MS = 250;
@@ -99,13 +99,14 @@ function DetailRow({ icon: Icon, children }) {
 
 // ── COI indicator ─────────────────────────────────────────────────────────────
 const COI_STYLES = {
-  active:  { icon: ShieldCheck,    label: 'COI active',   color: '#166534', bg: '#F0FDF4', border: '#BBF7D0', dot: '#16A34A' },
-  expired: { icon: ShieldAlert,    label: 'COI expired',  color: '#991B1B', bg: '#FEF2F2', border: '#FECACA', dot: '#DC2626' },
-  none:    { icon: ShieldQuestion, label: 'No COI date',  color: '#6B7280', bg: '#F9F8F6', border: '#E8E6E1', dot: '#9CA3AF' },
+  active:   { icon: ShieldCheck,    label: 'COI active',       color: '#166534', bg: '#F0FDF4', border: '#BBF7D0', dot: '#16A34A' },
+  expiring: { icon: ShieldAlert,    label: 'COI expires soon', color: '#92400E', bg: '#FFFBEB', border: '#FDE68A', dot: '#D97706' },
+  expired:  { icon: ShieldAlert,    label: 'COI expired',      color: '#991B1B', bg: '#FEF2F2', border: '#FECACA', dot: '#DC2626' },
+  none:     { icon: ShieldQuestion, label: 'No COI date',      color: '#6B7280', bg: '#F9F8F6', border: '#E8E6E1', dot: '#9CA3AF' },
 };
 
 function CoiIndicator({ sub, onOpenCoi }) {
-  const status = coiStatus(sub.coi_expires_on);
+  const status = coiState(sub.coi_expires_on);
   const { icon: Icon, label, color, bg, border, dot } = COI_STYLES[status];
   return (
     <div
@@ -223,7 +224,7 @@ function ContractorTable({ subs, onEdit, onOpenCoi }) {
         <tbody>
           {subs.map((sub) => {
             const title = sub.company || sub.name || 'Unnamed contractor';
-            const status = coiStatus(sub.coi_expires_on);
+            const status = coiState(sub.coi_expires_on);
             const coi = COI_STYLES[status];
             return (
               <tr key={sub.id} style={{ borderTop: '1px solid #F0EEE9' }}>
@@ -277,7 +278,7 @@ function printDirectory(groups) {
       <td>${esc(sub.service)}</td>
       <td>${sub.phone.map(esc).join('<br>')}</td>
       <td>${sub.email.map(esc).join('<br>')}</td>
-      <td>${esc(COI_STYLES[coiStatus(sub.coi_expires_on)].label)}${sub.coi_expires_on ? `<br><span class="muted">${esc(formatCoiDate(sub.coi_expires_on))}</span>` : ''}</td>
+      <td>${esc(COI_STYLES[coiState(sub.coi_expires_on)].label)}${sub.coi_expires_on ? `<br><span class="muted">${esc(formatCoiDate(sub.coi_expires_on))}</span>` : ''}</td>
     </tr>`).join('')}`).join('');
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Orozco Homes — Subcontractor Directory</title>
 <style>
@@ -560,6 +561,8 @@ function Directory({ tabs }) {
   const { data, error } = response;
   const results = data?.subcontractors ?? [];
   const shownTerm = data?.taskName ?? '';
+  const needsAttention = (sub) => coiState(sub.coi_expires_on) !== 'active';
+  const attentionCount = results.filter(needsAttention).length;
 
   // Add/edit modal: null when closed, else { mode: 'create' | 'edit', id? }
   const [editor, setEditor] = useState(null);
@@ -571,6 +574,9 @@ function Directory({ tabs }) {
   const [view, setView] = useState(() => {
     try { return localStorage.getItem('subs-view') === 'list' ? 'list' : 'cards'; } catch { return 'cards'; }
   });
+  // "Needs attention": only subs whose COI is expired, expires within 30 days, or has no date.
+  const [attention, setAttention] = useState(false);
+  const shown = attention ? results.filter(needsAttention) : results;
   const changeView = (v) => {
     setView(v);
     try { localStorage.setItem('subs-view', v); } catch { /* storage unavailable */ }
@@ -771,7 +777,7 @@ function Directory({ tabs }) {
 
       {data && (
         <>
-          {/* Result summary + Cards/List */}
+          {/* Result summary + Needs attention + Cards/List */}
           <div className="flex flex-wrap items-center gap-2 mb-4 text-sm" style={{ color: '#6B7280' }}>
             {loading
               ? <LoaderCircle size={15} className="animate-spin" style={{ color: '#D4AF37' }} />
@@ -787,9 +793,16 @@ function Directory({ tabs }) {
                 No match for “{shownTerm}”. Showing all <strong style={{ color: '#002147' }}>{data.count}</strong> subcontractors.
               </span>
             )}
-            <span className="ml-auto flex items-center gap-2">
-              {view === 'list' && results.length > 0 && (
-                <button type="button" onClick={() => printDirectory(groupByTrade(results))}
+            <span className="ml-auto flex flex-wrap items-center gap-2">
+              <button type="button" onClick={() => setAttention((a) => !a)} aria-pressed={attention}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold focus:outline-none focus:ring-2 focus:ring-amber-300"
+                style={attention
+                  ? { backgroundColor: '#92400E', color: '#fff', border: '1px solid #92400E' }
+                  : { backgroundColor: '#FFFBEB', color: '#92400E', border: '1px solid #FDE68A' }}>
+                <ShieldAlert size={13} /> Needs attention ({attentionCount})
+              </button>
+              {view === 'list' && shown.length > 0 && (
+                <button type="button" onClick={() => printDirectory(groupByTrade(shown))}
                   className="px-3 py-1.5 rounded-lg text-xs font-bold focus:outline-none"
                   style={{ border: '1px solid #E8E6E1', color: '#002147', backgroundColor: '#fff' }}>
                   Print list
@@ -809,7 +822,15 @@ function Directory({ tabs }) {
 
           {/* Grouped by trade */}
           <div className="flex flex-col gap-7 transition-opacity duration-150" style={{ opacity: loading ? 0.6 : 1 }} aria-busy={loading}>
-            {groupByTrade(results).map(({ group, subs }) => (
+            {attention && (
+              <p className="text-sm px-4 py-3 rounded-xl" role="status"
+                style={{ backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', color: '#92400E' }}>
+                {shown.length
+                  ? <>Showing <strong>{shown.length}</strong> {shown.length === 1 ? 'subcontractor' : 'subcontractors'} whose COI is expired, expires within 30 days, or has no date on file. Click the pencil to update the COI.</>
+                  : 'Every subcontractor shown has a current COI.'}
+              </p>
+            )}
+            {groupByTrade(shown).map(({ group, subs }) => (
               <section key={group.key} aria-labelledby={`trade-${group.key}`} data-testid="trade-group">
                 <h3 id={`trade-${group.key}`} className="flex items-baseline gap-2 mb-3 pb-2 text-sm font-bold uppercase tracking-wider"
                   style={{ color: '#002147', borderBottom: '2px solid rgba(212,175,55,0.45)' }}>

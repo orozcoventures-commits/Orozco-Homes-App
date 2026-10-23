@@ -126,6 +126,15 @@ export function coiStatus(expiresOn) {
   return expiresOn < today ? 'expired' : 'active';
 }
 
+// COI status with a 30-day warning: 'active' | 'expiring' | 'expired' | 'none'.
+export function coiState(expiresOn) {
+  const status = coiStatus(expiresOn);
+  if (status !== 'active') return status;
+  const [y, m, d] = expiresOn.split('-').map(Number);
+  const days = (new Date(y, m - 1, d) - new Date()) / 86400000;
+  return days <= 30 ? 'expiring' : 'active';
+}
+
 // 'YYYY-MM-DD' → 'Oct 12, 2026' without a timezone shift.
 export function formatCoiDate(expiresOn) {
   const [y, m, d] = expiresOn.split('-').map(Number);
