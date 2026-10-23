@@ -17,7 +17,7 @@ import { fetchCatalog, catalogUnitLabel } from '../lib/costCatalog';
 import { useProject } from '../context/ProjectContext';
 import { buildContractPrefill, buildProposalPrefill } from '../utils/contractPrefill';
 import { starterScope, withoutLegacyGeneral, MAX_SCOPE } from '../utils/tradeScopes';
-import { coiStatus, formatCoiDate, openCoi } from '../lib/subcontractorDirectory';
+import { coiState, formatCoiDate, openCoi } from '../lib/subcontractorDirectory';
 import { DESIGN_PERMIT_NEW_LINES } from '../utils/remodelDesignPermits';
 import { PROPOSAL_FIELDS, fmtLongDate } from '../utils/proposalTemplate';
 import { TRADES, subMatchesTrade } from '../utils/trades';
@@ -973,14 +973,6 @@ const companyInfo = () => ({
   license: COMPANY.company_license, phone: COMPANY.company_phone, email: COMPANY.company_email,
 });
 
-// COI status with a 30-day warning: 'active' | 'expiring' | 'expired' | 'none'.
-function coiState(expiresOn) {
-  const status = coiStatus(expiresOn);
-  if (status !== 'active') return status;
-  const [y, m, d] = expiresOn.split('-').map(Number);
-  const days = (new Date(y, m - 1, d) - new Date()) / 86400000;
-  return days <= 30 ? 'expiring' : 'active';
-}
 const COI_CHIP = {
   active:   { label: 'COI active',        color: '#166534', bg: '#F0FDF4', border: '#BBF7D0' },
   expiring: { label: 'COI expires soon',  color: '#92400E', bg: '#FFFBEB', border: '#FDE68A' },
