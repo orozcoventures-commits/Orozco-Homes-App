@@ -20,7 +20,7 @@ import { starterScope, withoutLegacyGeneral, MAX_SCOPE } from '../utils/tradeSco
 import { coiStatus, formatCoiDate, openCoi } from '../lib/subcontractorDirectory';
 import { DESIGN_PERMIT_NEW_LINES } from '../utils/remodelDesignPermits';
 import { PROPOSAL_FIELDS, fmtLongDate } from '../utils/proposalTemplate';
-import { TRADES } from '../utils/trades';
+import { TRADES, subMatchesTrade } from '../utils/trades';
 import { loadLatestStandards } from '../utils/subStandards';
 import { buildSnapshot, defaultTerms, sendProblem } from '../utils/subAgreement';
 import TradeAgreement from '../components/TradeAgreement';
@@ -962,26 +962,8 @@ function ChangeOrdersSection({ changeOrders, total, cost, margin, marginPct, isO
 // ── Subs & Materials view ─────────────────────────────────────────────────────
 // The same direct costs, grouped the way a GC buys them: work bought from
 // subcontractors (by trade) and materials bought directly (by section).
-// Directory subcontractors that usually do each trade (matched on their
-// trade/specialty text). They are listed first in the "Performed by" picker.
-const TRADE_MATCH = {
-  demolition: /demo|haul|junk|debris/i,
-  concrete:   /concrete|foundation|mason|footing/i,
-  framing:    /fram|carpent|structur/i,
-  roofing:    /roof/i,
-  windows:    /window|door/i,
-  siding:     /siding|exterior|gutter/i,
-  plumbing:   /plumb/i,
-  hvac:       /hvac|heat|air cond|mechanical|mini-split/i,
-  electrical: /electric/i,
-  insulation: /insulat|spray foam/i,
-  drywall:    /drywall|sheetrock/i,
-  tiling:     /tile/i,
-  flooring:   /floor/i,
-  carpentry:  /carpent|cabinet|trim|finish|millwork|countertop/i,
-  painting:   /paint/i,
-};
-const subMatchesTrade = (sub, trade) => !!TRADE_MATCH[trade]?.test(`${sub.service ?? ''} ${sub.specialty ?? ''}`);
+// Directory subcontractors that usually do a trade (subMatchesTrade) are
+// listed first in the "Performed by" picker.
 const subLabel = (sub) => sub.display_name || sub.company || sub.name || sub.service || `#${sub.id}`;
 
 // Orozco Homes details (the same defaults as proposals and contracts).

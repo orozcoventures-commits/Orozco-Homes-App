@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import SubStandardsEditor from '../components/SubStandardsEditor';
+import { DIRECTORY_GROUPS, UNGROUPED, directoryGroupOf } from '../utils/trades';
 import {
   EMPTY_SUBCONTRACTOR_FORM, toForm, validateForm, createSubcontractor, updateSubcontractor, deleteSubcontractor,
   COI_ACCEPT, openCoi, coiStatus, formatCoiDate,
@@ -42,6 +43,19 @@ async function searchSubcontractors(taskName, signal) {
     throw new SearchError(body?.error || 'Could not load subcontractors.', res.status);
   }
   return body;
+}
+
+// Directory sections: one per trade in the order of a job, companies A–Z.
+const sortName = (sub) => (sub.company || sub.name || '').trim().toLowerCase();
+function groupByTrade(subs) {
+  const byKey = new Map();
+  for (const sub of subs) {
+    const group = directoryGroupOf(sub);
+    if (!byKey.has(group.key)) byKey.set(group.key, { group, subs: [] });
+    byKey.get(group.key).subs.push(sub);
+  }
+  for (const g of byKey.values()) g.subs.sort((a, b) => sortName(a).localeCompare(sortName(b)));
+  return [...DIRECTORY_GROUPS, UNGROUPED].map((g) => byKey.get(g.key)).filter(Boolean);
 }
 
 // Quick filters for the trades used most across the remodel scopes.
@@ -660,13 +674,20 @@ function Directory({ tabs }) {
             )}
           </div>
 
-          {/* Cards */}
-          <div
-            className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 transition-opacity duration-150"
-            style={{ opacity: loading ? 0.6 : 1 }}
-            aria-busy={loading}
-          >
-            {results.map((sub) => <ContractorCard key={sub.id} sub={sub} onEdit={openEdit} onOpenCoi={handleOpenCoi} />)}
+          {/* Cards, grouped by trade */}
+          <div className="flex flex-col gap-7 transition-opacity duration-150" style={{ opacity: loading ? 0.6 : 1 }} aria-busy={loading}>
+            {groupByTrade(results).map(({ group, subs }) => (
+              <section key={group.key} aria-labelledby={`trade-${group.key}`} data-testid="trade-group">
+                <h3 id={`trade-${group.key}`} className="flex items-baseline gap-2 mb-3 pb-2 text-sm font-bold uppercase tracking-wider"
+                  style={{ color: '#002147', borderBottom: '2px solid rgba(212,175,55,0.45)' }}>
+                  {group.label}
+                  <span className="text-xs font-semibold normal-case tracking-normal" style={{ color: '#9CA3AF' }}>{subs.length}</span>
+                </h3>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {subs.map((sub) => <ContractorCard key={sub.id} sub={sub} onEdit={openEdit} onOpenCoi={handleOpenCoi} />)}
+                </div>
+              </section>
+            ))}
           </div>
         </>
       )}
