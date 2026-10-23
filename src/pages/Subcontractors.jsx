@@ -198,6 +198,113 @@ function ContractorCard({ sub, onEdit, onOpenCoi }) {
   );
 }
 
+// ── List view ─────────────────────────────────────────────────────────────────
+// A compact table: one row per subcontractor (same data as the cards).
+function ContractorTable({ subs, onEdit, onOpenCoi }) {
+  const th = 'text-left text-[11px] font-bold uppercase tracking-wider px-3 py-2';
+  return (
+    <div className="relative overflow-x-auto rounded-2xl" style={{ backgroundColor: '#fff', border: '1px solid #E8E6E1' }}>
+      <table className="w-full text-sm table-fixed" style={{ minWidth: 720 }}>
+        {/* Fixed widths so the columns line up across the trade sections. */}
+        <colgroup>
+          <col style={{ width: '25%' }} /><col style={{ width: '18%' }} /><col style={{ width: '15%' }} />
+          <col style={{ width: '22%' }} /><col style={{ width: '15%' }} /><col style={{ width: '5%' }} />
+        </colgroup>
+        <thead style={{ backgroundColor: '#F9F8F6', color: '#6B7280' }}>
+          <tr>
+            <th className={th}>Company</th>
+            <th className={th}>Trade</th>
+            <th className={th}>Phone</th>
+            <th className={th}>Email</th>
+            <th className={th}>COI</th>
+            <th className={th}><span className="sr-only">Edit</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {subs.map((sub) => {
+            const title = sub.company || sub.name || 'Unnamed contractor';
+            const status = coiStatus(sub.coi_expires_on);
+            const coi = COI_STYLES[status];
+            return (
+              <tr key={sub.id} style={{ borderTop: '1px solid #F0EEE9' }}>
+                <td className="px-3 py-2.5 align-top">
+                  <span className="font-bold" style={{ color: '#002147' }}>{title}</span>
+                  {sub.company && sub.name && <span className="block text-xs" style={{ color: '#6B7280' }}>{sub.name}</span>}
+                </td>
+                <td className="px-3 py-2.5 align-top break-words" style={{ color: '#4B5563' }}>{sub.service}</td>
+                <td className="px-3 py-2.5 align-top whitespace-nowrap">
+                  {sub.phone.map((p) => <a key={p} href={telHref(p)} className="block hover:underline" style={{ color: '#002147' }}>{p}</a>)}
+                </td>
+                <td className="px-3 py-2.5 align-top">
+                  {sub.email.map((e) => <a key={e} href={`mailto:${e}`} className="block break-all hover:underline" style={{ color: '#002147' }}>{e}</a>)}
+                </td>
+                <td className="px-3 py-2.5 align-top text-xs" data-coi-status={status}>
+                  <span className="flex items-center gap-1.5 font-semibold" style={{ color: coi.color }}>
+                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: coi.dot }} aria-hidden="true" />
+                    {coi.label}
+                  </span>
+                  {sub.coi_expires_on && <span className="block" style={{ color: '#6B7280' }}>{formatCoiDate(sub.coi_expires_on)}</span>}
+                  {sub.coi_file_path && (
+                    <button type="button" onClick={() => onOpenCoi(sub.coi_file_path)} className="block font-semibold hover:underline" style={{ color: '#002147' }}>
+                      View COI
+                    </button>
+                  )}
+                </td>
+                <td className="px-3 py-2.5 align-top text-right">
+                  <button type="button" onClick={() => onEdit(sub)} aria-label={`Edit ${title}`} title="Edit"
+                    className="w-7 h-7 rounded-lg inline-flex items-center justify-center focus:outline-none hover:bg-gray-100" style={{ color: '#6B7280' }}>
+                    <Pencil size={14} />
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+// Printable list of the subcontractors shown (internal: contains contacts).
+function printDirectory(groups) {
+  const date = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const rows = groups.map(({ group, subs }) => `
+    <tr class="group"><td colspan="5">${esc(group.label)} <span>(${subs.length})</span></td></tr>
+    ${subs.map((sub) => `<tr>
+      <td><strong>${esc(sub.company || sub.name)}</strong>${sub.company && sub.name ? `<br><span class="muted">${esc(sub.name)}</span>` : ''}</td>
+      <td>${esc(sub.service)}</td>
+      <td>${sub.phone.map(esc).join('<br>')}</td>
+      <td>${sub.email.map(esc).join('<br>')}</td>
+      <td>${esc(COI_STYLES[coiStatus(sub.coi_expires_on)].label)}${sub.coi_expires_on ? `<br><span class="muted">${esc(formatCoiDate(sub.coi_expires_on))}</span>` : ''}</td>
+    </tr>`).join('')}`).join('');
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Orozco Homes — Subcontractor Directory</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:9.5pt;color:#1A1A1A;padding:36px 40px}
+  .header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2.5px solid #002147;padding-bottom:12px;margin-bottom:14px}
+  .brand{font-size:16pt;font-weight:900;color:#002147}.sub{font-size:8pt;color:#6B7280;text-transform:uppercase;letter-spacing:.12em;font-weight:600}
+  .meta{text-align:right;font-size:8pt;color:#6B7280}.meta strong{display:block;font-size:11pt;color:#002147}
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-size:7.5pt;text-transform:uppercase;letter-spacing:.08em;color:#6B7280;border-bottom:1.5px solid #E5E7EB;padding:5px 6px}
+  td{padding:5px 6px;border-bottom:1px solid #F3F4F6;vertical-align:top}
+  tr.group td{font-weight:800;color:#002147;text-transform:uppercase;letter-spacing:.08em;font-size:8.5pt;padding-top:14px;border-bottom:2px solid #D4AF37}
+  tr.group span{color:#9CA3AF;font-weight:600}
+  .muted{color:#6B7280}
+  .foot{margin-top:18px;font-size:7.5pt;color:#9CA3AF;text-align:center}
+  @media print{body{padding:0}@page{margin:.5in;size:letter portrait}tr{break-inside:avoid}}
+</style></head><body>
+  <div class="header"><div><div class="brand">Orozco Homes</div><div class="sub">Design &amp; Construction · Virginia Beach, VA</div></div>
+  <div class="meta"><strong>Subcontractor Directory</strong>${date} · Internal</div></div>
+  <table><thead><tr><th>Company</th><th>Trade</th><th>Phone</th><th>Email</th><th>COI</th></tr></thead><tbody>${rows}</tbody></table>
+  <p class="foot">Orozco Homes · Internal — contains contact information</p>
+  <script>window.onload=function(){window.print()}</script>
+</body></html>`;
+  const win = window.open('', '_blank');
+  if (win) { win.document.write(html); win.document.close(); }
+}
+
 // ── Add / edit form ───────────────────────────────────────────────────────────
 const inputStyle = { border: '1.5px solid #E8E6E1', color: '#002147', backgroundColor: '#F9F8F6' };
 
@@ -460,6 +567,14 @@ function Directory({ tabs }) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
   const [notice, setNotice] = useState(null);
+  // Cards or List, remembered on this device.
+  const [view, setView] = useState(() => {
+    try { return localStorage.getItem('subs-view') === 'list' ? 'list' : 'cards'; } catch { return 'cards'; }
+  });
+  const changeView = (v) => {
+    setView(v);
+    try { localStorage.setItem('subs-view', v); } catch { /* storage unavailable */ }
+  };
 
   function openCreate() {
     setForm(EMPTY_SUBCONTRACTOR_FORM);
@@ -549,7 +664,7 @@ function Directory({ tabs }) {
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4 mb-6">
+      <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
         <div>
           <p className="text-xs font-bold tracking-[0.18em] uppercase mb-1" style={{ color: '#D4AF37' }}>Admin Tool</p>
           <h2 className="text-2xl font-bold" style={{ color: '#002147' }}>Subcontractors</h2>
@@ -656,8 +771,8 @@ function Directory({ tabs }) {
 
       {data && (
         <>
-          {/* Result summary */}
-          <div className="flex items-center gap-2 mb-4 text-sm" style={{ color: '#6B7280' }}>
+          {/* Result summary + Cards/List */}
+          <div className="flex flex-wrap items-center gap-2 mb-4 text-sm" style={{ color: '#6B7280' }}>
             {loading
               ? <LoaderCircle size={15} className="animate-spin" style={{ color: '#D4AF37' }} />
               : <Users size={15} />}
@@ -672,9 +787,27 @@ function Directory({ tabs }) {
                 No match for “{shownTerm}”. Showing all <strong style={{ color: '#002147' }}>{data.count}</strong> subcontractors.
               </span>
             )}
+            <span className="ml-auto flex items-center gap-2">
+              {view === 'list' && results.length > 0 && (
+                <button type="button" onClick={() => printDirectory(groupByTrade(results))}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold focus:outline-none"
+                  style={{ border: '1px solid #E8E6E1', color: '#002147', backgroundColor: '#fff' }}>
+                  Print list
+                </button>
+              )}
+              <span role="radiogroup" aria-label="View" className="flex p-0.5 rounded-lg" style={{ backgroundColor: '#F3F4F6' }}>
+                {[['cards', 'Cards'], ['list', 'List']].map(([key, label]) => (
+                  <button key={key} type="button" role="radio" aria-checked={view === key} onClick={() => changeView(key)}
+                    className="px-3 py-1 rounded-md text-xs font-bold focus:outline-none focus:ring-2 focus:ring-sky-300"
+                    style={view === key ? { backgroundColor: '#002147', color: '#D4AF37' } : { color: '#4B5563' }}>
+                    {label}
+                  </button>
+                ))}
+              </span>
+            </span>
           </div>
 
-          {/* Cards, grouped by trade */}
+          {/* Grouped by trade */}
           <div className="flex flex-col gap-7 transition-opacity duration-150" style={{ opacity: loading ? 0.6 : 1 }} aria-busy={loading}>
             {groupByTrade(results).map(({ group, subs }) => (
               <section key={group.key} aria-labelledby={`trade-${group.key}`} data-testid="trade-group">
@@ -683,9 +816,13 @@ function Directory({ tabs }) {
                   {group.label}
                   <span className="text-xs font-semibold normal-case tracking-normal" style={{ color: '#9CA3AF' }}>{subs.length}</span>
                 </h3>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {subs.map((sub) => <ContractorCard key={sub.id} sub={sub} onEdit={openEdit} onOpenCoi={handleOpenCoi} />)}
-                </div>
+                {view === 'list' ? (
+                  <ContractorTable subs={subs} onEdit={openEdit} onOpenCoi={handleOpenCoi} />
+                ) : (
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {subs.map((sub) => <ContractorCard key={sub.id} sub={sub} onEdit={openEdit} onOpenCoi={handleOpenCoi} />)}
+                  </div>
+                )}
               </section>
             ))}
           </div>
