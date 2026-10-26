@@ -21,6 +21,7 @@ import { coiState, formatCoiDate, openCoi } from '../lib/subcontractorDirectory'
 import { DESIGN_PERMIT_NEW_LINES } from '../utils/remodelDesignPermits';
 import { PROPOSAL_FIELDS, fmtLongDate } from '../utils/proposalTemplate';
 import { TRADES, subMatchesTrade } from '../utils/trades';
+import { compareAllowances, specMaterialCost } from '../utils/allowances';
 import { loadLatestStandards } from '../utils/subStandards';
 import { buildSnapshot, defaultTerms, sendProblem } from '../utils/subAgreement';
 import TradeAgreement from '../components/TradeAgreement';
@@ -833,56 +834,77 @@ function SummaryCard({ label, value, sub, highlight, color }) {
 
 // ── Design Specs section ──────────────────────────────────────────────────────
 
-function DesignSpecsSection({ approvedSpecs, total, isOpen, onToggle }) {
-  if (approvedSpecs.length === 0) return null;
+// Design selections compared with the budget's allowances. Selections never add
+// money to the estimate: allowance lines already carry it, and any difference
+// is handled by a change order. Unlinked selections are not in the budget.
+function SelectionsCheck({ rows, unlinked, isOpen, onToggle }) {
+  const linked = rows.filter((r) => r.count > 0);
+  if (linked.length === 0 && unlinked.length === 0) return null;
+  const money = (n) => '$' + Math.round(Math.abs(n)).toLocaleString('en-US');
+  const over = linked.filter((r) => r.approved > 0 && r.diff < 0).length;
+  const flags = over + unlinked.length;
   return (
-    <div className="rounded-2xl overflow-hidden mb-3" style={{ border: '1.5px solid #6EE7B7' }}>
-      <button onClick={onToggle}
-        className="w-full flex items-center justify-between px-5 py-4 focus:outline-none"
+    <div className="rounded-2xl overflow-hidden mb-3" style={{ border: '1.5px solid #6EE7B7' }} data-testid="selections-check">
+      <button onClick={onToggle} aria-expanded={isOpen}
+        className="w-full flex flex-wrap items-center justify-between gap-2 px-5 py-4 focus:outline-none"
         style={{ backgroundColor: '#ECFDF5' }}>
         <div className="flex items-center gap-3">
           <span className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-extrabold shrink-0"
             style={{ backgroundColor: '#065F46', color: '#fff' }}>DS</span>
-          <span className="text-sm font-bold text-left" style={{ color: '#065F46' }}>Design Selections (Approved)</span>
-          <span className="text-xs px-2 py-0.5 rounded-full font-bold"
-            style={{ backgroundColor: '#D1FAE5', color: '#065F46' }}>{approvedSpecs.length} items</span>
+          <span className="text-sm font-bold text-left" style={{ color: '#065F46' }}>Design Selections vs. Allowances</span>
+          {flags > 0 && (
+            <span className="text-xs px-2 py-0.5 rounded-full font-bold" style={{ backgroundColor: '#FEF3C7', color: '#92400E' }}>
+              {flags} need{flags === 1 ? 's' : ''} a change order
+            </span>
+          )}
         </div>
-        <div className="flex items-center gap-3">
-          <span className="text-sm font-extrabold" style={{ color: '#065F46' }}>
-            ${total.toLocaleString('en-US', { maximumFractionDigits: 0 })}
-          </span>
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#065F46"
-            strokeWidth="2" strokeLinecap="round"
-            style={{ transition: 'transform 0.2s', transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>
-            <polyline points="1 4 6 8 11 4" />
-          </svg>
-        </div>
+        <span className="text-xs font-semibold" style={{ color: '#065F46' }}>Not added to the estimate {isOpen ? '▴' : '▾'}</span>
       </button>
       {isOpen && (
-        <div style={{ backgroundColor: '#fff' }}>
-          {approvedSpecs.map((spec, i) => (
-            <div key={spec.id}
-              className="flex items-center gap-3 px-4 py-2.5"
-              style={{ borderTop: i === 0 ? '1px solid #6EE7B7' : '1px solid #F3F4F6' }}>
-              <span className="text-xs font-bold w-8 text-center py-0.5 rounded shrink-0"
-                style={{ backgroundColor: '#ECFDF5', color: '#065F46' }}>DS</span>
-              <div className="flex-1 min-w-0">
-                <span className="text-sm truncate" style={{ color: '#374151' }}>{spec.product_name}</span>
-                {spec.supplier && <span className="text-xs ml-2" style={{ color: '#9CA3AF' }}>{spec.supplier}</span>}
-              </div>
-              <span className="text-xs shrink-0" style={{ color: '#9CA3AF' }}>{spec.quantity} {spec.unit_type}</span>
-              <span className="text-sm font-semibold shrink-0" style={{ color: '#065F46' }}>
-                ${(Number(spec.installed_cost) || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}
-              </span>
+        <div className="px-5 py-3 text-sm" style={{ backgroundColor: '#fff' }}>
+          {linked.length > 0 && (
+            <div className="overflow-x-auto">
+              <table className="w-full" style={{ minWidth: 520 }}>
+                <thead>
+                  <tr className="text-xs uppercase tracking-wide" style={{ color: '#9CA3AF' }}>
+                    <th className="text-left font-semibold pb-1.5">Item</th>
+                    <th className="text-right font-semibold pb-1.5">Allowance</th>
+                    <th className="text-right font-semibold pb-1.5">Selected</th>
+                    <th className="text-right font-semibold pb-1.5">Difference</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {linked.map((r) => (
+                    <tr key={r.key} style={{ borderTop: '1px solid #F3F4F6' }}>
+                      <td className="py-2 font-semibold" style={{ color: '#374151' }}>{r.label}</td>
+                      <td className="py-2 text-right" style={{ color: '#002147' }}>{money(r.amount)}</td>
+                      <td className="py-2 text-right" style={{ color: '#0369A1' }}>
+                        {money(r.selected)}
+                        {r.pending > 0 && <span className="block text-xs" style={{ color: '#92400E' }}>{money(r.pending)} pending approval</span>}
+                      </td>
+                      <td className="py-2 text-right font-bold" style={{ color: r.diff < 0 ? '#DC2626' : '#059669' }}>
+                        {r.diff < 0 ? `${money(r.diff)} over — change order` : r.diff > 0 ? `${money(r.diff)} under — credit` : 'On allowance'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          ))}
-          <div className="flex items-center justify-between px-4 py-3"
-            style={{ borderTop: '1px solid #6EE7B7', backgroundColor: '#ECFDF5' }}>
-            <span className="text-xs font-bold uppercase tracking-wide" style={{ color: '#065F46' }}>Design Selections Total</span>
-            <span className="text-sm font-extrabold" style={{ color: '#065F46' }}>
-              ${total.toLocaleString('en-US', { maximumFractionDigits: 0 })}
-            </span>
-          </div>
+          )}
+          {unlinked.length > 0 && (
+            <div className="mt-3 rounded-xl px-4 py-3" style={{ backgroundColor: '#FFFBEB', border: '1px solid #FDE68A' }}>
+              <p className="text-xs font-bold mb-1" style={{ color: '#92400E' }}>Not in the budget — needs a change order (or link it to an allowance in Selections)</p>
+              {unlinked.map((sp) => (
+                <p key={sp.id} className="flex justify-between gap-3 text-xs py-0.5" style={{ color: '#374151' }}>
+                  <span>{sp.product_name}{sp.supplier ? ` · ${sp.supplier}` : ''}{sp.status !== 'approved' ? ' (pending approval)' : ''}</span>
+                  <span className="font-semibold whitespace-nowrap">{money(specMaterialCost(sp))}</span>
+                </p>
+              ))}
+            </div>
+          )}
+          <p className="text-xs mt-3" style={{ color: '#9CA3AF' }}>
+            Selections don't change the estimate: the allowance lines are already in the price. Over or under an allowance, or anything not in the budget, is settled by a change order (Projects → Change Orders). Material price = unit price × quantity, as on the Selections page.
+          </p>
         </div>
       )}
     </div>
@@ -1198,7 +1220,7 @@ function TradeScope({ trade, scope }) {
 }
 
 function SubsMaterialsView({ data, onTradeChange, scope, subs, sheets, bids, agreements }) {
-  const { trades, materials, fees, designSpecsTotal, changeOrderCost, subTotal, materialTotal, feeTotal, directCosts } = data;
+  const { trades, materials, fees, changeOrderCost, subTotal, materialTotal, feeTotal, directCosts } = data;
   const used = new Set(trades.map((t) => t.key));
   const notUsed = TRADES.filter((t) => t.key !== 'other' && !used.has(t.key));
   const card = { backgroundColor: '#fff', border: '1.5px solid #E5E7EB', boxShadow: '0 2px 12px rgba(0,33,71,0.05)' };
@@ -1300,7 +1322,7 @@ function SubsMaterialsView({ data, onTradeChange, scope, subs, sheets, bids, agr
           </div>
           <span className="text-sm font-extrabold" style={{ color: '#B45309' }}>{fmt(materialTotal)}</span>
         </div>
-        {materials.length === 0 && designSpecsTotal <= 0 ? (
+        {materials.length === 0 ? (
           <p className="px-5 py-4 text-xs" style={{ color: '#9CA3AF' }}>No material amounts in this budget.</p>
         ) : (
           <>
@@ -1318,12 +1340,6 @@ function SubsMaterialsView({ data, onTradeChange, scope, subs, sheets, bids, agr
                 ))}
               </div>
             ))}
-            {designSpecsTotal > 0 && (
-              <div className="flex items-center justify-between px-5 py-2.5" style={{ borderTop: '1px solid #FEF3C7', backgroundColor: '#FFFDF7' }}>
-                <span className="text-sm font-bold" style={{ color: '#002147' }}>Approved Design Selections</span>
-                <span className="text-sm font-extrabold" style={{ color: '#002147' }}>{fmt(designSpecsTotal)}</span>
-              </div>
-            )}
           </>
         )}
       </section>
@@ -1427,7 +1443,8 @@ export default function RemodelBudget() {
   );
 
   // ── Design specs ────────────────────────────────────────────────────────────
-  const [approvedSpecs,  setApprovedSpecs]  = useState([]);
+  const [selections,     setSelections]     = useState([]);   // design selections (approved + pending)
+  const approvedSpecs = useMemo(() => selections.filter((sp) => sp.status === 'approved'), [selections]);
   const [specsDivOpen,   setSpecsDivOpen]   = useState(true);
 
   // ── Approved change orders ──────────────────────────────────────────────────
@@ -1449,15 +1466,15 @@ export default function RemodelBudget() {
   const actualTimers    = useRef({});     // per-wbs debounce timers
 
   // ── Load design specs ───────────────────────────────────────────────────────
+  // Approved and pending selections (declined ones don't count anywhere).
   const loadApprovedSpecs = useCallback(async (pid) => {
-    if (!pid) { setApprovedSpecs([]); return; }
-    const { data } = await supabase
-      .from('design_specs')
-      .select('id, product_name, supplier, quantity, unit_type, unit_price, installed_cost, room_category')
-      .eq('project_id', pid)
-      .eq('status', 'approved')
-      .order('room_category');
-    setApprovedSpecs(data ?? []);
+    if (!pid) { setSelections([]); return; }
+    const run = (cols) => supabase.from('design_specs').select(cols)
+      .eq('project_id', pid).neq('status', 'declined').order('room_category');
+    const cols = 'id, product_name, supplier, quantity, unit_type, unit_price, installed_cost, room_category, status';
+    let { data, error } = await run(`${cols}, allowance_key`);
+    if (error && /allowance_key/.test(error.message ?? '')) ({ data } = await run(cols));   // before migration 052
+    setSelections(data ?? []);
   }, []);
 
   // ── Load approved change orders ─────────────────────────────────────────────
@@ -1555,7 +1572,7 @@ export default function RemodelBudget() {
     setUnsplitWbs(new Set());
     setOpenActual(null);
     setActualsError('');
-    setApprovedSpecs([]);
+    setSelections([]);
     setApprovedChangeOrders([]);
     setLastSaved(null);
     setSaving(false);
@@ -1778,12 +1795,6 @@ export default function RemodelBudget() {
     if (cfg) setOpenDivs(Object.fromEntries(cfg.divisions.map((d) => [d.key, true])));
   }
 
-  // ── Design specs total — must be declared before lineVals uses it ────────────
-  const designSpecsTotal = useMemo(
-    () => approvedSpecs.reduce((s, sp) => s + (Number(sp.installed_cost) || 0), 0),
-    [approvedSpecs]
-  );
-
   // ── Approved change orders total (new cost − original cost, as the client
   // approved it) ───────────────────────────────────────────────────────────────
   const changeOrdersTotal = useMemo(
@@ -1806,11 +1817,11 @@ export default function RemodelBudget() {
       }
     }
     const nonPctWbs = allNonPctWbs(config);
-    const baseSum = nonPctWbs.reduce((s, w) => s + (vals[w] ?? 0), 0) + designSpecsTotal;
-    // Materials sales tax: on each line's materials share (its cost split) plus
-    // approved design selections. A real cost, so contingency and margin apply to it.
+    const baseSum = nonPctWbs.reduce((s, w) => s + (vals[w] ?? 0), 0);
+    // Materials sales tax: on each line's materials share (its cost split). A
+    // real cost, so contingency and margin apply to it.
     const materialsBase = config.divisions.flatMap((d) => d.items).filter((it) => it.unit !== 'pct')
-      .reduce((s, it) => s + (vals[it.wbs] ?? 0) * (lineSplit(it, layout).m / 100), 0) + designSpecsTotal;
+      .reduce((s, it) => s + (vals[it.wbs] ?? 0) * (lineSplit(it, layout).m / 100), 0);
     vals['M.4'] = overrideFlags['M.4'] ? (userVals['M.4'] ?? 0) : materialsBase * ((pctRates.salesTaxPct ?? 0) / 100);
     const costBase = baseSum + vals['M.4'];
     vals['M.3'] = overrideFlags['M.3'] ? (userVals['M.3'] ?? 0) : costBase * (pctRates.contingencyPct / 100);
@@ -1820,7 +1831,7 @@ export default function RemodelBudget() {
       ? (userVals['M.2'] ?? 0)
       : grossMarginAmount(costBase + vals['M.3'], pctRates.profitPct);
     return vals;
-  }, [config, projectType, inputs, specLevel, pctRates, userVals, overrideFlags, designSpecsTotal, layout]);
+  }, [config, projectType, inputs, specLevel, pctRates, userVals, overrideFlags, layout]);
 
   // ── Aggregate totals (budget + actual) ──────────────────────────────────────
   const totals = useMemo(() => {
@@ -1834,7 +1845,7 @@ export default function RemodelBudget() {
     const changeOrderCost    = changeOrdersTotal - changeOrderMargin;
 
     // Budget
-    const directCosts        = nonPct.reduce((s, w) => s + (lineVals[w] ?? 0), 0) + designSpecsTotal + changeOrderCost;
+    const directCosts        = nonPct.reduce((s, w) => s + (lineVals[w] ?? 0), 0) + changeOrderCost;
     const profit             = (lineVals['M.2'] ?? 0) + changeOrderMargin;   // gross margin (overhead + profit)
     const contingency        = lineVals['M.3'] ?? 0;
     const salesTax           = lineVals['M.4'] ?? 0;   // materials sales tax (a cost)
@@ -1868,7 +1879,7 @@ export default function RemodelBudget() {
       actualTotalCost, totalVariance, projectedMargin, projectedMarginPct,
       changeOrderCost, changeOrderMargin,
     };
-  }, [config, lineVals, inputs.sqft, designSpecsTotal, changeOrdersTotal, actualVals, pctRates.profitPct]);
+  }, [config, lineVals, inputs.sqft, changeOrdersTotal, actualVals, pctRates.profitPct]);
 
   // ── Event handlers ──────────────────────────────────────────────────────────
   function handleLineChange(wbs, num)  {
@@ -2225,7 +2236,7 @@ export default function RemodelBudget() {
   const budgetByType = config ? config.divisions.reduce((acc, div) => {
     const b = divBreakdown(div);
     return { m: acc.m + b.m, s: acc.s + b.s, o: acc.o + b.o };
-  }, { m: designSpecsTotal, s: 0, o: 0 }) : { m: 0, s: 0, o: 0 };
+  }, { m: 0, s: 0, o: 0 }) : { m: 0, s: 0, o: 0 };
   // Subs & Materials view: subcontract amounts by trade, materials by section.
   const subsMaterials = (() => {
     if (!config) return null;
@@ -2251,8 +2262,8 @@ export default function RemodelBudget() {
     }));
     const sum = (arr) => arr.reduce((s, x) => s + (x.total ?? x.amount), 0);
     return {
-      trades, materials, fees, designSpecsTotal, changeOrderCost: totals.changeOrderCost || 0,
-      subTotal: sum(trades), materialTotal: sum(materials) + designSpecsTotal, feeTotal: sum(fees),
+      trades, materials, fees, changeOrderCost: totals.changeOrderCost || 0,
+      subTotal: sum(trades), materialTotal: sum(materials), feeTotal: sum(fees),
       directCosts: totals.directCosts,
     };
   })();
@@ -2290,6 +2301,9 @@ export default function RemodelBudget() {
     return () => clearTimeout(t);
   }, [currentProjectId, allowancesSnapshot]);
   const allowanceTotal = allowanceList.reduce((s, a) => s + a.amount, 0);
+  // Design selections compared with these allowances (the same comparison as the Selections page).
+  const allowanceRows = compareAllowances(JSON.parse(allowancesSnapshot), selections);
+  const unlinkedSelections = selections.filter((sp) => !allowanceRows.some((r) => r.key === sp.allowance_key));
 
   if (!config) return null;
 
@@ -2397,15 +2411,15 @@ export default function RemodelBudget() {
           <td>${escHtml(sp.product_name)}</td>
           <td>${escHtml(sp.supplier || '—')}</td>
           <td class="amount">${escHtml(`${sp.quantity} ${sp.unit_type}`)}</td>
-          <td class="amount">$${(Number(sp.installed_cost) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+          <td class="amount">$${specMaterialCost(sp).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
         </tr>`).join('');
       specsTableHTML = `
         <h2>Design Selections (Approved)</h2>
         <table>
-          <thead><tr><th>Product</th><th>Supplier</th><th class="amount">Qty / Unit</th><th class="amount">Installed Cost</th></tr></thead>
+          <thead><tr><th>Product</th><th>Supplier</th><th class="amount">Qty / Unit</th><th class="amount">Material Price</th></tr></thead>
           <tbody>${rows}</tbody>
-          <tfoot><tr><td colspan="3" class="amount-label">Design Selections Total</td><td class="amount">$${designSpecsTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td></tr></tfoot>
-        </table>`;
+        </table>
+        <p class="note">For reference — covered by the allowance lines above; differences are settled by change orders. Not added to the totals.</p>`;
     }
 
     let changeOrdersHTML = '';
@@ -2481,7 +2495,7 @@ export default function RemodelBudget() {
         }).join('')}</tbody>
         <tfoot><tr><td class="amount-label">Direct costs by type</td><td></td><td class="amount">${money(bdBase)}</td>${hasActuals ? '<td></td><td></td>' : ''}</tr></tfoot>
       </table>
-      <p class="note">${designSpecsTotal > 0 ? 'Approved design selections count as materials. ' : ''}${totals.changeOrderCost ? 'Approved change orders and contingency are not split.' : 'Contingency is not split.'}</p>`;
+      <p class="note">${totals.changeOrderCost ? 'Approved change orders and contingency are not split.' : 'Contingency is not split.'}</p>`;
     const allowancesHTML = allowanceList.length ? `
       <h2>Client Allowances <span class="h2-note">(shown to the client — included in the price)</span></h2>
       <table>
@@ -2602,16 +2616,17 @@ export default function RemodelBudget() {
         <td class="amount">${al.on && al.amount > 0 ? `<span class="tag">Allowance ${money(al.amount)}</span>` : ''}</td>
         <td class="amount">${money(m)}</td></tr>`).join('');
     }
-    const specCost = (sp) => (Number(sp.unit_price) || 0) * (Number(sp.quantity) || 0) || (Number(sp.installed_cost) || 0);
-    const specsTotal = approvedSpecs.reduce((t, sp) => t + specCost(sp), 0);
+    // Approved selections are the exact products to order for the allowance
+    // lines above, so they are listed but not added to the total again.
     const specsHTML = approvedSpecs.length ? `
-      <h2>Approved Design Selections</h2>
+      <h2>Selected Products to Order</h2>
       <table>
-        <thead><tr><th>Product</th><th>Supplier</th><th class="amount">Qty</th><th class="amount">Material Price</th></tr></thead>
+        <thead><tr><th>Product</th><th>Supplier</th><th>For</th><th class="amount">Qty</th><th class="amount">Material Price</th></tr></thead>
         <tbody>${approvedSpecs.map((sp) => `<tr><td>${escHtml(sp.product_name)}</td><td>${escHtml(sp.supplier || '—')}</td>
-          <td class="amount">${escHtml(`${sp.quantity} ${sp.unit_type ?? ''}`)}</td><td class="amount">${money(specCost(sp))}</td></tr>`).join('')}</tbody>
-        <tfoot><tr><td colspan="3" class="amount-label">Design Selections Total</td><td class="amount">${money(specsTotal)}</td></tr></tfoot>
-      </table>` : '';
+          <td>${escHtml(allowanceRows.find((r) => r.key === sp.allowance_key)?.label ?? 'Not in budget — change order')}</td>
+          <td class="amount">${escHtml(`${sp.quantity} ${sp.unit_type ?? ''}`)}</td><td class="amount">${money(specMaterialCost(sp))}</td></tr>`).join('')}</tbody>
+      </table>
+      <p class="note">Covered by the allowance lines above (differences go to change orders) — not added to the total.</p>` : '';
     const html = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Orozco Homes — Materials List</title>
 <style>
@@ -2648,7 +2663,7 @@ export default function RemodelBudget() {
     <tfoot><tr><td colspan="3" class="amount-label">Materials Budget Total</td><td class="amount">${money(total)}</td></tr></tfoot>
   </table>
   ${specsHTML}
-  <div class="grand"><span>Total Materials (budget${approvedSpecs.length ? ' + approved selections' : ''})</span><span>${money(total + specsTotal)}</span></div>
+  <div class="grand"><span>Total Materials (budget)</span><span>${money(total)}</span></div>
   <p class="note">Materials budget = each line's budget × its Materials %. Use for ordering and supplier quotes; compare purchases with these amounts. Internal — not for the client.</p>
   <script>window.onload=function(){window.print()}</script>
 </body></html>`;
@@ -3070,7 +3085,7 @@ ${sheets}
               </table>
             </div>
             <p className="text-xs mt-3" style={{ color: '#9CA3AF' }}>
-              Direct costs by type{designSpecsTotal > 0 ? ' (approved design selections count as materials)' : ''}.
+              Direct costs by type.
               {totals.changeOrderCost ? ` Approved change orders (${fmt(totals.changeOrderCost)} cost) and contingency are not split.` : ' Contingency is not split.'}
               {actualByType.unsplit > 0 ? ` ${fmt(actualByType.unsplit)} of actuals was entered before the split and isn't counted here.` : ''}
               {' '}Change any line's split under it.
@@ -3239,9 +3254,9 @@ ${sheets}
 
       {/* Design Selections division */}
       <div className="space-y-3 mb-3">
-        <DesignSpecsSection
-          approvedSpecs={approvedSpecs}
-          total={designSpecsTotal}
+        <SelectionsCheck
+          rows={allowanceRows}
+          unlinked={unlinkedSelections}
           isOpen={specsDivOpen}
           onToggle={() => setSpecsDivOpen((o) => !o)}
         />
