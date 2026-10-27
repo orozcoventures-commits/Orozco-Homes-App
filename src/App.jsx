@@ -17,6 +17,7 @@ import ManageClients from './pages/ManageClients';
 import PinClientPortal from './pages/PinClientPortal';
 import ContractBuilder from './pages/ContractBuilder';
 import Proposals from './pages/Proposals';
+import WelcomePackage from './pages/WelcomePackage';
 import Questionnaires from './pages/Questionnaires';
 import PublicQuestionnaire from './pages/PublicQuestionnaire';
 import PublicSubAgreement from './pages/PublicSubAgreement';
@@ -168,6 +169,7 @@ function AppContent() {
           {page === 'manage-clients'     && <ManageClients />}
           {page === 'questionnaires'     && <Questionnaires />}
           {page === 'proposals'          && <Proposals />}
+          {page === 'welcome-package'    && <WelcomePackage />}
           {page === 'contracts'          && <ContractBuilder />}
           {page === 'subcontractors'     && <Subcontractors />}
           {page === 'new-home-budget'    && <NewHomeBudget />}
@@ -177,7 +179,7 @@ function AppContent() {
           {page === 'designer-workspace' && <DesignerWorkspace />}
           {page === 'readme'             && <ReadMe />}
           {!['home','client-portal','photo-log','approvals','messages',
-              'weekly-updates','create-project','manage-clients','questionnaires','proposals','contracts','subcontractors',
+              'weekly-updates','create-project','manage-clients','questionnaires','proposals','contracts','welcome-package','subcontractors',
               'new-home-budget','remodel-budget','cost-catalog','schedule','designer-workspace','readme'].includes(page) && (
             <div className="flex flex-col items-center justify-center py-32 px-6 text-center">
               <div
