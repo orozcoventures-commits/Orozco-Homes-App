@@ -505,11 +505,6 @@ export default function Proposals() {
             <p className="text-sm mt-0.5" style={{ color: '#6B7280' }}>Prepare the proposal, preview it, then save or print to PDF for the client to sign.</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            {/* Welcome & Capabilities Package for new clients (Sales → Welcome Package). */}
-            <button onClick={() => dispatch({ type: 'SET_PAGE', page: 'welcome-package' })} className="px-4 py-2 rounded-xl text-xs font-bold"
-              style={{ border: `1.5px solid ${GOLD}`, backgroundColor: '#fff', color: NAVY }}>
-              Welcome Package
-            </button>
             <button onClick={handleNew} className="px-4 py-2 rounded-xl text-xs font-bold"
               style={{ border: `1.5px solid ${BORDER}`, backgroundColor: '#fff', color: '#6B7280' }}>
               New Proposal
