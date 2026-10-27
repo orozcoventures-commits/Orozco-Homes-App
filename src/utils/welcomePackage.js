@@ -230,7 +230,11 @@ export function normalizeWelcomePackage(raw) {
   };
 }
 
-// ── Printable HTML (preview and Print / Save as PDF) ─────────────────────────
+// Client link: /welcome (no login) shows the last saved version (migration 062).
+export const welcomeRoute = (pathname) => /^\/welcome\/?$/i.test(pathname);
+export const welcomeUrl = () => `${window.location.origin}/welcome`;
+
+// ── Printable HTML (preview, client link and Print / Save as PDF) ────────────
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const inline = (t) => esc(t).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
 
@@ -268,7 +272,7 @@ export function welcomePackageHtml(content, { logoUrl = '/orozco-homes-logo.png'
     return `<section class="${s.newPage ? 'newpage' : ''}">${s.kind === 'contact' ? '' : head}${inner}</section>`;
   }).join('');
 
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Orozco Homes — ${esc(c.cover.eyebrow || 'Welcome Package')}</title>
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Orozco Homes — ${esc(c.cover.eyebrow || 'Welcome Package')}</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
   html,body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -315,6 +319,14 @@ export function welcomePackageHtml(content, { logoUrl = '/orozco-homes-logo.png'
   .contact p{margin:0 0 2px}.contact .ct{font-weight:700;font-size:14pt;margin-bottom:6px}
   .contact .cn{color:#D4AF37;font-weight:700}.contact .cl{color:#C9D3E0;font-size:9pt}
   .foot{margin-top:24px;padding-top:8px;border-top:1px solid #E8E6E1;font-size:8pt;color:#6B7280;text-align:center}
+  @media screen and (max-width:640px){
+    .sheet{padding:24px 16px}
+    .cover{min-height:auto;padding:48px 16px 40px;gap:28px}
+    .cover h1{font-size:22pt}
+    h1{font-size:18pt}
+    .cards{grid-template-columns:1fr}
+    td.name{width:auto}
+  }
   @page{size:letter;margin:.6in .7in}
   @page:first{margin:0}
   @media print{

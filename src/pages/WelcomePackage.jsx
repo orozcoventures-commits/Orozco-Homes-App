@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import {
-  ITEM_KINDS, MAX_TEXT, SECTION_KINDS, defaultWelcomePackage, newSection, normalizeWelcomePackage, welcomePackageHtml,
+  ITEM_KINDS, MAX_TEXT, SECTION_KINDS, defaultWelcomePackage, newSection, normalizeWelcomePackage, welcomePackageHtml, welcomeUrl,
 } from '../utils/welcomePackage';
 import { SECTION_MARKUP_HELP } from '../utils/proposalTemplate';
 
@@ -110,6 +110,56 @@ function SectionEditor({ section, index, count, set, move, remove }) {
   );
 }
 
+// "Send to client": the /welcome link, to copy or email (pick a client or type an address).
+function SendPanel({ dirty, contactName, onClose }) {
+  const [clients, setClients] = useState(null);
+  const [to, setTo] = useState('');
+  const [copied, setCopied] = useState('');
+  useEffect(() => {
+    supabase.from('clients').select('id, full_name, email').order('full_name')
+      .then(({ data }) => setClients((data ?? []).filter((c) => c.email)));
+  }, []);
+  const url = welcomeUrl();
+  const client = clients?.find((c) => c.email === to);
+  const first = client?.full_name?.split(/\s+/)[0];
+  const body = `${first ? `Hi ${first},` : 'Hello,'}\n\nThank you for considering Orozco Homes for your project. Here is our Welcome & Capabilities Package — what we stand for, how we work and what to expect:\n${url}\n\nWe look forward to working with you.\n\n${contactName}\nOrozco Homes`;
+  const mailto = `mailto:${encodeURIComponent(to.trim())}?subject=${encodeURIComponent('Welcome to Orozco Homes')}&body=${encodeURIComponent(body)}`;
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(url); setCopied('Link copied.'); } catch { setCopied('Could not copy — select the link and copy it.'); }
+  };
+  return (
+    <div className="rounded-2xl p-4 mb-4 space-y-3" style={{ ...card, borderColor: GOLD }} data-testid="wp-send">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-bold" style={{ color: NAVY }}>Send to a client</p>
+        <button type="button" onClick={onClose} className="text-xs underline" style={{ color: '#6B7280' }}>Close</button>
+      </div>
+      {dirty && (
+        <p className="text-xs font-semibold" style={{ color: '#92400E' }}>You have unsaved changes — click Save first. The link shows your last saved version.</p>
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        <input readOnly value={url} onFocus={(e) => e.target.select()} aria-label="Welcome Package link"
+          className="flex-1 min-w-[220px] text-sm px-2.5 py-1.5 rounded-lg" style={{ ...box, color: '#6B7280' }} />
+        <button type="button" onClick={copy} className="px-3 py-1.5 rounded-lg text-xs font-bold" style={{ backgroundColor: NAVY, color: GOLD }}>Copy link</button>
+        <a href={url} target="_blank" rel="noreferrer" className="px-3 py-1.5 rounded-lg text-xs font-bold" style={{ border: '1.5px solid #E8E6E1', color: '#4B5563', backgroundColor: '#fff' }}>Open as client</a>
+      </div>
+      {copied && <p role="status" className="text-xs font-semibold" style={{ color: '#059669' }}>{copied}</p>}
+      <div className="flex flex-wrap items-center gap-2">
+        <select value={client ? to : ''} onChange={(e) => setTo(e.target.value)} aria-label="Pick a client"
+          className="text-sm px-2 py-1.5 rounded-lg max-w-[260px]" style={box}>
+          <option value="">{clients ? 'Pick a client…' : 'Loading clients…'}</option>
+          {(clients ?? []).map((c) => <option key={c.id} value={c.email}>{c.full_name || c.email}</option>)}
+        </select>
+        <input value={to} onChange={(e) => setTo(e.target.value.slice(0, 200))} placeholder="or type an email" aria-label="Client email"
+          className="flex-1 min-w-[200px] text-sm px-2.5 py-1.5 rounded-lg" style={box} />
+        <a href={mailto} className="px-3 py-1.5 rounded-lg text-xs font-bold" style={{ backgroundColor: '#059669', color: '#fff' }}>Email…</a>
+      </div>
+      <p className="text-[11px]" style={{ color: '#9CA3AF' }}>
+        “Email…” opens your email app with a ready message and the link. Anyone with the link can view the package; it shows your latest saved version.
+      </p>
+    </div>
+  );
+}
+
 export default function WelcomePackage() {
   const [saved, setSaved] = useState(null);        // last saved content (null = loading)
   const [draft, setDraft] = useState(null);
@@ -118,6 +168,7 @@ export default function WelcomePackage() {
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState('edit');
   const [updatedAt, setUpdatedAt] = useState(null);
+  const [sending, setSending] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -171,10 +222,16 @@ export default function WelcomePackage() {
             {updatedAt ? `Last saved ${new Date(updatedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}` : 'Showing the original version (not saved yet).'}
           </p>
         </div>
-        <button type="button" onClick={printPdf} className="px-4 py-2 rounded-xl text-xs font-bold" style={{ backgroundColor: GOLD, color: NAVY }}>
-          Print / Save as PDF
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => setSending((o) => !o)} className="px-4 py-2 rounded-xl text-xs font-bold" style={{ backgroundColor: '#059669', color: '#fff' }}>
+            Send to client
+          </button>
+          <button type="button" onClick={printPdf} className="px-4 py-2 rounded-xl text-xs font-bold" style={{ backgroundColor: GOLD, color: NAVY }}>
+            Print / Save as PDF
+          </button>
+        </div>
       </div>
+      {sending && <SendPanel dirty={dirty} contactName={saved.contact.name} onClose={() => setSending(false)} />}
       {missing && (
         <p role="alert" className="mb-4 text-sm font-semibold" style={{ color: '#DC2626' }}>
           Saving is not set up yet — run migration 061 in Supabase first. You can still edit, preview and print.

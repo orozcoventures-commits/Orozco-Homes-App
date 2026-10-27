@@ -18,11 +18,13 @@ import PinClientPortal from './pages/PinClientPortal';
 import ContractBuilder from './pages/ContractBuilder';
 import Proposals from './pages/Proposals';
 import WelcomePackage from './pages/WelcomePackage';
+import PublicWelcomePackage from './pages/PublicWelcomePackage';
 import Questionnaires from './pages/Questionnaires';
 import PublicQuestionnaire from './pages/PublicQuestionnaire';
 import PublicSubAgreement from './pages/PublicSubAgreement';
 import { questionnaireRoute } from './utils/questionnaireTemplate';
 import { subAgreementRoute } from './utils/subAgreement';
+import { welcomeRoute } from './utils/welcomePackage';
 import Subcontractors from './pages/Subcontractors';
 import NewHomeBudget from './pages/NewHomeBudget';
 import RemodelBudget from './pages/RemodelBudget';
@@ -220,6 +222,8 @@ export default function App() {
   // Subcontract Agreement links (subcontractors sign without logging in).
   const sRoute = subAgreementRoute(window.location.pathname);
   if (sRoute) return <ErrorBoundary><PublicSubAgreement route={sRoute} /></ErrorBoundary>;
+  // Welcome Package link for clients (no login).
+  if (welcomeRoute(window.location.pathname)) return <ErrorBoundary><PublicWelcomePackage /></ErrorBoundary>;
 
   return (
     <ErrorBoundary>
