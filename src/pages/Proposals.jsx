@@ -505,6 +505,12 @@ export default function Proposals() {
             <p className="text-sm mt-0.5" style={{ color: '#6B7280' }}>Prepare the proposal, preview it, then save or print to PDF for the client to sign.</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
+            {/* Welcome & Capabilities Package for new clients (built by tools/welcome-package). */}
+            <a href="/orozco-homes-welcome-package.pdf" download="Orozco Homes - Welcome Package.pdf"
+              className="px-4 py-2 rounded-xl text-xs font-bold"
+              style={{ border: `1.5px solid ${GOLD}`, backgroundColor: '#fff', color: NAVY }}>
+              Welcome Package (PDF)
+            </a>
             <button onClick={handleNew} className="px-4 py-2 rounded-xl text-xs font-bold"
               style={{ border: `1.5px solid ${BORDER}`, backgroundColor: '#fff', color: '#6B7280' }}>
               New Proposal
