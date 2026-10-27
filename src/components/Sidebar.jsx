@@ -11,7 +11,7 @@ const SIDEBAR_COLOR = '#1B4F6B';
 // "+ New Project") stay reachable but are not in the menu.
 const NAV_SECTIONS = [
   { title: 'Home',          items: [['home', 'Dashboard']] },
-  { title: 'Sales',         items: [['manage-clients', 'Clients'], ['questionnaires', 'Questionnaires'], ['proposals', 'Proposals'], ['contracts', 'Contracts']] },
+  { title: 'Sales',         items: [['manage-clients', 'Clients'], ['questionnaires', 'Questionnaires'], ['proposals', 'Proposals'], ['contracts', 'Contracts'], ['welcome-package', 'Welcome Package']] },
   { title: 'Estimating',    items: [['remodel-budget', 'Remodel Estimates'], ['new-home-budget', 'New Home Estimates'], ['cost-catalog', 'Cost Catalog']] },
   { title: 'Projects',      items: [['schedule', 'Schedule'], ['subcontractors', 'Subcontractors'], ['weekly-updates', 'Progress Updates'], ['photo-log', 'Photos'], ['designer-workspace', 'Selections'], ['approvals', 'Change Orders']] },
   { title: 'Communication', items: [['messages', 'Messages'], ['client-portal', 'Client Portal']] },
@@ -105,6 +105,17 @@ const CONTRACTOR_TOOLS = [
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
         <polyline points="14 2 14 8 20 8" />
         <line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" />
+      </svg>
+    ),
+  },
+  {
+    label: 'Welcome Package',
+    page: 'welcome-package',
+    adminOnly: true,
+    badge: null,
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 4h16v16H4z" /><path d="M4 9h16" /><path d="M9 13h6" /><path d="M9 16h4" />
       </svg>
     ),
   },
