@@ -577,6 +577,15 @@
 
         <div class="space-y-6 min-w-0">
           <section class="bg-white rounded-xl shadow-sm p-5">
+            <h2 class="text-lg font-semibold mb-1">Add a property</h2>
+            <p class="text-xs text-slate-500 mb-3">Track an investment before you have any news on it.</p>
+            <div class="flex gap-2">
+              <input id="invNewProp" type="text" maxlength="80" placeholder="e.g. Downtown Apartments Fund" aria-label="Property name" class="min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <button id="invNewPropBtn" type="button" class="rounded-md border border-slate-300 hover:bg-slate-50 px-3 py-2 text-sm font-medium">Add</button>
+            </div>
+            <p id="invNewPropMsg" class="text-sm text-red-600 min-h-[1.25rem] mt-1" aria-live="polite"></p>
+          </section>
+          <section class="bg-white rounded-xl shadow-sm p-5">
             <h2 id="invFormTitle" class="text-lg font-semibold mb-3">Add an update</h2>
             <div id="invForm" class="space-y-3">
               <div>
@@ -916,6 +925,7 @@
           projects: [],
           activeProject: null,
           investments: [],
+          invProps: [],
         };
       }
 
@@ -951,6 +961,7 @@
             projects: Array.isArray(data.projects) ? data.projects : [],
             activeProject: typeof data.activeProject === 'string' ? data.activeProject : null,
             investments: Array.isArray(data.investments) ? data.investments : [],
+            invProps: Array.isArray(data.invProps) ? data.invProps.filter((x) => typeof x === 'string') : [],
           };
         } catch (e) {
           return freshState();
@@ -2009,10 +2020,13 @@
       };
       let invEditingId = null;
       const invList = () => state.investments || (state.investments = []);
-      // Real Estate items from Net Worth, then any property named only in updates
+      const invProps = () => state.invProps || (state.invProps = []);
+      // Real Estate items from Net Worth, then properties added here, then any named only in updates
       function invProperties() {
         const names = nw().items.filter((it) => it.category === 'Real Estate').map((it) => it.name);
-        invList().forEach((u) => { if (u.property && !names.some((n) => n.toLowerCase() === u.property.toLowerCase())) names.push(u.property); });
+        [...invProps(), ...invList().map((u) => u.property)].forEach((n) => {
+          if (n && !names.some((x) => x.toLowerCase() === n.toLowerCase())) names.push(n);
+        });
         return names;
       }
       const invSorted = (list) => [...list].sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.createdAt || 0) - (a.createdAt || 0));
@@ -2037,8 +2051,10 @@
           const last = ups[0];
           const stale = last && daysSince(last.date) > 90;
           const open = ups.filter((u) => u.follow && !u.done).length;
-          return `<button type="button" data-inv-pick="${escapeHtml(p)}" class="text-left bg-white rounded-xl shadow-sm p-5 hover:ring-2 hover:ring-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-              <p class="font-semibold truncate">${escapeHtml(p)}</p>
+          // A property added here (not from Net Worth) with no updates yet can be removed
+          const removable = !nwItem && !ups.length;
+          return `<div class="relative"><button type="button" data-inv-pick="${escapeHtml(p)}" class="w-full h-full text-left bg-white rounded-xl shadow-sm p-5 hover:ring-2 hover:ring-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <p class="font-semibold truncate ${removable ? 'pr-6' : ''}">${escapeHtml(p)}</p>
               <p class="text-xs text-slate-500 mt-0.5">${last ? `Last update ${escapeHtml(longDate(last.date))}${stale ? ' <span class="text-amber-700">· over 90 days ago</span>' : ''}` : 'No updates yet'}</p>
               <dl class="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
                 <dt class="text-slate-500">Value</dt><dd class="text-right tabular-nums">${val ? fmt0.format(val.amount) : nwItem ? fmt0.format(nwItem.value) : '—'}</dd>
@@ -2046,7 +2062,7 @@
                 <dt class="text-slate-500">Paid in</dt><dd class="text-right tabular-nums">${fmt0.format(sum('paid'))}</dd>
               </dl>
               ${open ? `<p class="mt-2 text-xs text-amber-800">⚑ ${open} follow-up${open === 1 ? '' : 's'} open</p>` : ''}
-            </button>`;
+            </button>${removable ? `<button type="button" data-inv-prop-del="${escapeHtml(p)}" class="absolute top-3 right-3 text-slate-400 hover:text-red-600 px-1 text-lg leading-none" aria-label="Remove ${escapeHtml(p)}">&times;</button>` : ''}</div>`;
         }).join('') || '<p class="text-sm text-slate-500 sm:col-span-3">No properties yet. Add Real Estate items in Net Worth, or type a property name in the form to add your first update.</p>';
 
         // Open follow-ups, soonest first; overdue ones are flagged
@@ -2109,7 +2125,21 @@
       $('invForm').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.tagName === 'INPUT') { e.preventDefault(); $('invSaveBtn').click(); } });
       $('invFilter').addEventListener('change', renderInvestments);
       $('invSearch').addEventListener('input', renderInvestments);
+      $('invNewPropBtn').addEventListener('click', () => {
+        const name = $('invNewProp').value.trim();
+        if (!name) { $('invNewPropMsg').textContent = 'Type the property name.'; $('invNewProp').focus(); return; }
+        if (invProperties().some((p) => p.toLowerCase() === name.toLowerCase())) { $('invNewPropMsg').textContent = `${name} is already on the list.`; return; }
+        invProps().push(name);
+        $('invNewProp').value = ''; $('invNewPropMsg').textContent = '';
+        save(); renderInvestments(); toast(`Added ${name}`);
+      });
+      $('invNewProp').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $('invNewPropBtn').click(); } });
       $('invCards').addEventListener('click', (e) => {
+        const del = e.target.closest('[data-inv-prop-del]');
+        if (del) {
+          state.invProps = invProps().filter((n) => n !== del.dataset.invPropDel);
+          save(); renderInvestments(); return;
+        }
         const b = e.target.closest('[data-inv-pick]'); if (!b) return;
         $('invFilter').value = b.dataset.invPick;
         if (!invEditingId) $('invProperty').value = b.dataset.invPick;
