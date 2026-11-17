@@ -79,6 +79,7 @@
         <button type="button" role="tab" data-tab="loans" class="tab-btn">Loans</button>
         <button type="button" role="tab" data-tab="projects" class="tab-btn">Home Improvement</button>
         <button type="button" role="tab" data-tab="networth" class="tab-btn">Net Worth</button>
+        <button type="button" role="tab" data-tab="investments" class="tab-btn">Investment Updates</button>
         <button type="button" role="tab" data-tab="retirement" class="tab-btn">Retirement</button>
       </nav>
       <nav id="budgetSubnav" class="flex flex-wrap gap-2" aria-label="Budget sections">
@@ -551,6 +552,73 @@
       </div>
     </div>
 
+    <!-- INVESTMENT UPDATES -->
+    <div data-tabpanel="investments" hidden class="space-y-6">
+      <section id="invCards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></section>
+
+      <div class="grid lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-2 space-y-6 min-w-0">
+          <section id="invFollowWrap" class="bg-amber-50 border border-amber-200 rounded-xl p-5" hidden>
+            <h2 class="text-lg font-semibold">Follow-ups</h2>
+            <p class="text-xs text-slate-600 mb-2">Updates you marked to follow up on. Check one off when it's handled.</p>
+            <ul id="invFollow" class="space-y-2"></ul>
+          </section>
+          <section class="bg-white rounded-xl shadow-sm p-5">
+            <div class="flex flex-wrap items-end justify-between gap-3 mb-3">
+              <h2 class="text-lg font-semibold">Updates</h2>
+              <div class="flex flex-wrap gap-2">
+                <select id="invFilter" aria-label="Show updates for" class="rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"></select>
+                <input id="invSearch" type="search" placeholder="Search notes" aria-label="Search notes" class="w-40 rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              </div>
+            </div>
+            <ol id="invList" class="space-y-3"></ol>
+          </section>
+        </div>
+
+        <div class="space-y-6 min-w-0">
+          <section class="bg-white rounded-xl shadow-sm p-5">
+            <h2 id="invFormTitle" class="text-lg font-semibold mb-3">Add an update</h2>
+            <div id="invForm" class="space-y-3">
+              <div>
+                <label for="invProperty" class="block text-sm font-medium text-slate-600 mb-1">Property</label>
+                <input id="invProperty" type="text" maxlength="80" list="invPropertyList" placeholder="Pick or type a property" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                <datalist id="invPropertyList"></datalist>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label for="invDate" class="block text-sm font-medium text-slate-600 mb-1">Date</label>
+                  <input id="invDate" type="date" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                </div>
+                <div>
+                  <label for="invType" class="block text-sm font-medium text-slate-600 mb-1">Type</label>
+                  <select id="invType" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"></select>
+                </div>
+              </div>
+              <div>
+                <label for="invAmount" class="block text-sm font-medium text-slate-600 mb-1">Amount ($, optional)</label>
+                <input id="invAmount" type="text" inputmode="decimal" placeholder="e.g. 2,500" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              </div>
+              <div>
+                <label for="invNote" class="block text-sm font-medium text-slate-600 mb-1">What happened</label>
+                <textarea id="invNote" rows="4" maxlength="2000" placeholder="e.g. Quarterly report received. Occupancy at 94%, distribution paid." class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+              </div>
+              <div>
+                <label for="invFollowDate" class="block text-sm font-medium text-slate-600 mb-1">Follow up by (optional)</label>
+                <input id="invFollowDate" type="date" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              </div>
+              <div class="flex gap-2">
+                <button id="invSaveBtn" type="button" class="flex-1 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white py-2 font-medium">Add update</button>
+                <button id="invCancelBtn" type="button" hidden class="rounded-md border border-slate-300 hover:bg-slate-50 px-3 py-2 text-sm">Cancel</button>
+              </div>
+              <p id="invMsg" class="text-sm text-red-600 min-h-[1.25rem]" aria-live="polite"></p>
+            </div>
+          </section>
+          <p class="text-xs text-slate-500 px-1">Your Real Estate items from Net Worth show up as properties automatically. You can also type a new one.
+            For your safety, don't enter account numbers or passwords.</p>
+        </div>
+      </div>
+    </div>
+
     <!-- RETIREMENT -->
     <div data-tabpanel="retirement" hidden class="grid lg:grid-cols-3 gap-6">
       <div class="space-y-6 min-w-0">
@@ -847,6 +915,7 @@
           retirement: {},
           projects: [],
           activeProject: null,
+          investments: [],
         };
       }
 
@@ -881,6 +950,7 @@
             retirement: isObj(data.retirement) ? data.retirement : {},
             projects: Array.isArray(data.projects) ? data.projects : [],
             activeProject: typeof data.activeProject === 'string' ? data.activeProject : null,
+            investments: Array.isArray(data.investments) ? data.investments : [],
           };
         } catch (e) {
           return freshState();
@@ -1922,6 +1992,151 @@
         const pr = activeProject(); pr.changeOrders = pr.changeOrders.filter((c) => c.id !== btn.dataset.coDel); save(); renderProjects();
       });
 
+      // ---------- Investment updates ----------
+      // A dated log per property: notes, money in or out, valuations and follow-ups.
+      const INV_TYPES = [
+        { id: 'update', label: 'General update' },
+        { id: 'received', label: 'Money received', sign: 1 },
+        { id: 'paid', label: 'Money paid in', sign: -1 },
+        { id: 'valuation', label: 'New valuation' },
+        { id: 'milestone', label: 'Milestone' },
+        { id: 'issue', label: 'Issue / concern' },
+      ];
+      const invType = (id) => INV_TYPES.find((t) => t.id === id) || INV_TYPES[0];
+      const INV_BADGE = {
+        update: 'bg-slate-100 text-slate-700', received: 'bg-emerald-100 text-emerald-800', paid: 'bg-sky-100 text-sky-800',
+        valuation: 'bg-indigo-100 text-indigo-800', milestone: 'bg-violet-100 text-violet-800', issue: 'bg-amber-100 text-amber-800',
+      };
+      let invEditingId = null;
+      const invList = () => state.investments || (state.investments = []);
+      // Real Estate items from Net Worth, then any property named only in updates
+      function invProperties() {
+        const names = nw().items.filter((it) => it.category === 'Real Estate').map((it) => it.name);
+        invList().forEach((u) => { if (u.property && !names.some((n) => n.toLowerCase() === u.property.toLowerCase())) names.push(u.property); });
+        return names;
+      }
+      const invSorted = (list) => [...list].sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.createdAt || 0) - (a.createdAt || 0));
+
+      function renderInvestments() {
+        const props = invProperties();
+        const all = invList();
+        $('invPropertyList').innerHTML = props.map((p) => `<option value="${escapeHtml(p)}"></option>`).join('');
+        if (!$('invType').options.length) $('invType').innerHTML = INV_TYPES.map((t) => `<option value="${t.id}">${t.label}</option>`).join('');
+        if (!$('invDate').value) $('invDate').value = today();
+        const cur = $('invFilter').value;
+        $('invFilter').innerHTML = `<option value="">All properties (${all.length})</option>`
+          + props.map((p) => { const n = all.filter((u) => u.property === p).length; return `<option value="${escapeHtml(p)}">${escapeHtml(p)} (${n})</option>`; }).join('');
+        $('invFilter').value = props.includes(cur) ? cur : '';
+
+        // One card per property: latest update, money in and out, last valuation
+        $('invCards').innerHTML = props.map((p) => {
+          const ups = invSorted(all.filter((u) => u.property === p));
+          const sum = (type) => ups.filter((u) => u.type === type).reduce((a, u) => a + (Number(u.amount) || 0), 0);
+          const val = ups.find((u) => u.type === 'valuation' && u.amount);
+          const nwItem = nw().items.find((it) => it.name === p);
+          const last = ups[0];
+          const stale = last && daysSince(last.date) > 90;
+          const open = ups.filter((u) => u.follow && !u.done).length;
+          return `<button type="button" data-inv-pick="${escapeHtml(p)}" class="text-left bg-white rounded-xl shadow-sm p-5 hover:ring-2 hover:ring-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <p class="font-semibold truncate">${escapeHtml(p)}</p>
+              <p class="text-xs text-slate-500 mt-0.5">${last ? `Last update ${escapeHtml(longDate(last.date))}${stale ? ' <span class="text-amber-700">· over 90 days ago</span>' : ''}` : 'No updates yet'}</p>
+              <dl class="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
+                <dt class="text-slate-500">Value</dt><dd class="text-right tabular-nums">${val ? fmt0.format(val.amount) : nwItem ? fmt0.format(nwItem.value) : '—'}</dd>
+                <dt class="text-slate-500">Received</dt><dd class="text-right tabular-nums text-emerald-700">${fmt0.format(sum('received'))}</dd>
+                <dt class="text-slate-500">Paid in</dt><dd class="text-right tabular-nums">${fmt0.format(sum('paid'))}</dd>
+              </dl>
+              ${open ? `<p class="mt-2 text-xs text-amber-800">⚑ ${open} follow-up${open === 1 ? '' : 's'} open</p>` : ''}
+            </button>`;
+        }).join('') || '<p class="text-sm text-slate-500 sm:col-span-3">No properties yet. Add Real Estate items in Net Worth, or type a property name in the form to add your first update.</p>';
+
+        // Open follow-ups, soonest first; overdue ones are flagged
+        const follows = all.filter((u) => u.follow && !u.done).sort((a, b) => a.follow.localeCompare(b.follow));
+        $('invFollowWrap').hidden = !follows.length;
+        $('invFollow').innerHTML = follows.map((u) => {
+          const late = u.follow < today();
+          return `<li class="flex items-start gap-2 text-sm">
+              <input type="checkbox" data-inv-done="${u.id}" aria-label="Mark handled" class="mt-1 h-4 w-4 rounded border-slate-300" />
+              <span class="min-w-0"><span class="font-medium">${escapeHtml(u.property)}</span>: ${escapeHtml((u.note || invType(u.type).label).slice(0, 140))}
+              <span class="block text-xs ${late ? 'text-red-700 font-semibold' : 'text-slate-500'}">${late ? '▲ Overdue · ' : ''}by ${escapeHtml(longDate(u.follow))}</span></span></li>`;
+        }).join('');
+
+        // The log
+        const filter = $('invFilter').value, q = $('invSearch').value.trim().toLowerCase();
+        const shown = invSorted(all).filter((u) => (!filter || u.property === filter)
+          && (!q || `${u.property} ${u.note} ${invType(u.type).label}`.toLowerCase().includes(q)));
+        $('invList').innerHTML = shown.map((u) => {
+          const t = invType(u.type);
+          const amt = u.amount ? `<span class="tabular-nums font-semibold ${t.sign > 0 ? 'text-emerald-700' : ''}">${t.sign > 0 ? '+' : t.sign < 0 ? '−' : ''}${fmt.format(u.amount)}</span>` : '';
+          return `<li class="border border-slate-200 rounded-lg p-3 ${u.id === invEditingId ? 'ring-2 ring-indigo-400' : ''}">
+              <div class="flex flex-wrap items-center gap-2 text-sm">
+                <span class="text-slate-500 whitespace-nowrap">${u.date ? escapeHtml(longDate(u.date)) : '—'}</span>
+                <span class="font-semibold">${escapeHtml(u.property)}</span>
+                <span class="rounded-full px-2 py-0.5 text-xs ${INV_BADGE[t.id]}">${t.label}</span>
+                ${amt}
+                <span class="ml-auto flex gap-1">
+                  <button type="button" data-inv-edit="${u.id}" class="text-xs text-indigo-700 hover:underline px-1">Edit</button>
+                  <button type="button" data-inv-del="${u.id}" class="text-slate-400 hover:text-red-600 px-1 text-lg leading-none" aria-label="Delete update">&times;</button>
+                </span>
+              </div>
+              ${u.note ? `<p class="mt-1 text-sm text-slate-700 whitespace-pre-line">${escapeHtml(u.note)}</p>` : ''}
+              ${u.follow ? `<p class="mt-1 text-xs ${u.done ? 'text-slate-400 line-through' : 'text-amber-800'}">⚑ Follow up by ${escapeHtml(longDate(u.follow))}${u.done ? ' (done)' : ''}</p>` : ''}
+            </li>`;
+        }).join('') || `<li class="text-sm text-slate-400 text-center py-6">${all.length ? 'No updates match.' : 'No updates yet. Add your first one on the right.'}</li>`;
+      }
+
+      function invResetForm() {
+        invEditingId = null;
+        ['invAmount', 'invNote', 'invFollowDate'].forEach((x) => { $(x).value = ''; });
+        $('invDate').value = today(); $('invType').value = 'update';
+        $('invFormTitle').textContent = 'Add an update'; $('invSaveBtn').textContent = 'Add update';
+        $('invCancelBtn').hidden = true; $('invMsg').textContent = '';
+      }
+      $('invSaveBtn').addEventListener('click', () => {
+        const property = $('invProperty').value.trim(), note = $('invNote').value.trim();
+        const amount = nwAmount($('invAmount').value);
+        if (!property) { $('invMsg').textContent = 'Pick or type the property.'; $('invProperty').focus(); return; }
+        if (!note && !(amount > 0)) { $('invMsg').textContent = 'Write what happened or enter an amount.'; $('invNote').focus(); return; }
+        // Reuse the existing spelling of a property name
+        const known = invProperties().find((p) => p.toLowerCase() === property.toLowerCase()) || property;
+        const fields = { property: known, date: $('invDate').value || today(), type: $('invType').value, amount: amount > 0 ? amount : 0, note, follow: $('invFollowDate').value };
+        const old = invEditingId && invList().find((u) => u.id === invEditingId);
+        if (old) { if (old.follow !== fields.follow) old.done = false; Object.assign(old, fields); }
+        else invList().push({ id: uid(), createdAt: Date.now(), done: false, ...fields });
+        save(); toast(old ? 'Update saved' : `Added an update for ${known}`);
+        invResetForm(); renderInvestments();
+      });
+      $('invCancelBtn').addEventListener('click', () => { invResetForm(); renderInvestments(); });
+      $('invForm').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.tagName === 'INPUT') { e.preventDefault(); $('invSaveBtn').click(); } });
+      $('invFilter').addEventListener('change', renderInvestments);
+      $('invSearch').addEventListener('input', renderInvestments);
+      $('invCards').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-inv-pick]'); if (!b) return;
+        $('invFilter').value = b.dataset.invPick;
+        if (!invEditingId) $('invProperty').value = b.dataset.invPick;
+        renderInvestments();
+      });
+      $('invFollow').addEventListener('change', (e) => {
+        const u = invList().find((x) => x.id === e.target.dataset.invDone); if (!u) return;
+        u.done = true; save(); renderInvestments(); toast('Marked as handled');
+      });
+      $('invList').addEventListener('click', async (e) => {
+        const ed = e.target.closest('[data-inv-edit]'), del = e.target.closest('[data-inv-del]');
+        if (ed) {
+          const u = invList().find((x) => x.id === ed.dataset.invEdit); if (!u) return;
+          invEditingId = u.id;
+          $('invProperty').value = u.property; $('invDate').value = u.date || ''; $('invType').value = invType(u.type).id;
+          $('invAmount').value = u.amount ? u.amount : ''; $('invNote').value = u.note || ''; $('invFollowDate').value = u.follow || '';
+          $('invFormTitle').textContent = 'Edit update'; $('invSaveBtn').textContent = 'Save changes'; $('invCancelBtn').hidden = false;
+          renderInvestments(); $('invNote').focus();
+        } else if (del) {
+          const u = invList().find((x) => x.id === del.dataset.invDel);
+          if (!u || !(await askConfirm(`Delete this update for ${u.property}?`, 'Delete'))) return;
+          state.investments = invList().filter((x) => x !== u);
+          if (invEditingId === u.id) invResetForm();
+          save(); renderInvestments();
+        }
+      });
+
       // ---------- Retirement planner ----------
       const RET_FIELDS = ['Age', 'RetireAge', 'PlanTo', 'Savings', 'Contrib', 'Spend', 'SsMonthly', 'SsAge', 'Other', 'ReturnPre', 'ReturnPost', 'Inflation', 'Tax'];
       const RET_DEFAULTS = { retireage: 65, planto: 95, contrib: 0, ssmonthly: 0, ssage: 67, other: 0, returnpre: 7, returnpost: 5, inflation: 3, tax: 15 };
@@ -2565,6 +2780,7 @@
         renderLoan();
         renderNetWorth();
         renderProjects();
+        renderInvestments();
         if (!$('retChartBox').closest('[data-tabpanel]').hidden) renderRetirement();
         $('incomeInput').value = effectiveIncome() || '';
         $('setupMonthLabel').textContent = monthName(selectedMonth);
@@ -2828,7 +3044,7 @@
       let lastBudgetTab = 'overview';
       function showTab(name) {
         if (name === 'budget') name = lastBudgetTab;
-        if (![...BUDGET_TABS, 'networth', 'loans', 'projects', 'retirement'].includes(name)) name = 'overview';
+        if (![...BUDGET_TABS, 'networth', 'investments', 'loans', 'projects', 'retirement'].includes(name)) name = 'overview';
         const inBudget = BUDGET_TABS.includes(name);
         if (inBudget) lastBudgetTab = name;
         document.querySelectorAll('[data-tabpanel]').forEach((el) => { el.hidden = el.dataset.tabpanel !== name; });
@@ -2840,6 +3056,7 @@
         if (name === 'retirement' && typeof renderRetirement === 'function') renderRetirement();
         if (name === 'overview' && typeof renderTrend === 'function') renderTrend();
         if (name === 'networth' && typeof renderNwHistory === 'function') renderNwHistory();
+        if (name === 'investments' && typeof renderInvestments === 'function') renderInvestments();
       }
       document.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
 
